@@ -30,9 +30,12 @@ function hashPassword(password) {
 
 // ── REST API ────────────────────────────────
 
-// Реєстрація
-app.post('/register', (req, res) => {
-  const { nick, password, email } = req.body;
+// Тимчасове сховище для очікуючих реєстрацій
+const pendingRegistrations = new Map(); // email -> {nick, passwordHash, color, code, expires}
+
+// Крок 1 — надіслати код підтвердження
+app.post('/register', async (req, res) => {
+  const { nick, password, email, color } = req.body;
   if (!nick || nick.trim().length < 2)
     return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
   if (!password || password.length < 4)
@@ -41,13 +44,50 @@ app.post('/register', (req, res) => {
     return res.json({ ok: false, error: 'Невірний email' });
   if (users.has(nick.toLowerCase()))
     return res.json({ ok: false, error: 'Нік вже зайнятий' });
+  const emailExists = [...users.values()].find(u => u.email === email);
+  if (emailExists)
+    return res.json({ ok: false, error: 'Цей email вже використовується' });
 
-  users.set(nick.toLowerCase(), {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  pendingRegistrations.set(email, {
     nick,
     passwordHash: hashPassword(password),
-    email,
-    color: req.body.color || 4280391411,
+    color: color || 4280391411,
+    code,
+    expires: Date.now() + 15 * 60 * 1000,
   });
+
+  try {
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: email,
+      subject: 'EI° — Підтвердження реєстрації',
+      text: `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`,
+    });
+    res.json({ ok: true, needVerification: true });
+  } catch (e) {
+    res.json({ ok: false, error: 'Помилка відправки email' });
+  }
+});
+
+// Крок 2 — підтвердити email і створити акаунт
+app.post('/verify-email', (req, res) => {
+  const { email, code } = req.body;
+  const pending = pendingRegistrations.get(email);
+  if (!pending)
+    return res.json({ ok: false, error: 'Реєстрацію не знайдено' });
+  if (Date.now() > pending.expires)
+    return res.json({ ok: false, error: 'Код застарів' });
+  if (pending.code !== code)
+    return res.json({ ok: false, error: 'Невірний код' });
+
+  users.set(pending.nick.toLowerCase(), {
+    nick: pending.nick,
+    passwordHash: pending.passwordHash,
+    email,
+    color: pending.color,
+  });
+  pendingRegistrations.delete(email);
   res.json({ ok: true });
 });
 
