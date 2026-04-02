@@ -212,6 +212,12 @@ app.post('/delete-account', (req, res) => {
   res.json({ ok: true });
 });
 
+// Список онлайн користувачів
+app.get('/online-users', (req, res) => {
+  const online = [...onlineUsers.keys()];
+  res.json({ ok: true, users: online });
+});
+
 // Звільнення ніку
 app.post('/unregister', (req, res) => {
   const { nick } = req.body;
