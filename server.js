@@ -226,6 +226,17 @@ app.get('/online-users', (req, res) => {
   res.json({ ok: true, users: online });
 });
 
+// Пошук користувача по ніку
+app.get('/search-user', (req, res) => {
+  const { nick } = req.query;
+  if (!nick || nick.trim().length < 2)
+    return res.json({ ok: false, error: 'Введіть мін. 2 символи' });
+  const users = db.prepare(
+    "SELECT nick FROM users WHERE nick_lower LIKE ? LIMIT 10"
+  ).all(`%${nick.toLowerCase()}%`);
+  res.json({ ok: true, users: users.map(u => u.nick) });
+});
+
 // Звільнення ніку
 app.post('/unregister', (req, res) => {
   const { nick } = req.body;
