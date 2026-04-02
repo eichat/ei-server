@@ -155,6 +155,63 @@ app.post('/reset', (req, res) => {
   res.json({ ok: true });
 });
 
+// Зміна ніку
+app.post('/update-nick', (req, res) => {
+  const { nick, password, newNick } = req.body;
+  const user = users.get(nick?.toLowerCase());
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if (user.passwordHash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newNick || newNick.trim().length < 2)
+    return res.json({ ok: false, error: 'Нік занадто короткий' });
+  if (users.has(newNick.toLowerCase()))
+    return res.json({ ok: false, error: 'Нік вже зайнятий' });
+  users.delete(nick.toLowerCase());
+  user.nick = newNick;
+  users.set(newNick.toLowerCase(), user);
+  res.json({ ok: true });
+});
+
+// Зміна пароля
+app.post('/update-password', (req, res) => {
+  const { nick, password, newPassword } = req.body;
+  const user = users.get(nick?.toLowerCase());
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if (user.passwordHash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newPassword || newPassword.length < 4)
+    return res.json({ ok: false, error: 'Новий пароль занадто короткий' });
+  user.passwordHash = hashPassword(newPassword);
+  res.json({ ok: true });
+});
+
+// Зміна email
+app.post('/update-email', async (req, res) => {
+  const { nick, password, newEmail } = req.body;
+  const user = users.get(nick?.toLowerCase());
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if (user.passwordHash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newEmail || !newEmail.includes('@'))
+    return res.json({ ok: false, error: 'Невірний email' });
+  const emailExists = [...users.values()].find(u => u.email === newEmail);
+  if (emailExists) return res.json({ ok: false, error: 'Email вже використовується' });
+  user.email = newEmail;
+  res.json({ ok: true });
+});
+
+// Видалення акаунта
+app.post('/delete-account', (req, res) => {
+  const { nick, password } = req.body;
+  const user = users.get(nick?.toLowerCase());
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if (user.passwordHash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
+  users.delete(nick.toLowerCase());
+  onlineUsers.delete(nick);
+  res.json({ ok: true });
+});
+
 // Звільнення ніку
 app.post('/unregister', (req, res) => {
   const { nick } = req.body;
