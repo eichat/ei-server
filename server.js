@@ -285,6 +285,19 @@ wss.on('connection', (ws) => {
         }
       }
 
+      if (msg.type === 'file_message') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({
+            type: 'file_message',
+            from: userNick,
+            fileName: msg.fileName,
+            fileSize: msg.fileSize,
+            data: msg.data,
+          }));
+        }
+      }
+      
       if (msg.type === 'ping') {
         if (userNick && onlineUsers.has(userNick)) {
           onlineUsers.get(userNick).lastSeen = Date.now();
