@@ -3,8 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
-const Database = require('better-sqlite3');
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,39 +11,16 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.json({ limit: '10mb' }));
 
-// ── База даних ──────────────────────────────
-const db = new Database(path.join('/tmp', 'ei.db'));
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    nick TEXT PRIMARY KEY,
-    nick_lower TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    color INTEGER NOT NULL DEFAULT 4280391411,
-    created_at INTEGER NOT NULL DEFAULT (unixepoch())
-  );
-
-  CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    from_nick TEXT NOT NULL,
-    to_nick TEXT NOT NULL,
-    type TEXT NOT NULL DEFAULT 'text',
-    content TEXT NOT NULL,
-    file_name TEXT,
-    file_data TEXT,
-    timestamp INTEGER NOT NULL DEFAULT (unixepoch() * 1000),
-    delivered INTEGER NOT NULL DEFAULT 0
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_nick, delivered);
-  CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(from_nick, to_nick, timestamp);
-`);
+// ── Supabase ────────────────────────────────
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
 // ── Онлайн користувачі (в пам'яті) ─────────
-const onlineUsers = new Map(); // nick -> {ws, lastSeen}
-const resetCodes = new Map();  // email -> {code, nick, expires}
-const pendingRegistrations = new Map(); // email -> {nick, passwordHash, color, code, expires}
+const onlineUsers = new Map();
+const resetCodes = new Map();
+const pendingRegistrations = new Map();
 
 // ── Email ───────────────────────────────────
 const transporter = nodemailer.createTransport({
@@ -61,7 +37,6 @@ function hashPassword(password) {
 
 // ── REST API ────────────────────────────────
 
-// Реєстрація — крок 1
 app.post('/register', async (req, res) => {
   const { nick, password, email, color } = req.body;
   if (!nick || nick.trim().length < 2)
@@ -71,25 +46,24 @@ app.post('/register', async (req, res) => {
   if (!email || !email.includes('@'))
     return res.json({ ok: false, error: 'Невірний email' });
 
-  const existing = db.prepare('SELECT nick FROM users WHERE nick_lower = ?').get(nick.toLowerCase());
+  const { data: existing } = await supabase
+    .from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
   if (existing) return res.json({ ok: false, error: 'Нік вже зайнятий' });
 
-  const emailExists = db.prepare('SELECT nick FROM users WHERE email = ?').get(email);
+  const { data: emailExists } = await supabase
+    .from('users').select('nick').eq('email', email).single();
   if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   pendingRegistrations.set(email, {
-    nick,
-    passwordHash: hashPassword(password),
-    color: color || 4280391411,
-    code,
+    nick, passwordHash: hashPassword(password),
+    color: color || 4280391411, code,
     expires: Date.now() + 15 * 60 * 1000,
   });
 
   try {
     await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: email,
+      from: process.env.GMAIL_USER, to: email,
       subject: 'EI° — Підтвердження реєстрації',
       text: `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`,
     });
@@ -99,34 +73,36 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// Реєстрація — крок 2
-app.post('/verify-email', (req, res) => {
+app.post('/verify-email', async (req, res) => {
   const { email, code } = req.body;
   const pending = pendingRegistrations.get(email);
   if (!pending) return res.json({ ok: false, error: 'Реєстрацію не знайдено' });
   if (Date.now() > pending.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (pending.code !== code) return res.json({ ok: false, error: 'Невірний код' });
 
-  db.prepare('INSERT INTO users (nick, nick_lower, password_hash, email, color) VALUES (?, ?, ?, ?, ?)').run(
-    pending.nick, pending.nick.toLowerCase(), pending.passwordHash, email, pending.color
-  );
+  const { error } = await supabase.from('users').insert({
+    nick: pending.nick, nick_lower: pending.nick.toLowerCase(),
+    password_hash: pending.passwordHash, email, color: pending.color,
+  });
+  if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
   pendingRegistrations.delete(email);
   res.json({ ok: true });
 });
 
-// Вхід
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { nick, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE nick_lower = ?').get(nick?.toLowerCase());
+  const { data: user } = await supabase
+    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password)) return res.json({ ok: false, error: 'Невірний пароль' });
+  if (user.password_hash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
   res.json({ ok: true, nick: user.nick, color: user.color });
 });
 
-// Відновлення пароля
 app.post('/forgot', async (req, res) => {
   const { email } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  const { data: user } = await supabase
+    .from('users').select('*').eq('email', email).single();
   if (!user) return res.json({ ok: false, error: 'Email не знайдено' });
 
   const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -134,8 +110,7 @@ app.post('/forgot', async (req, res) => {
 
   try {
     await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: email,
+      from: process.env.GMAIL_USER, to: email,
       subject: 'EI° — Відновлення пароля',
       text: `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`,
     });
@@ -145,99 +120,105 @@ app.post('/forgot', async (req, res) => {
   }
 });
 
-// Скидання пароля
-app.post('/reset', (req, res) => {
+app.post('/reset', async (req, res) => {
   const { email, code, newPassword } = req.body;
   const reset = resetCodes.get(email);
   if (!reset) return res.json({ ok: false, error: 'Код не знайдено' });
   if (Date.now() > reset.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (reset.code !== code) return res.json({ ok: false, error: 'Невірний код' });
-  if (!newPassword || newPassword.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий' });
+  if (!newPassword || newPassword.length < 4)
+    return res.json({ ok: false, error: 'Пароль занадто короткий' });
 
-  db.prepare('UPDATE users SET password_hash = ? WHERE nick_lower = ?').run(
-    hashPassword(newPassword), reset.nick.toLowerCase()
-  );
+  await supabase.from('users')
+    .update({ password_hash: hashPassword(newPassword) })
+    .eq('nick_lower', reset.nick.toLowerCase());
   resetCodes.delete(email);
   res.json({ ok: true });
 });
 
-// Зміна ніку
-app.post('/update-nick', (req, res) => {
+app.post('/update-nick', async (req, res) => {
   const { nick, password, newNick } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE nick_lower = ?').get(nick?.toLowerCase());
+  const { data: user } = await supabase
+    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password)) return res.json({ ok: false, error: 'Невірний пароль' });
-  if (!newNick || newNick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий' });
+  if (user.password_hash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newNick || newNick.trim().length < 2)
+    return res.json({ ok: false, error: 'Нік занадто короткий' });
 
-  const exists = db.prepare('SELECT nick FROM users WHERE nick_lower = ?').get(newNick.toLowerCase());
+  const { data: exists } = await supabase
+    .from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
   if (exists) return res.json({ ok: false, error: 'Нік вже зайнятий' });
 
-  db.prepare('UPDATE users SET nick = ?, nick_lower = ? WHERE nick_lower = ?').run(
-    newNick, newNick.toLowerCase(), nick.toLowerCase()
-  );
+  await supabase.from('users')
+    .update({ nick: newNick, nick_lower: newNick.toLowerCase() })
+    .eq('nick_lower', nick.toLowerCase());
   res.json({ ok: true });
 });
 
-// Зміна пароля
-app.post('/update-password', (req, res) => {
+app.post('/update-password', async (req, res) => {
   const { nick, password, newPassword } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE nick_lower = ?').get(nick?.toLowerCase());
+  const { data: user } = await supabase
+    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password)) return res.json({ ok: false, error: 'Невірний пароль' });
-  if (!newPassword || newPassword.length < 4) return res.json({ ok: false, error: 'Новий пароль занадто короткий' });
+  if (user.password_hash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newPassword || newPassword.length < 4)
+    return res.json({ ok: false, error: 'Новий пароль занадто короткий' });
 
-  db.prepare('UPDATE users SET password_hash = ? WHERE nick_lower = ?').run(
-    hashPassword(newPassword), nick.toLowerCase()
-  );
+  await supabase.from('users')
+    .update({ password_hash: hashPassword(newPassword) })
+    .eq('nick_lower', nick.toLowerCase());
   res.json({ ok: true });
 });
 
-// Зміна email
-app.post('/update-email', (req, res) => {
+app.post('/update-email', async (req, res) => {
   const { nick, password, newEmail } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE nick_lower = ?').get(nick?.toLowerCase());
+  const { data: user } = await supabase
+    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password)) return res.json({ ok: false, error: 'Невірний пароль' });
-  if (!newEmail || !newEmail.includes('@')) return res.json({ ok: false, error: 'Невірний email' });
+  if (user.password_hash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newEmail || !newEmail.includes('@'))
+    return res.json({ ok: false, error: 'Невірний email' });
 
-  const emailExists = db.prepare('SELECT nick FROM users WHERE email = ?').get(newEmail);
+  const { data: emailExists } = await supabase
+    .from('users').select('nick').eq('email', newEmail).single();
   if (emailExists) return res.json({ ok: false, error: 'Email вже використовується' });
 
-  db.prepare('UPDATE users SET email = ? WHERE nick_lower = ?').run(newEmail, nick.toLowerCase());
+  await supabase.from('users').update({ email: newEmail }).eq('nick_lower', nick.toLowerCase());
   res.json({ ok: true });
 });
 
-// Видалення акаунта
-app.post('/delete-account', (req, res) => {
+app.post('/delete-account', async (req, res) => {
   const { nick, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE nick_lower = ?').get(nick?.toLowerCase());
+  const { data: user } = await supabase
+    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password)) return res.json({ ok: false, error: 'Невірний пароль' });
+  if (user.password_hash !== hashPassword(password))
+    return res.json({ ok: false, error: 'Невірний пароль' });
 
-  db.prepare('DELETE FROM messages WHERE from_nick = ? OR to_nick = ?').run(nick, nick);
-  db.prepare('DELETE FROM users WHERE nick_lower = ?').run(nick.toLowerCase());
+  await supabase.from('messages').delete().or(`from_nick.eq.${nick},to_nick.eq.${nick}`);
+  await supabase.from('users').delete().eq('nick_lower', nick.toLowerCase());
   onlineUsers.delete(nick);
   res.json({ ok: true });
 });
 
-// Список онлайн користувачів
 app.get('/online-users', (req, res) => {
-  const online = [...onlineUsers.keys()];
-  res.json({ ok: true, users: online });
+  res.json({ ok: true, users: [...onlineUsers.keys()] });
 });
 
-// Пошук користувача по ніку
-app.get('/search-user', (req, res) => {
+app.get('/search-user', async (req, res) => {
   const { nick } = req.query;
   if (!nick || nick.trim().length < 2)
     return res.json({ ok: false, error: 'Введіть мін. 2 символи' });
-  const users = db.prepare(
-    "SELECT nick FROM users WHERE nick_lower LIKE ? LIMIT 10"
-  ).all(`%${nick.toLowerCase()}%`);
-  res.json({ ok: true, users: users.map(u => u.nick) });
+  const { data } = await supabase
+    .from('users').select('nick')
+    .ilike('nick_lower', `%${nick.toLowerCase()}%`)
+    .limit(10);
+  res.json({ ok: true, users: (data || []).map(u => u.nick) });
 });
 
-// Звільнення ніку
 app.post('/unregister', (req, res) => {
   const { nick } = req.body;
   if (nick) onlineUsers.delete(nick);
@@ -248,7 +229,7 @@ app.post('/unregister', (req, res) => {
 wss.on('connection', (ws) => {
   let userNick = null;
 
-  ws.on('message', (raw) => {
+  ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw);
 
@@ -263,108 +244,65 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({ type: 'login_ok' }));
 
         // Доставляємо пропущені повідомлення
-        const pending = db.prepare(
-          'SELECT * FROM messages WHERE to_nick = ? AND delivered = 0 ORDER BY timestamp ASC'
-        ).all(userNick);
+        const { data: pending } = await supabase
+          .from('messages').select('*')
+          .eq('to_nick', userNick).eq('delivered', false)
+          .order('timestamp', { ascending: true });
 
-        for (const m of pending) {
-          if (m.type === 'file') {
-            ws.send(JSON.stringify({
-              type: 'file_message',
-              from: m.from_nick,
-              fileName: m.file_name,
-              data: m.file_data,
-              timestamp: m.timestamp,
-            }));
-          } else {
-            ws.send(JSON.stringify({
-              type: 'chat_message',
-              from: m.from_nick,
-              text: m.content,
-              timestamp: m.timestamp,
-            }));
+        if (pending && pending.length > 0) {
+          for (const m of pending) {
+            ws.send(JSON.stringify(
+              m.type === 'file'
+                ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, data: m.file_data, timestamp: m.timestamp }
+                : { type: 'chat_message', from: m.from_nick, text: m.content, timestamp: m.timestamp }
+            ));
           }
-          db.prepare('UPDATE messages SET delivered = 1 WHERE id = ?').run(m.id);
+          await supabase.from('messages')
+            .update({ delivered: true })
+            .eq('to_nick', userNick).eq('delivered', false);
         }
       }
 
       if (msg.type === 'check_online') {
-        ws.send(JSON.stringify({
-          type: 'online_status',
-          nick: msg.nick,
-          online: onlineUsers.has(msg.nick),
-        }));
+        ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
       }
 
       if (msg.type === 'connect_request') {
         const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick }));
-        } else {
-          ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` }));
-        }
+        if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick }));
+        else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` }));
       }
 
       if (msg.type === 'connect_response') {
         const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'connect_response',
-            from: userNick,
-            accepted: msg.accepted,
-          }));
-        }
+        if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted }));
       }
 
       if (msg.type === 'chat_message') {
         const ts = Date.now();
-        // Зберігаємо в БД
-        db.prepare(
-          'INSERT INTO messages (from_nick, to_nick, type, content, timestamp) VALUES (?, ?, ?, ?, ?)'
-        ).run(userNick, msg.to, 'text', msg.text, ts);
-
         const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'chat_message',
-            from: userNick,
-            text: msg.text,
-            timestamp: ts,
-          }));
-          // Позначаємо як доставлене
-          db.prepare(
-            'UPDATE messages SET delivered = 1 WHERE from_nick = ? AND to_nick = ? AND timestamp = ?'
-          ).run(userNick, msg.to, ts);
-        }
+        await supabase.from('messages').insert({
+          from_nick: userNick, to_nick: msg.to,
+          type: 'text', content: msg.text,
+          timestamp: ts, delivered: !!target,
+        });
+        if (target) target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts }));
       }
 
       if (msg.type === 'file_message') {
         const ts = Date.now();
-        // Зберігаємо файл в БД
-        db.prepare(
-          'INSERT INTO messages (from_nick, to_nick, type, content, file_name, file_data, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).run(userNick, msg.to, 'file', msg.fileName, msg.fileName, msg.data, ts);
-
         const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'file_message',
-            from: userNick,
-            fileName: msg.fileName,
-            fileSize: msg.fileSize,
-            data: msg.data,
-            timestamp: ts,
-          }));
-          db.prepare(
-            'UPDATE messages SET delivered = 1 WHERE from_nick = ? AND to_nick = ? AND timestamp = ?'
-          ).run(userNick, msg.to, ts);
-        }
+        await supabase.from('messages').insert({
+          from_nick: userNick, to_nick: msg.to,
+          type: 'file', content: msg.fileName,
+          file_name: msg.fileName, file_data: msg.data,
+          timestamp: ts, delivered: !!target,
+        });
+        if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts }));
       }
 
       if (msg.type === 'ping') {
-        if (userNick && onlineUsers.has(userNick)) {
-          onlineUsers.get(userNick).lastSeen = Date.now();
-        }
+        if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now();
         ws.send(JSON.stringify({ type: 'pong' }));
       }
 
@@ -373,12 +311,9 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.on('close', () => {
-    if (userNick) onlineUsers.delete(userNick);
-  });
+  ws.on('close', () => { if (userNick) onlineUsers.delete(userNick); });
 });
 
-// Очищення неактивних
 setInterval(() => {
   const now = Date.now();
   for (const [nick, user] of onlineUsers) {
@@ -386,10 +321,9 @@ setInterval(() => {
   }
 }, 60000);
 
-// Очищення старих доставлених повідомлень (старші 7 днів)
-setInterval(() => {
+setInterval(async () => {
   const week = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  db.prepare('DELETE FROM messages WHERE delivered = 1 AND timestamp < ?').run(week);
+  await supabase.from('messages').delete().eq('delivered', true).lt('timestamp', week);
 }, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
