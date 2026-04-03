@@ -243,6 +243,13 @@ wss.on('connection', (ws) => {
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
         ws.send(JSON.stringify({ type: 'login_ok' }));
 
+        // Повідомляємо всіх онлайн-юзерів що цей юзер з'явився
+        for (const [nick, user] of onlineUsers) {
+          if (nick !== userNick) {
+            user.ws.send(JSON.stringify({ type: 'user_online', nick: userNick }));
+          }
+        }
+
         // Доставляємо пропущені повідомлення
         const { data: pending } = await supabase
           .from('messages').select('*')
@@ -254,7 +261,7 @@ wss.on('connection', (ws) => {
             ws.send(JSON.stringify(
               m.type === 'file'
                 ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, data: m.file_data, timestamp: m.timestamp }
-                : { type: 'chat_message', from: m.from_nick, text: m.content, timestamp: m.timestamp }
+                : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp }
             ));
           }
           await supabase.from('messages')
@@ -281,12 +288,16 @@ wss.on('connection', (ws) => {
       if (msg.type === 'chat_message') {
         const ts = Date.now();
         const target = onlineUsers.get(msg.to);
+        const msgId = msg.msgId || null;
         await supabase.from('messages').insert({
           from_nick: userNick, to_nick: msg.to,
           type: 'text', content: msg.text,
           timestamp: ts, delivered: !!target,
+          msg_id: msgId,
         });
-        if (target) target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts }));
+        if (target) target.ws.send(JSON.stringify({
+          type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId,
+        }));
       }
 
       if (msg.type === 'file_message') {
@@ -298,19 +309,18 @@ wss.on('connection', (ws) => {
           file_name: msg.fileName, file_data: msg.data,
           timestamp: ts, delivered: !!target,
         });
-        if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts }));
+        if (target) target.ws.send(JSON.stringify({
+          type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts,
+        }));
       }
 
       if (msg.type === 'read_receipt') {
-  const target = onlineUsers.get(msg.to);
-  if (target) {
-    target.ws.send(JSON.stringify({
-      type: 'read_receipt',
-      from: userNick,
-    }));
-  }
-}
-      
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick }));
+        }
+      }
+
       if (msg.type === 'ping') {
         if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now();
         ws.send(JSON.stringify({ type: 'pong' }));
