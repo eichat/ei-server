@@ -301,6 +301,16 @@ wss.on('connection', (ws) => {
         if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts }));
       }
 
+      if (msg.type === 'read_receipt') {
+  const target = onlineUsers.get(msg.to);
+  if (target) {
+    target.ws.send(JSON.stringify({
+      type: 'read_receipt',
+      from: userNick,
+    }));
+  }
+}
+      
       if (msg.type === 'ping') {
         if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now();
         ws.send(JSON.stringify({ type: 'pong' }));
