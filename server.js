@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
-const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -11,31 +11,21 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.json({ limit: '10mb' }));
 
-// ── Supabase ────────────────────────────────
+const BCRYPT_ROUNDS = 10;
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
 
-// ── Онлайн користувачі (в пам'яті) ─────────
 const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
 
-// ── Email ───────────────────────────────────
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
-  },
+  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
 });
-
-function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
-}
-
-// ── REST API ────────────────────────────────
 
 app.post('/register', async (req, res) => {
   const { nick, password, email, color } = req.body;
@@ -46,18 +36,16 @@ app.post('/register', async (req, res) => {
   if (!email || !email.includes('@'))
     return res.json({ ok: false, error: 'Невірний email' });
 
-  const { data: existing } = await supabase
-    .from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
+  const { data: existing } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
   if (existing) return res.json({ ok: false, error: 'Нік вже зайнятий' });
 
-  const { data: emailExists } = await supabase
-    .from('users').select('nick').eq('email', email).single();
+  const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
   if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
 
+  const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   pendingRegistrations.set(email, {
-    nick, passwordHash: hashPassword(password),
-    color: color || 4280391411, code,
+    nick, passwordHash, color: color || 4280391411, code,
     expires: Date.now() + 15 * 60 * 1000,
   });
 
@@ -91,23 +79,19 @@ app.post('/verify-email', async (req, res) => {
 
 app.post('/login', async (req, res) => {
   const { nick, password } = req.body;
-  const { data: user } = await supabase
-    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
+  const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password))
-    return res.json({ ok: false, error: 'Невірний пароль' });
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
   res.json({ ok: true, nick: user.nick, color: user.color });
 });
 
 app.post('/forgot', async (req, res) => {
   const { email } = req.body;
-  const { data: user } = await supabase
-    .from('users').select('*').eq('email', email).single();
+  const { data: user } = await supabase.from('users').select('*').eq('email', email).single();
   if (!user) return res.json({ ok: false, error: 'Email не знайдено' });
-
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   resetCodes.set(email, { code, nick: user.nick, expires: Date.now() + 15 * 60 * 1000 });
-
   try {
     await transporter.sendMail({
       from: process.env.GMAIL_USER, to: email,
@@ -126,78 +110,57 @@ app.post('/reset', async (req, res) => {
   if (!reset) return res.json({ ok: false, error: 'Код не знайдено' });
   if (Date.now() > reset.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (reset.code !== code) return res.json({ ok: false, error: 'Невірний код' });
-  if (!newPassword || newPassword.length < 4)
-    return res.json({ ok: false, error: 'Пароль занадто короткий' });
-
-  await supabase.from('users')
-    .update({ password_hash: hashPassword(newPassword) })
-    .eq('nick_lower', reset.nick.toLowerCase());
+  if (!newPassword || newPassword.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий' });
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', reset.nick.toLowerCase());
   resetCodes.delete(email);
   res.json({ ok: true });
 });
 
 app.post('/update-nick', async (req, res) => {
   const { nick, password, newNick } = req.body;
-  const { data: user } = await supabase
-    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
+  const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password))
-    return res.json({ ok: false, error: 'Невірний пароль' });
-  if (!newNick || newNick.trim().length < 2)
-    return res.json({ ok: false, error: 'Нік занадто короткий' });
-
-  const { data: exists } = await supabase
-    .from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newNick || newNick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий' });
+  const { data: exists } = await supabase.from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
   if (exists) return res.json({ ok: false, error: 'Нік вже зайнятий' });
-
-  await supabase.from('users')
-    .update({ nick: newNick, nick_lower: newNick.toLowerCase() })
-    .eq('nick_lower', nick.toLowerCase());
+  await supabase.from('users').update({ nick: newNick, nick_lower: newNick.toLowerCase() }).eq('nick_lower', nick.toLowerCase());
   res.json({ ok: true });
 });
 
 app.post('/update-password', async (req, res) => {
   const { nick, password, newPassword } = req.body;
-  const { data: user } = await supabase
-    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
+  const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password))
-    return res.json({ ok: false, error: 'Невірний пароль' });
-  if (!newPassword || newPassword.length < 4)
-    return res.json({ ok: false, error: 'Новий пароль занадто короткий' });
-
-  await supabase.from('users')
-    .update({ password_hash: hashPassword(newPassword) })
-    .eq('nick_lower', nick.toLowerCase());
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newPassword || newPassword.length < 4) return res.json({ ok: false, error: 'Новий пароль занадто короткий' });
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', nick.toLowerCase());
   res.json({ ok: true });
 });
 
 app.post('/update-email', async (req, res) => {
   const { nick, password, newEmail } = req.body;
-  const { data: user } = await supabase
-    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
+  const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password))
-    return res.json({ ok: false, error: 'Невірний пароль' });
-  if (!newEmail || !newEmail.includes('@'))
-    return res.json({ ok: false, error: 'Невірний email' });
-
-  const { data: emailExists } = await supabase
-    .from('users').select('nick').eq('email', newEmail).single();
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!newEmail || !newEmail.includes('@')) return res.json({ ok: false, error: 'Невірний email' });
+  const { data: emailExists } = await supabase.from('users').select('nick').eq('email', newEmail).single();
   if (emailExists) return res.json({ ok: false, error: 'Email вже використовується' });
-
   await supabase.from('users').update({ email: newEmail }).eq('nick_lower', nick.toLowerCase());
   res.json({ ok: true });
 });
 
 app.post('/delete-account', async (req, res) => {
   const { nick, password } = req.body;
-  const { data: user } = await supabase
-    .from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
+  const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if (user.password_hash !== hashPassword(password))
-    return res.json({ ok: false, error: 'Невірний пароль' });
-
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
   await supabase.from('messages').delete().or(`from_nick.eq.${nick},to_nick.eq.${nick}`);
   await supabase.from('users').delete().eq('nick_lower', nick.toLowerCase());
   onlineUsers.delete(nick);
@@ -210,12 +173,8 @@ app.get('/online-users', (req, res) => {
 
 app.get('/search-user', async (req, res) => {
   const { nick } = req.query;
-  if (!nick || nick.trim().length < 2)
-    return res.json({ ok: false, error: 'Введіть мін. 2 символи' });
-  const { data } = await supabase
-    .from('users').select('nick')
-    .ilike('nick_lower', `%${nick.toLowerCase()}%`)
-    .limit(10);
+  if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Введіть мін. 2 символи' });
+  const { data } = await supabase.from('users').select('nick').ilike('nick_lower', `%${nick.toLowerCase()}%`).limit(10);
   res.json({ ok: true, users: (data || []).map(u => u.nick) });
 });
 
@@ -225,7 +184,6 @@ app.post('/unregister', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── WebSocket ───────────────────────────────
 wss.on('connection', (ws) => {
   let userNick = null;
 
@@ -243,48 +201,27 @@ wss.on('connection', (ws) => {
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
         ws.send(JSON.stringify({ type: 'login_ok' }));
 
-        // Повідомляємо всіх онлайн-юзерів що цей юзер з'явився
         for (const [nick, user] of onlineUsers) {
-          if (nick !== userNick) {
-            user.ws.send(JSON.stringify({ type: 'user_online', nick: userNick }));
-          }
+          if (nick !== userNick) user.ws.send(JSON.stringify({ type: 'user_online', nick: userNick }));
         }
 
-        // Оновлюємо статус повідомлень до цього юзера -> delivered
-        const { data: toDeliver } = await supabase
-          .from('messages').select('id, from_nick, msg_id')
-          .eq('to_nick', userNick).eq('status', 'sent');
+        const { data: toDeliver } = await supabase.from('messages').select('id, from_nick, msg_id').eq('to_nick', userNick).eq('status', 'sent');
         if (toDeliver && toDeliver.length > 0) {
-          await supabase.from('messages')
-            .update({ status: 'delivered' })
-            .eq('to_nick', userNick).eq('status', 'sent');
-          // Сповіщаємо відправників що повідомлення доставлені
+          await supabase.from('messages').update({ status: 'delivered' }).eq('to_nick', userNick).eq('status', 'sent');
           const senders = [...new Set(toDeliver.map(m => m.from_nick))];
           for (const sender of senders) {
             const senderWs = onlineUsers.get(sender);
             if (senderWs) {
               const msgIds = toDeliver.filter(m => m.from_nick === sender).map(m => m.msg_id).filter(Boolean);
-              if (msgIds.length > 0) {
-                senderWs.ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds }));
-              }
+              if (msgIds.length > 0) senderWs.ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds }));
             }
           }
         }
 
-        // Надсилаємо юзеру актуальні статуси його повідомлень
-        const { data: myStatuses } = await supabase
-          .from('messages').select('msg_id, status')
-          .eq('from_nick', userNick).neq('status', 'sent').not('msg_id', 'is', null);
-        if (myStatuses && myStatuses.length > 0) {
-          ws.send(JSON.stringify({ type: 'status_sync', statuses: myStatuses }));
-        }
+        const { data: myStatuses } = await supabase.from('messages').select('msg_id, status').eq('from_nick', userNick).neq('status', 'sent').not('msg_id', 'is', null);
+        if (myStatuses && myStatuses.length > 0) ws.send(JSON.stringify({ type: 'status_sync', statuses: myStatuses }));
 
-        // Доставляємо пропущені повідомлення
-        const { data: pending } = await supabase
-          .from('messages').select('*')
-          .eq('to_nick', userNick).eq('delivered', false)
-          .order('timestamp', { ascending: true });
-
+        const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
           for (const m of pending) {
             ws.send(JSON.stringify(
@@ -293,15 +230,11 @@ wss.on('connection', (ws) => {
                 : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp }
             ));
           }
-          await supabase.from('messages')
-            .update({ delivered: true })
-            .eq('to_nick', userNick).eq('delivered', false);
+          await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
         }
       }
 
-      if (msg.type === 'check_online') {
-        ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
-      }
+      if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
 
       if (msg.type === 'connect_request') {
         const target = onlineUsers.get(msg.to);
@@ -318,58 +251,32 @@ wss.on('connection', (ws) => {
         const ts = Date.now();
         const target = onlineUsers.get(msg.to);
         const msgId = msg.msgId || null;
-        await supabase.from('messages').insert({
-          from_nick: userNick, to_nick: msg.to,
-          type: 'text', content: msg.text,
-          timestamp: ts, delivered: !!target,
-          msg_id: msgId,
-        });
-        if (target) target.ws.send(JSON.stringify({
-          type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId,
-        }));
+        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId });
+        if (target) target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId }));
       }
 
       if (msg.type === 'file_message') {
         const ts = Date.now();
         const target = onlineUsers.get(msg.to);
-        await supabase.from('messages').insert({
-          from_nick: userNick, to_nick: msg.to,
-          type: 'file', content: msg.fileName,
-          file_name: msg.fileName, file_data: msg.data,
-          timestamp: ts, delivered: !!target,
-        });
-        if (target) target.ws.send(JSON.stringify({
-          type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts,
-        }));
+        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target });
+        if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts }));
       }
 
       if (msg.type === 'read_receipt') {
-        // Зберігаємо статус read в Supabase
-        await supabase.from('messages')
-          .update({ status: 'read' })
-          .eq('to_nick', userNick).eq('from_nick', msg.to);
+        await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to);
         const target = onlineUsers.get(msg.to);
         if (target) {
-          // Надсилаємо read_receipt відправнику якщо він онлайн
-          const { data: readMsgs } = await supabase
-            .from('messages').select('msg_id')
-            .eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null);
+          const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null);
           const msgIds = (readMsgs || []).map(m => m.msg_id).filter(Boolean);
           target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds }));
         }
       }
 
       if (msg.type === 'delete_message') {
-  const target = onlineUsers.get(msg.to);
-  if (target) {
-    target.ws.send(JSON.stringify({
-      type: 'delete_message',
-      from: userNick,
-      msgId: msg.msgId,
-    }));
-  }
-}
-      
+        const target = onlineUsers.get(msg.to);
+        if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId }));
+      }
+
       if (msg.type === 'ping') {
         if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now();
         ws.send(JSON.stringify({ type: 'pong' }));
