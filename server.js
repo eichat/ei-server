@@ -359,6 +359,17 @@ wss.on('connection', (ws) => {
         }
       }
 
+      if (msg.type === 'delete_message') {
+  const target = onlineUsers.get(msg.to);
+  if (target) {
+    target.ws.send(JSON.stringify({
+      type: 'delete_message',
+      from: userNick,
+      msgId: msg.msgId,
+    }));
+  }
+}
+      
       if (msg.type === 'ping') {
         if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now();
         ws.send(JSON.stringify({ type: 'pong' }));
