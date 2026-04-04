@@ -29,12 +29,9 @@ const transporter = nodemailer.createTransport({
 
 app.post('/register', async (req, res) => {
   const { nick, password, email, color } = req.body;
-  if (!nick || nick.trim().length < 2)
-    return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
-  if (!password || password.length < 4)
-    return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 4 символи)' });
-  if (!email || !email.includes('@'))
-    return res.json({ ok: false, error: 'Невірний email' });
+  if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
+  if (!password || password.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 4 символи)' });
+  if (!email || !email.includes('@')) return res.json({ ok: false, error: 'Невірний email' });
   const { data: existing } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
   if (existing) return res.json({ ok: false, error: 'Нік вже зайнятий' });
   const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
@@ -144,9 +141,7 @@ app.post('/delete-account', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/online-users', (req, res) => {
-  res.json({ ok: true, users: [...onlineUsers.keys()] });
-});
+app.get('/online-users', (req, res) => res.json({ ok: true, users: [...onlineUsers.keys()] }));
 
 app.get('/search-user', async (req, res) => {
   const { nick } = req.query;
@@ -169,7 +164,6 @@ app.post('/group/create', async (req, res) => {
   if (error) return res.json({ ok: false, error: 'Помилка створення групи' });
   const allMembers = [...new Set([creatorNick, ...(members || [])])];
   await supabase.from('group_members').insert(allMembers.map(nick => ({ group_id: group.id, nick })));
-  // Сповіщаємо онлайн учасників
   for (const nick of allMembers) {
     if (nick !== creatorNick) {
       const target = onlineUsers.get(nick);
@@ -201,10 +195,8 @@ app.post('/group/add-member', async (req, res) => {
   await supabase.from('group_members').insert({ group_id: groupId, nick: newNick });
   const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
   const memberList = (members || []).map(m => m.nick);
-  // Сповіщаємо нового учасника
   const target = onlineUsers.get(newNick);
   if (target) target.ws.send(JSON.stringify({ type: 'group_added', group: { id: group.id, name: group.name, creator_nick: group.creator_nick }, members: memberList }));
-  // Сповіщаємо існуючих учасників
   for (const nick of memberList) {
     if (nick !== newNick) {
       const t = onlineUsers.get(nick);
@@ -222,10 +214,8 @@ app.post('/group/remove-member', async (req, res) => {
   await supabase.from('group_members').delete().eq('group_id', groupId).eq('nick', targetNick);
   const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
   const memberList = (members || []).map(m => m.nick);
-  // Сповіщаємо видаленого
   const target = onlineUsers.get(targetNick);
   if (target) target.ws.send(JSON.stringify({ type: 'group_removed', groupId }));
-  // Сповіщаємо решту
   for (const nick of memberList) {
     const t = onlineUsers.get(nick);
     if (t) t.ws.send(JSON.stringify({ type: 'group_member_removed', groupId, nick: targetNick }));
@@ -277,14 +267,12 @@ wss.on('connection', (ws) => {
           if (nick !== userNick) user.ws.send(JSON.stringify({ type: 'user_online', nick: userNick }));
         }
 
-        // Доставляємо пропущені видалення
         const { data: pendingDeletes } = await supabase.from('deleted_messages').select('msg_id, from_nick').eq('to_nick', userNick);
         if (pendingDeletes && pendingDeletes.length > 0) {
           for (const d of pendingDeletes) ws.send(JSON.stringify({ type: 'delete_message', from: d.from_nick, msgId: d.msg_id }));
           await supabase.from('deleted_messages').delete().eq('to_nick', userNick);
         }
 
-        // Статуси повідомлень
         const { data: toDeliver } = await supabase.from('messages').select('id, from_nick, msg_id').eq('to_nick', userNick).eq('status', 'sent');
         if (toDeliver && toDeliver.length > 0) {
           await supabase.from('messages').update({ status: 'delivered' }).eq('to_nick', userNick).eq('status', 'sent');
@@ -301,7 +289,6 @@ wss.on('connection', (ws) => {
         const { data: myStatuses } = await supabase.from('messages').select('msg_id, status').eq('from_nick', userNick).neq('status', 'sent').not('msg_id', 'is', null);
         if (myStatuses && myStatuses.length > 0) ws.send(JSON.stringify({ type: 'status_sync', statuses: myStatuses }));
 
-        // Пропущені особисті повідомлення
         const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
           for (const m of pending) {
@@ -314,7 +301,6 @@ wss.on('connection', (ws) => {
           await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
         }
 
-        // Пропущені групові повідомлення
         const { data: myGroups } = await supabase.from('group_members').select('group_id').eq('nick', userNick);
         if (myGroups && myGroups.length > 0) {
           for (const gm of myGroups) {
@@ -329,6 +315,15 @@ wss.on('connection', (ws) => {
               }
             }
           }
+        }
+
+        // Доставляємо пропущені реакції
+        const { data: pendingReactions } = await supabase.from('pending_reactions').select('*').eq('to_nick', userNick);
+        if (pendingReactions && pendingReactions.length > 0) {
+          for (const r of pendingReactions) {
+            ws.send(JSON.stringify({ type: 'reaction', msgId: r.msg_id, emoji: r.emoji, from: r.from_nick, chatNick: r.chat_nick, groupId: r.group_id }));
+          }
+          await supabase.from('pending_reactions').delete().eq('to_nick', userNick);
         }
       }
 
@@ -363,20 +358,12 @@ wss.on('connection', (ws) => {
       if (msg.type === 'group_message') {
         const ts = Date.now();
         const msgId = msg.msgId || `${userNick}_g${msg.groupId}_${ts}`;
-        // Перевіряємо членство
         const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
         if (!membership) return;
-        // Отримуємо всіх учасників
         const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
         const memberNicks = (members || []).map(m => m.nick);
         const onlineMembers = memberNicks.filter(n => n !== userNick && onlineUsers.has(n));
-        // Зберігаємо повідомлення
-        await supabase.from('group_messages').insert({
-          group_id: msg.groupId, from_nick: userNick, content: msg.text,
-          timestamp: ts, msg_id: msgId,
-          delivered_to: [userNick, ...onlineMembers],
-        });
-        // Розсилаємо онлайн учасникам
+        await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers] });
         for (const nick of onlineMembers) {
           onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId }));
         }
@@ -388,6 +375,34 @@ wss.on('connection', (ws) => {
           if (m.nick !== userNick) {
             const t = onlineUsers.get(m.nick);
             if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick }));
+          }
+        }
+      }
+
+      // ── Реакції ──────────────────────────────
+      if (msg.type === 'reaction') {
+        const { msgId, emoji, chatNick, groupId } = msg;
+        const reactionPayload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId };
+
+        if (groupId) {
+          // Групова реакція — розсилаємо всім учасникам крім себе
+          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
+          for (const m of members || []) {
+            if (m.nick === userNick) continue;
+            const t = onlineUsers.get(m.nick);
+            if (t) {
+              t.ws.send(JSON.stringify(reactionPayload));
+            } else {
+              await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null });
+            }
+          }
+        } else if (chatNick) {
+          // Особиста реакція
+          const target = onlineUsers.get(chatNick);
+          if (target) {
+            target.ws.send(JSON.stringify(reactionPayload));
+          } else {
+            await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null });
           }
         }
       }
