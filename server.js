@@ -299,7 +299,10 @@ app.post('/group/add-member', async (req, res) => {
 
 app.post('/group/remove-member', async (req, res) => {
   const { groupId, requesterNick, targetNick } = req.body;
-  if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Тільки модератор або творець може видаляти учасників' });
+  // Дозволяємо юзеру покинути групу самостійно
+  if (requesterNick !== targetNick && !(await isModOrCreator(groupId, requesterNick))) {
+    return res.json({ ok: false, error: 'Тільки модератор або творець може видаляти учасників' });
+  }
   await supabase.from('group_members').delete().eq('group_id', groupId).eq('nick', targetNick);
   const target = onlineUsers.get(targetNick);
   if (target) target.ws.send(JSON.stringify({ type: 'group_removed', groupId }));
