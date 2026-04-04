@@ -250,6 +250,35 @@ wss.on('connection', (ws) => {
           }
         }
 
+        // Оновлюємо статус повідомлень до цього юзера -> delivered
+        const { data: toDeliver } = await supabase
+          .from('messages').select('id, from_nick, msg_id')
+          .eq('to_nick', userNick).eq('status', 'sent');
+        if (toDeliver && toDeliver.length > 0) {
+          await supabase.from('messages')
+            .update({ status: 'delivered' })
+            .eq('to_nick', userNick).eq('status', 'sent');
+          // Сповіщаємо відправників що повідомлення доставлені
+          const senders = [...new Set(toDeliver.map(m => m.from_nick))];
+          for (const sender of senders) {
+            const senderWs = onlineUsers.get(sender);
+            if (senderWs) {
+              const msgIds = toDeliver.filter(m => m.from_nick === sender).map(m => m.msg_id).filter(Boolean);
+              if (msgIds.length > 0) {
+                senderWs.ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds }));
+              }
+            }
+          }
+        }
+
+        // Надсилаємо юзеру актуальні статуси його повідомлень
+        const { data: myStatuses } = await supabase
+          .from('messages').select('msg_id, status')
+          .eq('from_nick', userNick).neq('status', 'sent').not('msg_id', 'is', null);
+        if (myStatuses && myStatuses.length > 0) {
+          ws.send(JSON.stringify({ type: 'status_sync', statuses: myStatuses }));
+        }
+
         // Доставляємо пропущені повідомлення
         const { data: pending } = await supabase
           .from('messages').select('*')
@@ -315,9 +344,18 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'read_receipt') {
+        // Зберігаємо статус read в Supabase
+        await supabase.from('messages')
+          .update({ status: 'read' })
+          .eq('to_nick', userNick).eq('from_nick', msg.to);
         const target = onlineUsers.get(msg.to);
         if (target) {
-          target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick }));
+          // Надсилаємо read_receipt відправнику якщо він онлайн
+          const { data: readMsgs } = await supabase
+            .from('messages').select('msg_id')
+            .eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null);
+          const msgIds = (readMsgs || []).map(m => m.msg_id).filter(Boolean);
+          target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds }));
         }
       }
 
