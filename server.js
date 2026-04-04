@@ -201,10 +201,24 @@ wss.on('connection', (ws) => {
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
         ws.send(JSON.stringify({ type: 'login_ok' }));
 
+        // Повідомляємо всіх онлайн-юзерів що цей юзер з'явився
         for (const [nick, user] of onlineUsers) {
           if (nick !== userNick) user.ws.send(JSON.stringify({ type: 'user_online', nick: userNick }));
         }
 
+        // Доставляємо пропущені видалення
+        const { data: pendingDeletes } = await supabase
+          .from('deleted_messages')
+          .select('msg_id, from_nick')
+          .eq('to_nick', userNick);
+        if (pendingDeletes && pendingDeletes.length > 0) {
+          for (const d of pendingDeletes) {
+            ws.send(JSON.stringify({ type: 'delete_message', from: d.from_nick, msgId: d.msg_id }));
+          }
+          await supabase.from('deleted_messages').delete().eq('to_nick', userNick);
+        }
+
+        // Оновлюємо статус повідомлень -> delivered
         const { data: toDeliver } = await supabase.from('messages').select('id, from_nick, msg_id').eq('to_nick', userNick).eq('status', 'sent');
         if (toDeliver && toDeliver.length > 0) {
           await supabase.from('messages').update({ status: 'delivered' }).eq('to_nick', userNick).eq('status', 'sent');
@@ -218,9 +232,11 @@ wss.on('connection', (ws) => {
           }
         }
 
+        // Надсилаємо актуальні статуси власних повідомлень
         const { data: myStatuses } = await supabase.from('messages').select('msg_id, status').eq('from_nick', userNick).neq('status', 'sent').not('msg_id', 'is', null);
         if (myStatuses && myStatuses.length > 0) ws.send(JSON.stringify({ type: 'status_sync', statuses: myStatuses }));
 
+        // Доставляємо пропущені повідомлення
         const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
           for (const m of pending) {
@@ -274,7 +290,17 @@ wss.on('connection', (ws) => {
 
       if (msg.type === 'delete_message') {
         const target = onlineUsers.get(msg.to);
-        if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId }));
+        if (target) {
+          // Співрозмовник онлайн — надсилаємо одразу
+          target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId }));
+        } else {
+          // Офлайн — зберігаємо для доставки при логіні
+          await supabase.from('deleted_messages').insert({
+            msg_id: msg.msgId,
+            from_nick: userNick,
+            to_nick: msg.to,
+          });
+        }
       }
 
       if (msg.type === 'ping') {
