@@ -303,6 +303,11 @@ wss.on('connection', (ws) => {
         }
       }
 
+      if (msg.type === 'typing') {
+        const target = onlineUsers.get(msg.to);
+        if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick }));
+      }
+
       if (msg.type === 'ping') {
         if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now();
         ws.send(JSON.stringify({ type: 'pong' }));
