@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -10,16 +10,22 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 app.use(express.json({ limit: '10mb' }));
 
-const BCRYPT_ROUNDS = 8; // знижено для швидкості на Render
+const BCRYPT_ROUNDS = 8;
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY);
 const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS },
-});
+async function sendEmail(to, subject, text) {
+  const { error } = await resend.emails.send({
+    from: 'EI° <onboarding@resend.dev>',
+    to,
+    subject,
+    text,
+  });
+  if (error) throw new Error(error.message);
+}
 
 async function isModOrCreator(groupId, nick) {
   const { data } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', nick).single();
@@ -51,7 +57,7 @@ app.post('/register', async (req, res) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
   try {
-    await transporter.sendMail({ from: process.env.GMAIL_USER, to: email, subject: 'EI° — Підтвердження реєстрації', text: `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.` });
+    await sendEmail(email, 'EI° — Підтвердження реєстрації', `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`);
     console.log('Email sent to', email);
     res.json({ ok: true, needVerification: true });
   } catch (e) {
@@ -89,7 +95,7 @@ app.post('/forgot', async (req, res) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   resetCodes.set(email, { code, nick: user.nick, expires: Date.now() + 15 * 60 * 1000 });
   try {
-    await transporter.sendMail({ from: process.env.GMAIL_USER, to: email, subject: 'EI° — Відновлення пароля', text: `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.` });
+    await sendEmail(email, 'EI° — Відновлення пароля', `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`);
     res.json({ ok: true });
   } catch (e) { res.json({ ok: false, error: 'Помилка відправки email' }); }
 });
@@ -316,7 +322,6 @@ app.get('/group/messages', async (req, res) => {
 
 wss.on('connection', (ws) => {
   let userNick = null;
-
   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw);
@@ -365,77 +370,20 @@ wss.on('connection', (ws) => {
       if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
       if (msg.type === 'connect_request') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick })); else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
-
-      if (msg.type === 'chat_message') {
-        const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
-        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId });
-        if (target) target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId }));
-      }
-
-      if (msg.type === 'file_message') {
-        const ts = Date.now(); const target = onlineUsers.get(msg.to);
-        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target });
-        if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts }));
-      }
-
-      if (msg.type === 'group_message') {
-        const ts = Date.now(); const msgId = msg.msgId || `${userNick}_g${msg.groupId}_${ts}`;
-        const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
-        if (!membership) return;
-        const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
-        const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
-        await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers] });
-        for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId }));
-      }
-
-      if (msg.type === 'group_typing') {
-        const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
-        for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } }
-      }
-
-      if (msg.type === 'reaction') {
-        const { msgId, emoji, chatNick, groupId } = msg;
-        const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId };
-        if (groupId) {
-          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
-          for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); }
-        } else if (chatNick) { const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); }
-      }
-
+      if (msg.type === 'chat_message') { const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null; await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId }); if (target) target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId })); }
+      if (msg.type === 'file_message') { const ts = Date.now(); const target = onlineUsers.get(msg.to); await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target }); if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts })); }
+      if (msg.type === 'group_message') { const ts = Date.now(); const msgId = msg.msgId || `${userNick}_g${msg.groupId}_${ts}`; const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n)); await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers] }); for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId })); }
+      if (msg.type === 'group_typing') { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } } }
+      if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
       if (msg.type === 'edit_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text })); }
-
-      if (msg.type === 'edit_group_message') {
-        const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
-        if (!membership) return;
-        await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick);
-        await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick);
-      }
-
-      if (msg.type === 'delete_group_message') {
-        const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single();
-        if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return;
-        await supabase.from('group_messages').delete().eq('msg_id', msg.msgId);
-        await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick);
-      }
-
-      if (msg.type === 'read_receipt') {
-        await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to);
-        const target = onlineUsers.get(msg.to);
-        if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); }
-      }
-
-      if (msg.type === 'delete_message') {
-        const target = onlineUsers.get(msg.to);
-        if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId }));
-        else await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to });
-      }
-
+      if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
+      if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
+      if (msg.type === 'read_receipt') { await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to); const target = onlineUsers.get(msg.to); if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); } }
+      if (msg.type === 'delete_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId })); else await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
-
     } catch (e) { console.error('Помилка:', e); }
   });
-
   ws.on('close', () => { if (userNick) onlineUsers.delete(userNick); });
 });
 
