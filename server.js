@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 app.use(express.json({ limit: '10mb' }));
 
-const BCRYPT_ROUNDS = 10;
+const BCRYPT_ROUNDS = 8; // знижено для швидкості на Render
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const onlineUsers = new Map();
 const resetCodes = new Map();
@@ -36,6 +36,7 @@ async function notifyMembers(groupId, payload, excludeNick = null) {
 }
 
 app.post('/register', async (req, res) => {
+  console.log('Register request:', req.body?.nick);
   const { nick, password, email, color } = req.body;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
   if (!password || password.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 4 символи)' });
@@ -44,13 +45,19 @@ app.post('/register', async (req, res) => {
   if (existing) return res.json({ ok: false, error: 'Нік вже зайнятий' });
   const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
   if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
+  console.log('Hashing password...');
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  console.log('Password hashed, sending email...');
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
   try {
     await transporter.sendMail({ from: process.env.GMAIL_USER, to: email, subject: 'EI° — Підтвердження реєстрації', text: `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.` });
+    console.log('Email sent to', email);
     res.json({ ok: true, needVerification: true });
-  } catch (e) { res.json({ ok: false, error: 'Помилка відправки email' }); }
+  } catch (e) {
+    console.error('Email error:', e.message);
+    res.json({ ok: false, error: 'Помилка відправки email: ' + e.message });
+  }
 });
 
 app.post('/verify-email', async (req, res) => {
@@ -66,6 +73,7 @@ app.post('/verify-email', async (req, res) => {
 });
 
 app.post('/login', async (req, res) => {
+  console.log('Login request:', req.body?.nick);
   const { nick, password } = req.body;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
@@ -158,7 +166,6 @@ app.get('/search-user', async (req, res) => {
 });
 app.post('/unregister', (req, res) => { const { nick } = req.body; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
 
-// ── Групові чати REST ────────────────────────
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;
   if (!name || name.trim().length < 1) return res.json({ ok: false, error: 'Назва групи порожня' });
@@ -307,7 +314,6 @@ app.get('/group/messages', async (req, res) => {
   res.json({ ok: true, messages: data || [] });
 });
 
-// ── WebSocket ────────────────────────────────
 wss.on('connection', (ws) => {
   let userNick = null;
 
@@ -396,10 +402,7 @@ wss.on('connection', (ws) => {
         } else if (chatNick) { const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); }
       }
 
-      if (msg.type === 'edit_message') {
-        const target = onlineUsers.get(msg.to);
-        if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }));
-      }
+      if (msg.type === 'edit_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text })); }
 
       if (msg.type === 'edit_group_message') {
         const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
@@ -428,7 +431,6 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
-
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
     } catch (e) { console.error('Помилка:', e); }
