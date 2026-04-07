@@ -17,11 +17,6 @@ const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
 
-// ── EI Coins ─────────────────────────────────
-async function addCoins(nick, amount) {
-  await supabase.rpc('add_coins', { p_nick: nick, p_amount: amount });
-}
-
 async function sendEmail(to, subject, text) {
   const { error } = await resend.emails.send({ from: 'EI° <onboarding@resend.dev>', to, subject, text });
   if (error) throw new Error(error.message);
@@ -171,13 +166,45 @@ app.post('/delete-account', async (req, res) => {
 });
 
 app.get('/online-users', (req, res) => res.json({ ok: true, users: [...onlineUsers.keys()] }));
+
 app.get('/search-user', async (req, res) => {
   const { nick } = req.query;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Введіть мін. 2 символи' });
   const { data } = await supabase.from('users').select('nick').ilike('nick_lower', `%${nick.toLowerCase()}%`).limit(10);
   res.json({ ok: true, users: (data || []).map(u => u.nick) });
 });
+
 app.post('/unregister', (req, res) => { const { nick } = req.body; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
+
+app.post('/update-status', async (req, res) => {
+  const { nick, status } = req.body;
+  if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
+  const newStatus = status && status.trim().length > 0 ? status.trim().substring(0, 60) : null;
+  await supabase.from('users').update({ status: newStatus }).eq('nick', nick);
+  for (const [n, user] of onlineUsers) {
+    if (n !== nick) user.ws.send(JSON.stringify({ type: 'user_status', nick, status: newStatus }));
+  }
+  res.json({ ok: true, status: newStatus });
+});
+
+app.post('/transfer-coins', async (req, res) => {
+  const { fromNick, toNick, amount } = req.body;
+  if (!fromNick || !toNick || !amount || amount < 1) return res.json({ ok: false, error: 'Невірні параметри' });
+  if (fromNick === toNick) return res.json({ ok: false, error: 'Не можна переказати собі' });
+  const { data: sender } = await supabase.from('users').select('coins').eq('nick', fromNick).single();
+  if (!sender) return res.json({ ok: false, error: 'Відправника не знайдено' });
+  if ((sender.coins || 0) < amount) return res.json({ ok: false, error: 'Недостатньо монет' });
+  const { data: receiver } = await supabase.from('users').select('coins').eq('nick', toNick).single();
+  if (!receiver) return res.json({ ok: false, error: 'Отримувача не знайдено' });
+  await supabase.from('users').update({ coins: (sender.coins || 0) - amount }).eq('nick', fromNick);
+  const newReceiverCoins = (receiver.coins || 0) + amount;
+  await supabase.from('users').update({ coins: newReceiverCoins }).eq('nick', toNick);
+  const senderWs = onlineUsers.get(fromNick);
+  if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -amount, total: (sender.coins || 0) - amount }));
+  const receiverWs = onlineUsers.get(toNick);
+  if (receiverWs) receiverWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount, total: newReceiverCoins }));
+  res.json({ ok: true, newBalance: (sender.coins || 0) - amount });
+});
 
 // ── Групи ────────────────────────────────────
 app.post('/group/create', async (req, res) => {
@@ -404,7 +431,6 @@ wss.on('connection', (ws) => {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId });
         if (target) target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId }));
-        // +1 монета за повідомлення в живому чаті
         const { data: u1 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u1) { const newCoins = (u1.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); }
       }
@@ -413,7 +439,6 @@ wss.on('connection', (ws) => {
         const ts = Date.now(); const target = onlineUsers.get(msg.to);
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target });
         if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts }));
-        // +3 монети за файл
         const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
       }
@@ -426,13 +451,11 @@ wss.on('connection', (ws) => {
         const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
         await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers] });
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId }));
-        // +2 монети за групове повідомлення
         const { data: u3 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u3) { const newCoins = (u3.coins || 0) + 2; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 2, newCoins); }
       }
 
       if (msg.type === 'ei_message') {
-        // +1 монета за взаємодію з EI°
         const { data: u4 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u4) { const newCoins = (u4.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); }
       }
