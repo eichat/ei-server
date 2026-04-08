@@ -358,6 +358,17 @@ app.post('/group/remove-member', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/group/ban-member', async (req, res) => {
+  const { groupId, requesterNick, targetNick } = req.body;
+  if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('group_members').delete().eq('group_id', groupId).eq('nick', targetNick);
+  await supabase.from('group_bans').upsert({ group_id: groupId, nick: targetNick });
+  const target = onlineUsers.get(targetNick);
+  if (target) target.ws.send(JSON.stringify({ type: 'group_removed', groupId }));
+  await notifyMembers(groupId, { type: 'group_member_removed', groupId, nick: targetNick });
+  res.json({ ok: true });
+});
+
 app.get('/group/join-requests', async (req, res) => {
   const { groupId, nick } = req.query;
   if (!(await isModOrCreator(groupId, nick))) return res.json({ ok: false, error: 'Недостатньо прав' });
