@@ -187,6 +187,13 @@ app.post('/update-status', async (req, res) => {
   res.json({ ok: true, status: newStatus });
 });
 
+app.post('/update-nick-color', async (req, res) => {
+  const { nick, nickColor } = req.body;
+  if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
+  await supabase.from('users').update({ nick_color: nickColor || null }).eq('nick', nick);
+  res.json({ ok: true });
+});
+
 app.post('/transfer-coins', async (req, res) => {
   const { fromNick, toNick, amount } = req.body;
   if (!fromNick || !toNick || !amount || amount < 1) return res.json({ ok: false, error: 'Невірні параметри' });
