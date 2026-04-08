@@ -235,6 +235,8 @@ app.post('/shop/buy-premium', async (req, res) => {
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;
   if (!name || name.trim().length < 1) return res.json({ ok: false, error: 'Назва групи порожня' });
+  const { data: existing } = await supabase.from('groups').select('id').ilike('name', name.trim()).maybeSingle();
+  if (existing) return res.json({ ok: false, error: 'Група з такою назвою вже існує' });
   const groupType = type || 'closed';
   const { data: group, error } = await supabase.from('groups').insert({ name: name.trim(), creator_nick: creatorNick, type: groupType }).select().single();
   if (error) return res.json({ ok: false, error: 'Помилка створення групи' });
