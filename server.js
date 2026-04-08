@@ -87,7 +87,7 @@ app.post('/login', async (req, res) => {
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
-  res.json({ ok: true, nick: user.nick, color: user.color, coins: user.coins || 0 });
+  res.json({ ok: true, nick: user.nick, color: user.color, coins: user.coins || 0, premium_expires_at: user.premium_expires_at, premium_plan: user.premium_plan, nick_color: user.nick_color });
 });
 
 app.post('/forgot', async (req, res) => {
@@ -204,6 +204,24 @@ app.post('/transfer-coins', async (req, res) => {
   const receiverWs = onlineUsers.get(toNick);
   if (receiverWs) receiverWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount, total: newReceiverCoins }));
   res.json({ ok: true, newBalance: (sender.coins || 0) - amount });
+});
+
+app.post('/shop/buy-premium', async (req, res) => {
+  const { nick, plan } = req.body;
+  if (!nick || !plan) return res.json({ ok: false, error: 'Невірні параметри' });
+  const price = plan === 'yearly' ? 1680 : 200;
+  const { data: user } = await supabase.from('users').select('coins, premium_expires_at').eq('nick', nick).single();
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if ((user.coins || 0) < price) return res.json({ ok: false, error: 'Недостатньо монет' });
+  const now = new Date();
+  const currentExpiry = user.premium_expires_at && new Date(user.premium_expires_at) > now ? new Date(user.premium_expires_at) : now;
+  const expiresAt = new Date(currentExpiry);
+  expiresAt.setMonth(expiresAt.getMonth() + (plan === 'yearly' ? 12 : 1));
+  const newCoins = (user.coins || 0) - price;
+  await supabase.from('users').update({ coins: newCoins, premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
+  const userWs = onlineUsers.get(nick);
+  if (userWs) userWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newCoins }));
+  res.json({ ok: true, newBalance: newCoins, expiresAt: expiresAt.toISOString(), plan });
 });
 
 // ── Групи ────────────────────────────────────
