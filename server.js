@@ -288,6 +288,8 @@ app.post('/group/join', async (req, res) => {
   if (group.type === 'closed') return res.json({ ok: false, error: 'Група закрита' });
   const { data: existing } = await supabase.from('group_members').select('nick').eq('group_id', groupId).eq('nick', nick).single();
   if (existing) return res.json({ ok: false, error: 'Ви вже в групі' });
+    const { data: banned } = await supabase.from('group_bans').select('nick').eq('group_id', groupId).eq('nick', nick).single();
+if (banned) return res.json({ ok: false, error: 'Вас заблоковано в цій групі' });
   if (group.type === 'open') {
     await supabase.from('group_members').insert({ group_id: groupId, nick, role: 'member' });
     const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
