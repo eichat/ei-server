@@ -476,12 +476,12 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'file_message') {
-        const ts = Date.now(); const target = onlineUsers.get(msg.to);
-        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target });
-        if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts }));
+        const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
+        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId });
+        if (target) target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId }));
         const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
-      }
+       }
 
       if (msg.type === 'group_message') {
         const ts = Date.now(); const msgId = msg.msgId || `${userNick}_g${msg.groupId}_${ts}`;
