@@ -473,8 +473,12 @@ wss.on('connection', (ws) => {
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status });
         if (target) {
           target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId }));
-          // Одразу повідомляємо відправника що повідомлення доставлено
-          if (msgId) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] }));
+          if (msgId) {
+            console.log('status_update: ws.readyState=', ws.readyState, 'msgId=', msgId);
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] }));
+            }
+          }
         }
         const { data: u1 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u1) { const newCoins = (u1.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); }
@@ -486,7 +490,9 @@ wss.on('connection', (ws) => {
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status });
         if (target) {
           target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId }));
-          if (msgId) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] }));
+          if (msgId && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] }));
+          }
         }
         const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
