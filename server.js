@@ -469,7 +469,7 @@ wss.on('connection', (ws) => {
 
       if (msg.type === 'chat_message') {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
-        console.log('chat_message received:', userNick, '→', msg.to, 'msgId:', msgId, 'target online:', !!target);
+        process.stdout.write(`chat_message: ${userNick} → ${msg.to} msgId:${msgId} target:${!!target}\n`);
         const status = target ? 'delivered' : 'sent';
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status });
         if (target) {
