@@ -434,6 +434,13 @@ wss.on('connection', (ws) => {
         const { data: myStatuses } = await supabase.from('messages').select('msg_id, status').eq('from_nick', userNick).neq('status', 'sent').not('msg_id', 'is', null);
         if (myStatuses && myStatuses.length > 0) ws.send(JSON.stringify({ type: 'status_sync', statuses: myStatuses }));
 
+// Видаляємо повідомлення що були видалені відправником
+const { data: deletedMsgIds } = await supabase.from('deleted_messages').select('msg_id').eq('to_nick', userNick);
+if (deletedMsgIds && deletedMsgIds.length > 0) {
+  const ids = deletedMsgIds.map(d => d.msg_id);
+  await supabase.from('messages').delete().eq('to_nick', userNick).in('msg_id', ids);
+}
+        
         const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
           for (const m of pending) ws.send(JSON.stringify(m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, data: m.file_data, timestamp: m.timestamp, msgId: m.msg_id } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp }));
