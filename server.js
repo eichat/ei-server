@@ -482,6 +482,63 @@ wss.on('connection', (ws) => {
       if (msg.type === 'delete_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId })); else await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
+
+      // ── Дзвінки (WebRTC сигналінг) ──────────
+      if (msg.type === 'call_offer') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({
+            type: 'call_offer',
+            from: userNick,
+            offer: msg.offer,
+            hasVideo: msg.hasVideo || false,
+          }));
+        } else {
+          ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
+        }
+      }
+
+      if (msg.type === 'call_answer') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({
+            type: 'call_answer',
+            from: userNick,
+            answer: msg.answer,
+          }));
+        }
+      }
+
+      if (msg.type === 'call_ice') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({
+            type: 'call_ice',
+            from: userNick,
+            candidate: msg.candidate,
+          }));
+        }
+      }
+
+      if (msg.type === 'call_reject') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({
+            type: 'call_reject',
+            from: userNick,
+          }));
+        }
+      }
+
+      if (msg.type === 'call_end') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({
+            type: 'call_end',
+            from: userNick,
+          }));
+        }
+      }
     } catch (e) { console.error('Помилка:', e); }
   });
   ws.on('close', () => { if (userNick) onlineUsers.delete(userNick); });
