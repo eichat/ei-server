@@ -206,6 +206,35 @@ app.post('/transfer-coins', async (req, res) => {
   res.json({ ok: true, newBalance: (sender.coins || 0) - amount });
 });
 
+// ── Логи дзвінків ────────────────────────────
+app.post('/call-log', async (req, res) => {
+  const { fromNick, toNick, hasVideo, startedAt, durationSeconds, status } = req.body;
+  if (!fromNick || !toNick || !startedAt || !status) return res.json({ ok: false, error: 'Невірні параметри' });
+  await supabase.from('call_logs').insert({
+    from_nick: fromNick,
+    to_nick: toNick,
+    has_video: hasVideo || false,
+    started_at: startedAt,
+    duration_seconds: durationSeconds || null,
+    status,
+  });
+  // Повідомити співбесідника про лог дзвінка
+  const payload = { type: 'call_log', fromNick, toNick, hasVideo: hasVideo || false, startedAt, durationSeconds: durationSeconds || null, status };
+  const target = onlineUsers.get(toNick === fromNick ? toNick : (fromNick === req.body.myNick ? toNick : fromNick));
+  if (target) target.ws.send(JSON.stringify(payload));
+  res.json({ ok: true });
+});
+
+app.get('/call-logs', async (req, res) => {
+  const { nick, otherNick } = req.query;
+  if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data } = await supabase.from('call_logs')
+    .select('*')
+    .or(`and(from_nick.eq.${nick},to_nick.eq.${otherNick}),and(from_nick.eq.${otherNick},to_nick.eq.${nick})`)
+    .order('started_at', { ascending: true });
+  res.json({ ok: true, logs: data || [] });
+});
+
 // ── Групи ────────────────────────────────────
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;
@@ -487,58 +516,16 @@ wss.on('connection', (ws) => {
       if (msg.type === 'call_offer') {
         const target = onlineUsers.get(msg.to);
         if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'call_offer',
-            from: userNick,
-            offer: msg.offer,
-            hasVideo: msg.hasVideo || false,
-          }));
+          target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
         } else {
           ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
         }
       }
+      if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
+      if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
+      if (msg.type === 'call_reject') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
+      if (msg.type === 'call_end') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_end', from: userNick })); }
 
-      if (msg.type === 'call_answer') {
-        const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'call_answer',
-            from: userNick,
-            answer: msg.answer,
-          }));
-        }
-      }
-
-      if (msg.type === 'call_ice') {
-        const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'call_ice',
-            from: userNick,
-            candidate: msg.candidate,
-          }));
-        }
-      }
-
-      if (msg.type === 'call_reject') {
-        const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'call_reject',
-            from: userNick,
-          }));
-        }
-      }
-
-      if (msg.type === 'call_end') {
-        const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({
-            type: 'call_end',
-            from: userNick,
-          }));
-        }
-      }
     } catch (e) { console.error('Помилка:', e); }
   });
   ws.on('close', () => { if (userNick) onlineUsers.delete(userNick); });
