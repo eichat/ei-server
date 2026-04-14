@@ -11,6 +11,9 @@ const wss = new WebSocket.Server({ server });
 app.use(express.json({ limit: '10mb' }));
 
 const BCRYPT_ROUNDS = 8;
+// ── Підтвердження email при реєстрації (true = обов'язково, false = без підтвердження) ──
+const REQUIRE_EMAIL_VERIFICATION = false;
+
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const resend = new Resend(process.env.RESEND_API_KEY);
 const onlineUsers = new Map();
@@ -61,12 +64,21 @@ app.post('/register', async (req, res) => {
   const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
   if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
-  try {
-    await sendEmail(email, 'EI° — Підтвердження реєстрації', `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`);
-    res.json({ ok: true, needVerification: true });
-  } catch (e) { res.json({ ok: false, error: 'Помилка відправки email: ' + e.message }); }
+
+  if (REQUIRE_EMAIL_VERIFICATION) {
+    // З підтвердженням email
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
+    try {
+      await sendEmail(email, 'EI° — Підтвердження реєстрації', `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`);
+      res.json({ ok: true, needVerification: true });
+    } catch (e) { res.json({ ok: false, error: 'Помилка відправки email: ' + e.message }); }
+  } else {
+    // Без підтвердження — одразу створюємо акаунт
+    const { error } = await supabase.from('users').insert({ nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash, email, color: color || 4280391411, coins: 5 });
+    if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
+    res.json({ ok: true, needVerification: false });
+  }
 });
 
 app.post('/verify-email', async (req, res) => {
@@ -210,18 +222,7 @@ app.post('/transfer-coins', async (req, res) => {
 app.post('/call-log', async (req, res) => {
   const { fromNick, toNick, hasVideo, startedAt, durationSeconds, status } = req.body;
   if (!fromNick || !toNick || !startedAt || !status) return res.json({ ok: false, error: 'Невірні параметри' });
-  await supabase.from('call_logs').insert({
-    from_nick: fromNick,
-    to_nick: toNick,
-    has_video: hasVideo || false,
-    started_at: startedAt,
-    duration_seconds: durationSeconds || null,
-    status,
-  });
-  // Повідомити співбесідника про лог дзвінка
-  const payload = { type: 'call_log', fromNick, toNick, hasVideo: hasVideo || false, startedAt, durationSeconds: durationSeconds || null, status };
-  const target = onlineUsers.get(toNick === fromNick ? toNick : (fromNick === req.body.myNick ? toNick : fromNick));
-  if (target) target.ws.send(JSON.stringify(payload));
+  await supabase.from('call_logs').insert({ from_nick: fromNick, to_nick: toNick, has_video: hasVideo || false, started_at: startedAt, duration_seconds: durationSeconds || null, status });
   res.json({ ok: true });
 });
 
@@ -243,10 +244,7 @@ app.post('/group/create', async (req, res) => {
   const { data: group, error } = await supabase.from('groups').insert({ name: name.trim(), creator_nick: creatorNick, type: groupType }).select().single();
   if (error) return res.json({ ok: false, error: 'Помилка створення групи' });
   await supabase.from('group_members').insert({ group_id: group.id, nick: creatorNick, role: 'creator' });
-  for (const nick of (members || [])) {
-    if (nick === creatorNick) continue;
-    await sendGroupInvite(group.id, group.name, creatorNick, nick);
-  }
+  for (const nick of (members || [])) { if (nick === creatorNick) continue; await sendGroupInvite(group.id, group.name, creatorNick, nick); }
   res.json({ ok: true, group: { id: group.id, name: group.name, creator_nick: group.creator_nick, type: group.type }, members: [creatorNick] });
 });
 
@@ -259,9 +257,7 @@ app.post('/group/invite-response', async (req, res) => {
     const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
     await notifyMembers(groupId, { type: 'group_member_added', groupId, nick }, nick);
     res.json({ ok: true, group: { id: group.id, name: group.name, creator_nick: group.creator_nick, type: group.type }, members: (members || []).map(m => m.nick) });
-  } else {
-    res.json({ ok: true });
-  }
+  } else { res.json({ ok: true }); }
   await supabase.from('pending_group_invites').delete().eq('group_id', groupId).eq('target_nick', nick);
 });
 
@@ -465,10 +461,7 @@ wss.on('connection', (ws) => {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-        if (target) {
-          target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId }));
-          if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] }));
-        }
+        if (target) { target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
         const { data: u1 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u1) { const newCoins = (u1.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); }
       }
@@ -477,10 +470,7 @@ wss.on('connection', (ws) => {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-        if (target) {
-          target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId }));
-          if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] }));
-        }
+        if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
         const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
       }
@@ -497,11 +487,7 @@ wss.on('connection', (ws) => {
         if (u3) { const newCoins = (u3.coins || 0) + 2; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 2, newCoins); }
       }
 
-      if (msg.type === 'ei_message') {
-        const { data: u4 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
-        if (u4) { const newCoins = (u4.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); }
-      }
-
+      if (msg.type === 'ei_message') { const { data: u4 } = await supabase.from('users').select('coins').eq('nick', userNick).single(); if (u4) { const newCoins = (u4.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); } }
       if (msg.type === 'group_typing') { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } } }
       if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
       if (msg.type === 'edit_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text })); }
@@ -512,15 +498,8 @@ wss.on('connection', (ws) => {
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
-      // ── Дзвінки (WebRTC сигналінг) ──────────
-      if (msg.type === 'call_offer') {
-        const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
-        } else {
-          ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
-        }
-      }
+      // ── Дзвінки ──────────────────────────────
+      if (msg.type === 'call_offer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false })); else ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
       if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
       if (msg.type === 'call_reject') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
