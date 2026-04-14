@@ -244,6 +244,15 @@ app.get('/call-logs', async (req, res) => {
   res.json({ ok: true, logs: data || [] });
 });
 
+app.delete('/call-logs', async (req, res) => {
+  const { nick, otherNick } = req.query;
+  if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  await supabase.from('call_logs')
+    .delete()
+    .or(`and(from_nick.eq.${nick},to_nick.eq.${otherNick}),and(from_nick.eq.${otherNick},to_nick.eq.${nick})`);
+  res.json({ ok: true });
+});
+
 // ── Групи ────────────────────────────────────
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;
