@@ -99,7 +99,7 @@ app.post('/login', async (req, res) => {
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
-  res.json({ ok: true, nick: user.nick, color: user.color, coins: user.coins || 0 });
+  res.json({ ok: true, nick: user.nick, color: user.color, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null });
 });
 
 app.post('/forgot', async (req, res) => {
@@ -178,6 +178,14 @@ app.post('/delete-account', async (req, res) => {
 });
 
 app.get('/online-users', (req, res) => res.json({ ok: true, users: [...onlineUsers.keys()] }));
+
+app.get('/user-info', async (req, res) => {
+  const { nick } = req.query;
+  if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
+  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color').eq('nick', nick).single();
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null });
+});
 
 app.get('/search-user', async (req, res) => {
   const { nick } = req.query;
