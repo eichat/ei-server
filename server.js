@@ -484,10 +484,22 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'file_message') {
-        const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
-        const status = target ? 'delivered' : 'sent';
-        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-        if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+        const ts = Date.now(); const msgId = msg.msgId || null;
+        if (msg.groupId) {
+          // Груповий файл
+          const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
+          if (!membership) return;
+          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
+          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
+          await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: msg.data });
+          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId }));
+        } else {
+          // Особистий файл
+          const target = onlineUsers.get(msg.to);
+          const status = target ? 'delivered' : 'sent';
+          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status });
+          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+        }
         const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
       }
