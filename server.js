@@ -406,7 +406,13 @@ app.post('/group/delete', async (req, res) => {
 app.get('/group/messages', async (req, res) => {
   const { groupId } = req.query;
   const { data } = await supabase.from('group_messages').select('*').eq('group_id', groupId).order('timestamp', { ascending: true });
-  res.json({ ok: true, messages: data || [] });
+  // Включаємо file_data для файлових повідомлень
+  res.json({ ok: true, messages: (data || []).map(m => ({
+    ...m,
+    type: m.type || 'text',
+    file_name: m.file_name || null,
+    file_data: m.file_data || null,
+  })) });
 });
 
 // ── WebSocket ────────────────────────────────
