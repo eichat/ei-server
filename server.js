@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const bcrypt = require('bcrypt');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -15,20 +15,14 @@ const BCRYPT_ROUNDS = 8;
 const REQUIRE_EMAIL_VERIFICATION = false;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const mailer = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com',
-  port: 587,
-  auth: {
-    user: process.env.BREVO_LOGIN,
-    pass: process.env.BREVO_PASSWORD,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
 
 async function sendEmail(to, subject, text) {
-  await mailer.sendMail({ from: 'EI° <eichatserver@gmail.com>', to, subject, text });
+  const { error } = await resend.emails.send({ from: 'EI° <onboarding@resend.dev>', to, subject, text });
+  if (error) throw new Error(error.message);
 }
 
 async function isModOrCreator(groupId, nick) {
@@ -250,13 +244,6 @@ app.get('/call-logs', async (req, res) => {
   res.json({ ok: true, logs: data || [] });
 });
 
-app.delete('/call-logs', async (req, res) => {
-  const { nick, otherNick } = req.query;
-  if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  await supabase.from('call_logs').delete().or(`and(from_nick.eq.${nick},to_nick.eq.${otherNick}),and(from_nick.eq.${otherNick},to_nick.eq.${nick})`);
-  res.json({ ok: true });
-});
-
 // ── Групи ────────────────────────────────────
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;
@@ -410,7 +397,7 @@ app.post('/group/delete', async (req, res) => {
 app.get('/group/messages', async (req, res) => {
   const { groupId } = req.query;
   const { data } = await supabase.from('group_messages').select('*').eq('group_id', groupId).order('timestamp', { ascending: true });
-  res.json({ ok: true, messages: (data || []).map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null })) });
+  res.json({ ok: true, messages: data || [] });
 });
 
 // ── WebSocket ────────────────────────────────
@@ -447,7 +434,7 @@ wss.on('connection', (ws) => {
 
         const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
-          for (const m of pending) ws.send(JSON.stringify(m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, data: m.file_data, timestamp: m.timestamp, msgId: m.msg_id } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp }));
+          for (const m of pending) ws.send(JSON.stringify(m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, data: m.file_data, timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp }));
           await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
         }
 
@@ -455,14 +442,7 @@ wss.on('connection', (ws) => {
         if (myGroups && myGroups.length > 0) {
           for (const gm of myGroups) {
             const { data: pendingGroup } = await supabase.from('group_messages').select('*').eq('group_id', gm.group_id).not('delivered_to', 'cs', `{"${userNick}"}`).order('timestamp', { ascending: true });
-            if (pendingGroup && pendingGroup.length > 0) { for (const m of pendingGroup) {
-              if (m.type === 'file') {
-                ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, data: m.file_data, timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: m.waveform } : {}) }));
-              } else {
-                ws.send(JSON.stringify({ type: 'group_message', groupId: m.group_id, from: m.from_nick, text: m.content, timestamp: m.timestamp, msgId: m.msg_id }));
-              }
-              await supabase.from('group_messages').update({ delivered_to: [...(m.delivered_to || []), userNick] }).eq('id', m.id);
-            } }
+            if (pendingGroup && pendingGroup.length > 0) { for (const m of pendingGroup) { ws.send(JSON.stringify({ type: 'group_message', groupId: m.group_id, from: m.from_nick, text: m.content, timestamp: m.timestamp, msgId: m.msg_id })); await supabase.from('group_messages').update({ delivered_to: [...(m.delivered_to || []), userNick] }).eq('id', m.id); } }
           }
         }
 
@@ -495,19 +475,10 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'file_message') {
-        const ts = Date.now(); const msgId = msg.msgId || null;
-        if (msg.groupId) {
-          const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
-          if (!membership) return;
-          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
-          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
-          await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: msg.data, ...(msg.waveform ? { waveform: msg.waveform } : {}) });
-          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}) }));
-        } else {
-          const target = onlineUsers.get(msg.to); const status = target ? 'delivered' : 'sent';
-          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
-        }
+        const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
+        const status = target ? 'delivered' : 'sent';
+        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}) });
+        if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
         const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
       }
@@ -536,7 +507,17 @@ wss.on('connection', (ws) => {
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
       // ── Дзвінки ──────────────────────────────
-      if (msg.type === 'call_offer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false })); else ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` })); }
+      if (msg.type === 'call_offer') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
+        } else {
+          ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
+          // Зберігаємо missed лог для офлайн отримувача
+          const ts = Date.now();
+          await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: ts, status: 'missed' });
+        }
+      }
       if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
       if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
       if (msg.type === 'call_reject') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
