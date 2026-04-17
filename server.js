@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const bcrypt = require('bcrypt');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -12,17 +12,28 @@ app.use(express.json({ limit: '10mb' }));
 
 const BCRYPT_ROUNDS = 8;
 // ── Підтвердження email при реєстрації (true = обов'язково, false = без підтвердження) ──
-const REQUIRE_EMAIL_VERIFICATION = false;
+const REQUIRE_EMAIL_VERIFICATION = true;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const resend = new Resend(process.env.RESEND_API_KEY);
+const mailer = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  auth: {
+    user: process.env.BREVO_LOGIN,
+    pass: process.env.BREVO_PASSWORD,
+  },
+});
 const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
 
 async function sendEmail(to, subject, text) {
-  const { error } = await resend.emails.send({ from: 'EI° <onboarding@resend.dev>', to, subject, text });
-  if (error) throw new Error(error.message);
+  await mailer.sendMail({
+    from: 'EI° <eichatserver@gmail.com>',
+    to,
+    subject,
+    text,
+  });
 }
 
 async function isModOrCreator(groupId, nick) {
@@ -244,15 +255,6 @@ app.get('/call-logs', async (req, res) => {
   res.json({ ok: true, logs: data || [] });
 });
 
-app.delete('/call-logs', async (req, res) => {
-  const { nick, otherNick } = req.query;
-  if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  await supabase.from('call_logs')
-    .delete()
-    .or(`and(from_nick.eq.${nick},to_nick.eq.${otherNick}),and(from_nick.eq.${otherNick},to_nick.eq.${nick})`);
-  res.json({ ok: true });
-});
-
 // ── Групи ────────────────────────────────────
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;
@@ -406,13 +408,7 @@ app.post('/group/delete', async (req, res) => {
 app.get('/group/messages', async (req, res) => {
   const { groupId } = req.query;
   const { data } = await supabase.from('group_messages').select('*').eq('group_id', groupId).order('timestamp', { ascending: true });
-  // Включаємо file_data для файлових повідомлень
-  res.json({ ok: true, messages: (data || []).map(m => ({
-    ...m,
-    type: m.type || 'text',
-    file_name: m.file_name || null,
-    file_data: m.file_data || null,
-  })) });
+  res.json({ ok: true, messages: data || [] });
 });
 
 // ── WebSocket ────────────────────────────────
@@ -490,22 +486,10 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'file_message') {
-        const ts = Date.now(); const msgId = msg.msgId || null;
-        if (msg.groupId) {
-          // Груповий файл
-          const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
-          if (!membership) return;
-          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
-          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
-          await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: msg.data });
-          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId }));
-        } else {
-          // Особистий файл
-          const target = onlineUsers.get(msg.to);
-          const status = target ? 'delivered' : 'sent';
-          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
-        }
+        const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
+        const status = target ? 'delivered' : 'sent';
+        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status });
+        if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
         const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
         if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
       }
