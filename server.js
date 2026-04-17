@@ -12,7 +12,7 @@ app.use(express.json({ limit: '10mb' }));
 
 const BCRYPT_ROUNDS = 8;
 // ── Підтвердження email при реєстрації (true = обов'язково, false = без підтвердження) ──
-const REQUIRE_EMAIL_VERIFICATION = true;
+const REQUIRE_EMAIL_VERIFICATION = false;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const mailer = nodemailer.createTransport({
