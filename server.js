@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
+const admin = require('firebase-admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -23,6 +24,47 @@ const mailer = nodemailer.createTransport({
 const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
+// FCM токени: nick → token
+const fcmTokens = new Map();
+
+// ── Firebase Admin ────────────────────────────
+// FIREBASE_SERVICE_ACCOUNT — JSON рядок з Firebase Console → Project Settings → Service accounts
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    console.log('Firebase Admin ініціалізовано');
+  } catch (e) {
+    console.error('Помилка ініціалізації Firebase Admin:', e.message);
+  }
+}
+
+async function sendCallPush(toNick, fromNick, hasVideo, offer) {
+  const token = fcmTokens.get(toNick);
+  if (!token) return;
+  try {
+    await admin.messaging().send({
+      token,
+      data: {
+        type: 'call_offer',
+        from_nick: fromNick,
+        has_video: hasVideo ? 'true' : 'false',
+        offer: typeof offer === 'string' ? offer : JSON.stringify(offer),
+      },
+      android: {
+        priority: 'high',
+        ttl: 30000, // 30 секунд — якщо не доставлено, не актуально
+      },
+    });
+    console.log(`FCM push відправлено до ${toNick}`);
+  } catch (e) {
+    console.error(`Помилка FCM push до ${toNick}:`, e.message);
+    // Якщо токен недійсний — видаляємо
+    if (e.code === 'messaging/registration-token-not-registered') {
+      fcmTokens.delete(toNick);
+    }
+  }
+}
 
 async function sendEmail(to, subject, text) {
   await mailer.sendMail({ from: 'EI° <eichatserver@gmail.com>', to, subject, text });
@@ -69,7 +111,6 @@ app.post('/register', async (req, res) => {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
   if (REQUIRE_EMAIL_VERIFICATION) {
-    // З підтвердженням email
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
     try {
@@ -77,7 +118,6 @@ app.post('/register', async (req, res) => {
       res.json({ ok: true, needVerification: true });
     } catch (e) { res.json({ ok: false, error: 'Помилка відправки email: ' + e.message }); }
   } else {
-    // Без підтвердження — одразу створюємо акаунт
     const { error } = await supabase.from('users').insert({ nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash, email, color: color || 4280391411, coins: 5 });
     if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
     res.json({ ok: true, needVerification: false });
@@ -177,6 +217,7 @@ app.post('/delete-account', async (req, res) => {
   await supabase.from('messages').delete().or(`from_nick.eq.${nick},to_nick.eq.${nick}`);
   await supabase.from('users').delete().eq('nick_lower', nick.toLowerCase());
   onlineUsers.delete(nick);
+  fcmTokens.delete(nick);
   res.json({ ok: true });
 });
 
@@ -198,6 +239,14 @@ app.get('/search-user', async (req, res) => {
 });
 
 app.post('/unregister', (req, res) => { const { nick } = req.body; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
+
+// ── FCM токен ────────────────────────────────
+app.post('/register-fcm-token', (req, res) => {
+  const { nick, token } = req.body;
+  if (!nick || !token) return res.json({ ok: false, error: 'Невірні параметри' });
+  fcmTokens.set(nick, token);
+  res.json({ ok: true });
+});
 
 app.post('/update-nick-color', async (req, res) => {
   const { nick, nickColor } = req.body;
@@ -488,6 +537,11 @@ wss.on('connection', (ws) => {
         }
       }
 
+      // ── FCM токен через WebSocket ─────────────
+      if (msg.type === 'register_fcm_token') {
+        if (userNick && msg.token) fcmTokens.set(userNick, msg.token);
+      }
+
       if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
       if (msg.type === 'connect_request') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick })); else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
@@ -548,7 +602,12 @@ wss.on('connection', (ws) => {
         if (target) {
           target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
         } else {
-          ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
+          // Отримувач офлайн — відправляємо FCM push
+          await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
+          // Якщо немає FCM токену — повідомляємо дзвонящому
+          if (!fcmTokens.has(msg.to)) {
+            ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
+          }
           await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
         }
       }
