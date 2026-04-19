@@ -12,7 +12,6 @@ const wss = new WebSocket.Server({ server });
 app.use(express.json({ limit: '10mb' }));
 
 const BCRYPT_ROUNDS = 8;
-// ── Підтвердження email при реєстрації (true = обов'язково, false = без підтвердження) ──
 const REQUIRE_EMAIL_VERIFICATION = false;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -24,11 +23,11 @@ const mailer = nodemailer.createTransport({
 const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
-// FCM токени: nick → token
 const fcmTokens = new Map();
+// Тимчасове сховище offer'ів: callId → {fromNick, toNick, offer, hasVideo, expires}
+const pendingCallOffers = new Map();
 
 // ── Firebase Admin ────────────────────────────
-// FIREBASE_SERVICE_ACCOUNT — JSON рядок з Firebase Console → Project Settings → Service accounts
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -39,9 +38,25 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   }
 }
 
+// Очищення старих offer'ів кожні 2 хвилини
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, data] of pendingCallOffers) {
+    if (now > data.expires) pendingCallOffers.delete(id);
+  }
+}, 120000);
+
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   const token = fcmTokens.get(toNick);
   if (!token) return;
+  // Зберігаємо offer окремо — SDP занадто великий для FCM payload (ліміт 4KB)
+  const callId = `${fromNick}_${toNick}_${Date.now()}`;
+  pendingCallOffers.set(callId, {
+    fromNick, toNick,
+    offer: typeof offer === 'string' ? offer : JSON.stringify(offer),
+    hasVideo,
+    expires: Date.now() + 60000,
+  });
   try {
     await admin.messaging().send({
       token,
@@ -49,22 +64,26 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
         type: 'call_offer',
         from_nick: fromNick,
         has_video: hasVideo ? 'true' : 'false',
-        offer: typeof offer === 'string' ? offer : JSON.stringify(offer),
+        call_id: callId,
       },
-      android: {
-        priority: 'high',
-        ttl: 30000, // 30 секунд — якщо не доставлено, не актуально
-      },
+      android: { priority: 'high', ttl: 30000 },
     });
-    console.log(`FCM push відправлено до ${toNick}`);
+    console.log(`FCM push відправлено до ${toNick}, callId=${callId}`);
   } catch (e) {
     console.error(`Помилка FCM push до ${toNick}:`, e.message);
-    // Якщо токен недійсний — видаляємо
-    if (e.code === 'messaging/registration-token-not-registered') {
-      fcmTokens.delete(toNick);
-    }
+    pendingCallOffers.delete(callId);
+    if (e.code === 'messaging/registration-token-not-registered') fcmTokens.delete(toNick);
   }
 }
+
+// Endpoint: Flutter завантажує offer по callId після отримання push
+app.get('/call-offer', (req, res) => {
+  const { callId } = req.query;
+  if (!callId) return res.json({ ok: false, error: 'callId обов\'язковий' });
+  const data = pendingCallOffers.get(callId);
+  if (!data) return res.json({ ok: false, error: 'Offer не знайдено або застарів' });
+  res.json({ ok: true, fromNick: data.fromNick, offer: data.offer, hasVideo: data.hasVideo });
+});
 
 async function sendEmail(to, subject, text) {
   await mailer.sendMail({ from: 'EI° <eichatserver@gmail.com>', to, subject, text });
@@ -109,7 +128,6 @@ app.post('/register', async (req, res) => {
   const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
   if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-
   if (REQUIRE_EMAIL_VERIFICATION) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
@@ -240,7 +258,6 @@ app.get('/search-user', async (req, res) => {
 
 app.post('/unregister', (req, res) => { const { nick } = req.body; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
 
-// ── FCM токен ────────────────────────────────
 app.post('/register-fcm-token', (req, res) => {
   const { nick, token } = req.body;
   if (!nick || !token) return res.json({ ok: false, error: 'Невірні параметри' });
@@ -288,7 +305,6 @@ app.post('/transfer-coins', async (req, res) => {
   res.json({ ok: true, newBalance: (sender.coins || 0) - amount });
 });
 
-// ── Логи дзвінків ────────────────────────────
 app.post('/call-log', async (req, res) => {
   const { fromNick, toNick, hasVideo, startedAt, durationSeconds, status } = req.body;
   if (!fromNick || !toNick || !startedAt || !status) return res.json({ ok: false, error: 'Невірні параметри' });
@@ -313,7 +329,6 @@ app.delete('/call-logs', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Групи ────────────────────────────────────
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;
   if (!name || name.trim().length < 1) return res.json({ ok: false, error: 'Назва групи порожня' });
@@ -537,7 +552,6 @@ wss.on('connection', (ws) => {
         }
       }
 
-      // ── FCM токен через WebSocket ─────────────
       if (msg.type === 'register_fcm_token') {
         if (userNick && msg.token) fcmTokens.set(userNick, msg.token);
       }
@@ -602,9 +616,7 @@ wss.on('connection', (ws) => {
         if (target) {
           target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
         } else {
-          // Отримувач офлайн — відправляємо FCM push
           await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
-          // Якщо немає FCM токену — повідомляємо дзвонящому
           if (!fcmTokens.has(msg.to)) {
             ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
           }
