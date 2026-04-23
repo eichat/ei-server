@@ -85,6 +85,14 @@ app.get('/call-offer', (req, res) => {
   res.json({ ok: true, fromNick: data.fromNick, offer: data.offer, hasVideo: data.hasVideo });
 });
 
+app.post('/decline-call', (req, res) => {
+  const { fromNick, toNick } = req.body;
+  if (!fromNick || !toNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const target = onlineUsers.get(toNick);
+  if (target) target.ws.send(JSON.stringify({ type: 'call_reject', from: fromNick }));
+  res.json({ ok: true });
+});
+
 async function sendEmail(to, subject, text) {
   await mailer.sendMail({ from: 'EI° <eichatserver@gmail.com>', to, subject, text });
 }
