@@ -24,10 +24,8 @@ const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
 const fcmTokens = new Map();
-// Тимчасове сховище offer'ів: callId → {fromNick, toNick, offer, hasVideo, expires}
 const pendingCallOffers = new Map();
 
-// ── Firebase Admin ────────────────────────────
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -38,7 +36,6 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   }
 }
 
-// Очищення старих offer'ів кожні 2 хвилини
 setInterval(() => {
   const now = Date.now();
   for (const [id, data] of pendingCallOffers) {
@@ -49,7 +46,6 @@ setInterval(() => {
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   const token = fcmTokens.get(toNick);
   if (!token) return;
-  // Зберігаємо offer окремо — SDP занадто великий для FCM payload (ліміт 4KB)
   const callId = `${fromNick}_${toNick}_${Date.now()}`;
   pendingCallOffers.set(callId, {
     fromNick, toNick,
@@ -76,7 +72,21 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   }
 }
 
-// Endpoint: Flutter завантажує offer по callId після отримання push
+async function sendFcmPush(toNick, data) {
+  const token = fcmTokens.get(toNick);
+  if (!token) return;
+  try {
+    await admin.messaging().send({
+      token,
+      data,
+      android: { priority: 'high', ttl: 10000 },
+    });
+  } catch (e) {
+    console.error(`FCM push error до ${toNick}:`, e.message);
+    if (e.code === 'messaging/registration-token-not-registered') fcmTokens.delete(toNick);
+  }
+}
+
 app.get('/call-offer', (req, res) => {
   const { callId } = req.query;
   if (!callId) return res.json({ ok: false, error: 'callId обов\'язковий' });
@@ -631,10 +641,44 @@ wss.on('connection', (ws) => {
           await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
         }
       }
-      if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
-      if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
-      if (msg.type === 'call_reject') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
-      if (msg.type === 'call_end') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_end', from: userNick })); }
+
+      if (msg.type === 'call_answer') {
+        const target = onlineUsers.get(msg.to);
+        if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer }));
+      }
+
+      if (msg.type === 'call_ice') {
+        const target = onlineUsers.get(msg.to);
+        if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate }));
+      }
+
+      if (msg.type === 'call_reject') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick }));
+        } else {
+          // Відправник офлайн — надсилаємо FCM push
+          await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
+        }
+        // Зберігаємо лог відхиленого дзвінка
+        await supabase.from('call_logs').insert({
+          from_nick: msg.to, to_nick: userNick,
+          has_video: msg.hasVideo || false,
+          started_at: Date.now(),
+          duration_seconds: null,
+          status: 'rejected'
+        }).catch(() => {});
+      }
+
+      if (msg.type === 'call_end') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({ type: 'call_end', from: userNick }));
+        } else {
+          // Android у фоні — надсилаємо FCM push щоб зупинити рінгтон
+          await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
+        }
+      }
 
     } catch (e) { console.error('Помилка:', e); }
   });
@@ -645,4 +689,4 @@ setInterval(() => { const now = Date.now(); for (const [nick, user] of onlineUse
 setInterval(async () => { const week = Date.now() - 7 * 24 * 60 * 60 * 1000; await supabase.from('messages').delete().eq('delivered', true).lt('timestamp', week); }, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`EI° сервер запущено на порті ${PORT}`));
+server.listen(PORT, () => console.log(`EION сервер запущено на порті ${PORT}`));
