@@ -136,6 +136,7 @@ async function notifyCoins(nick, amount, total) {
   if (user) user.ws.send(JSON.stringify({ type: 'coins_update', amount, total }));
 }
 
+// ── Реєстрація: 50 EION за реєстрацію ────────
 app.post('/register', async (req, res) => {
   const { nick, password, email, color } = req.body;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
@@ -150,11 +151,12 @@ app.post('/register', async (req, res) => {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
     try {
-      await sendEmail(email, 'EI° — Підтвердження реєстрації', `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`);
+      await sendEmail(email, 'EION — Підтвердження реєстрації', `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`);
       res.json({ ok: true, needVerification: true });
     } catch (e) { res.json({ ok: false, error: 'Помилка відправки email: ' + e.message }); }
   } else {
-    const { error } = await supabase.from('users').insert({ nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash, email, color: color || 4280391411, coins: 5 });
+    // 50 EION за реєстрацію
+    const { error } = await supabase.from('users').insert({ nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash, email, color: color || 4280391411, coins: 50 });
     if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
     res.json({ ok: true, needVerification: false });
   }
@@ -166,7 +168,8 @@ app.post('/verify-email', async (req, res) => {
   if (!pending) return res.json({ ok: false, error: 'Реєстрацію не знайдено' });
   if (Date.now() > pending.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (pending.code !== code) return res.json({ ok: false, error: 'Невірний код' });
-  const { error } = await supabase.from('users').insert({ nick: pending.nick, nick_lower: pending.nick.toLowerCase(), password_hash: pending.passwordHash, email, color: pending.color, coins: 5 });
+  // 50 EION за реєстрацію з верифікацією email
+  const { error } = await supabase.from('users').insert({ nick: pending.nick, nick_lower: pending.nick.toLowerCase(), password_hash: pending.passwordHash, email, color: pending.color, coins: 50 });
   if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
   pendingRegistrations.delete(email);
   res.json({ ok: true });
@@ -188,7 +191,7 @@ app.post('/forgot', async (req, res) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   resetCodes.set(email, { code, nick: user.nick, expires: Date.now() + 15 * 60 * 1000 });
   try {
-    await sendEmail(email, 'EI° — Відновлення пароля', `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`);
+    await sendEmail(email, 'EION — Відновлення пароля', `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`);
     res.json({ ok: true });
   } catch (e) { res.json({ ok: false, error: 'Помилка відправки email' }); }
 });
@@ -578,13 +581,12 @@ wss.on('connection', (ws) => {
       if (msg.type === 'connect_request') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick })); else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
 
+      // ── Повідомлення (БЕЗ нарахування монет) ──
       if (msg.type === 'chat_message') {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status });
         if (target) { target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
-        const { data: u1 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
-        if (u1) { const newCoins = (u1.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); }
       }
 
       if (msg.type === 'file_message') {
@@ -601,8 +603,6 @@ wss.on('connection', (ws) => {
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: msg.data, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}) });
           if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, data: msg.data, timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
         }
-        const { data: u2 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
-        if (u2) { const newCoins = (u2.coins || 0) + 3; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 3, newCoins); }
       }
 
       if (msg.type === 'group_message') {
@@ -613,11 +613,11 @@ wss.on('connection', (ws) => {
         const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
         await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers] });
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId }));
-        const { data: u3 } = await supabase.from('users').select('coins').eq('nick', userNick).single();
-        if (u3) { const newCoins = (u3.coins || 0) + 2; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 2, newCoins); }
       }
 
-      if (msg.type === 'ei_message') { const { data: u4 } = await supabase.from('users').select('coins').eq('nick', userNick).single(); if (u4) { const newCoins = (u4.coins || 0) + 1; await supabase.from('users').update({ coins: newCoins }).eq('nick', userNick); await notifyCoins(userNick, 1, newCoins); } }
+      // ei_message — БЕЗ нарахування монет
+      if (msg.type === 'ei_message') { /* нарахування прибрано */ }
+
       if (msg.type === 'group_typing') { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } } }
       if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
       if (msg.type === 'edit_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text })); }
@@ -657,10 +657,8 @@ wss.on('connection', (ws) => {
         if (target) {
           target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick }));
         } else {
-          // Відправник офлайн — надсилаємо FCM push
           await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
         }
-        // Зберігаємо лог відхиленого дзвінка
         await supabase.from('call_logs').insert({
           from_nick: msg.to, to_nick: userNick,
           has_video: msg.hasVideo || false,
@@ -675,7 +673,6 @@ wss.on('connection', (ws) => {
         if (target) {
           target.ws.send(JSON.stringify({ type: 'call_end', from: userNick }));
         } else {
-          // Android у фоні — надсилаємо FCM push щоб зупинити рінгтон
           await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
         }
       }
