@@ -56,29 +56,13 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   try {
     await admin.messaging().send({
       token,
-      // notification payload — Android розбудить додаток навіть якщо він закритий
-      notification: {
-        title: `📞 Вхідний дзвінок від ${fromNick}`,
-        body: hasVideo ? 'Відеодзвінок' : 'Аудіодзвінок',
-      },
       data: {
         type: 'call_offer',
         from_nick: fromNick,
         has_video: hasVideo ? 'true' : 'false',
         call_id: callId,
       },
-      android: {
-        priority: 'high',
-        ttl: 30000,
-        notification: {
-          channelId: 'incoming_calls_v2',
-          priority: 'max',
-          defaultSound: false,
-          defaultVibrateTimings: false,
-          // Не показуємо стандартне сповіщення — EiFirebaseService покаже своє
-          visibility: 'public',
-        },
-      },
+      android: { priority: 'high', ttl: 30000 },
     });
     console.log(`FCM push відправлено до ${toNick}, callId=${callId}`);
   } catch (e) {
@@ -171,6 +155,7 @@ app.post('/register', async (req, res) => {
       res.json({ ok: true, needVerification: true });
     } catch (e) { res.json({ ok: false, error: 'Помилка відправки email: ' + e.message }); }
   } else {
+    // 50 EION за реєстрацію
     const { error } = await supabase.from('users').insert({ nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash, email, color: color || 4280391411, coins: 50 });
     if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
     res.json({ ok: true, needVerification: false });
@@ -183,6 +168,7 @@ app.post('/verify-email', async (req, res) => {
   if (!pending) return res.json({ ok: false, error: 'Реєстрацію не знайдено' });
   if (Date.now() > pending.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (pending.code !== code) return res.json({ ok: false, error: 'Невірний код' });
+  // 50 EION за реєстрацію з верифікацією email
   const { error } = await supabase.from('users').insert({ nick: pending.nick, nick_lower: pending.nick.toLowerCase(), password_hash: pending.passwordHash, email, color: pending.color, coins: 50 });
   if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
   pendingRegistrations.delete(email);
@@ -519,19 +505,6 @@ app.get('/group/messages', async (req, res) => {
   res.json({ ok: true, messages: (data || []).map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null })) });
 });
 
-app.post('/group/ban-member', async (req, res) => {
-  const { groupId, requesterNick, targetNick } = req.body;
-  if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Недостатньо прав' });
-  await supabase.from('group_members').delete().eq('group_id', groupId).eq('nick', targetNick);
-  await supabase.from('group_bans').upsert({ group_id: groupId, nick: targetNick });
-  const target = onlineUsers.get(targetNick);
-  if (target) target.ws.send(JSON.stringify({ type: 'group_removed', groupId }));
-  await notifyMembers(groupId, { type: 'group_member_removed', groupId, nick: targetNick });
-  res.json({ ok: true });
-});
-
-app.get('/ping', (req, res) => res.json({ ok: true }));
-
 // ── WebSocket ────────────────────────────────
 wss.on('connection', (ws) => {
   let userNick = null;
@@ -608,6 +581,7 @@ wss.on('connection', (ws) => {
       if (msg.type === 'connect_request') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick })); else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
 
+      // ── Повідомлення (БЕЗ нарахування монет) ──
       if (msg.type === 'chat_message') {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
@@ -641,6 +615,7 @@ wss.on('connection', (ws) => {
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId }));
       }
 
+      // ei_message — БЕЗ нарахування монет
       if (msg.type === 'ei_message') { /* нарахування прибрано */ }
 
       if (msg.type === 'group_typing') { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } } }
