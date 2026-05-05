@@ -5,6 +5,8 @@ const bcrypt = require('bcrypt');
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 const admin = require('firebase-admin');
+const https = require('https');
+const httpModule = require('http');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,6 +27,7 @@ const resetCodes = new Map();
 const pendingRegistrations = new Map();
 const fcmTokens = new Map();
 const pendingCallOffers = new Map();
+const linkPreviewCache = new Map(); // кеш превью на 1 годину
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
@@ -41,7 +44,95 @@ setInterval(() => {
   for (const [id, data] of pendingCallOffers) {
     if (now > data.expires) pendingCallOffers.delete(id);
   }
+  // Очищаємо застарілий кеш превью
+  for (const [url, data] of linkPreviewCache) {
+    if (now > data.expires) linkPreviewCache.delete(url);
+  }
 }, 120000);
+
+// ── Link Preview ──────────────────────────────
+app.get('/link-preview', async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.json({ ok: false, error: 'url обов\'язковий' });
+
+  // Перевіряємо кеш
+  const cached = linkPreviewCache.get(url);
+  if (cached) return res.json({ ok: true, ...cached.data });
+
+  try {
+    const html = await fetchUrl(url);
+    const preview = parseOpenGraph(html, url);
+    // Кешуємо на 1 годину
+    linkPreviewCache.set(url, { data: preview, expires: Date.now() + 3600000 });
+    res.json({ ok: true, ...preview });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+function fetchUrl(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : httpModule;
+    const req = client.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; EIONBot/1.0)',
+        'Accept': 'text/html',
+      },
+      timeout: 8000,
+    }, (resp) => {
+      // Обробляємо редиректи
+      if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
+        return fetchUrl(resp.headers.location).then(resolve).catch(reject);
+      }
+      let data = '';
+      resp.setEncoding('utf8');
+      resp.on('data', chunk => {
+        data += chunk;
+        if (data.length > 100000) { resp.destroy(); resolve(data); } // макс 100KB
+      });
+      resp.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
+function parseOpenGraph(html, url) {
+  const getMeta = (property) => {
+    const match = html.match(new RegExp(
+      `<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']+)["']`,
+      'i'
+    )) || html.match(new RegExp(
+      `<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${property}["']`,
+      'i'
+    ));
+    return match ? match[1].trim() : null;
+  };
+
+  const title = getMeta('og:title') || getMeta('twitter:title') ||
+    (html.match(/<title[^>]*>([^<]+)<\/title>/i) || [])[1]?.trim() || null;
+
+  const description = getMeta('og:description') || getMeta('twitter:description') ||
+    getMeta('description') || null;
+
+  let image = getMeta('og:image') || getMeta('twitter:image') || null;
+
+  // Якщо image відносний URL — робимо абсолютним
+  if (image && !image.startsWith('http')) {
+    try {
+      const base = new URL(url);
+      image = new URL(image, base.origin).toString();
+    } catch (_) { image = null; }
+  }
+
+  const siteName = getMeta('og:site_name') || null;
+
+  // Витягуємо домен для відображення
+  let domain = url;
+  try { domain = new URL(url).hostname.replace('www.', ''); } catch (_) {}
+
+  return { title, description, image, siteName, domain, url };
+}
 
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   const token = fcmTokens.get(toNick);
@@ -136,7 +227,6 @@ async function notifyCoins(nick, amount, total) {
   if (user) user.ws.send(JSON.stringify({ type: 'coins_update', amount, total }));
 }
 
-// ── Реєстрація: 50 EION за реєстрацію ────────
 app.post('/register', async (req, res) => {
   const { nick, password, email, color } = req.body;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
@@ -155,7 +245,6 @@ app.post('/register', async (req, res) => {
       res.json({ ok: true, needVerification: true });
     } catch (e) { res.json({ ok: false, error: 'Помилка відправки email: ' + e.message }); }
   } else {
-    // 50 EION за реєстрацію
     const { error } = await supabase.from('users').insert({ nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash, email, color: color || 4280391411, coins: 50 });
     if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
     res.json({ ok: true, needVerification: false });
@@ -168,7 +257,6 @@ app.post('/verify-email', async (req, res) => {
   if (!pending) return res.json({ ok: false, error: 'Реєстрацію не знайдено' });
   if (Date.now() > pending.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (pending.code !== code) return res.json({ ok: false, error: 'Невірний код' });
-  // 50 EION за реєстрацію з верифікацією email
   const { error } = await supabase.from('users').insert({ nick: pending.nick, nick_lower: pending.nick.toLowerCase(), password_hash: pending.passwordHash, email, color: pending.color, coins: 50 });
   if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
   pendingRegistrations.delete(email);
@@ -505,6 +593,8 @@ app.get('/group/messages', async (req, res) => {
   res.json({ ok: true, messages: (data || []).map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null })) });
 });
 
+app.get('/ping', (req, res) => res.json({ ok: true }));
+
 // ── WebSocket ────────────────────────────────
 wss.on('connection', (ws) => {
   let userNick = null;
@@ -581,7 +671,6 @@ wss.on('connection', (ws) => {
       if (msg.type === 'connect_request') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick })); else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
 
-      // ── Повідомлення (БЕЗ нарахування монет) ──
       if (msg.type === 'chat_message') {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
@@ -615,7 +704,6 @@ wss.on('connection', (ws) => {
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId }));
       }
 
-      // ei_message — БЕЗ нарахування монет
       if (msg.type === 'ei_message') { /* нарахування прибрано */ }
 
       if (msg.type === 'group_typing') { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } } }
@@ -628,7 +716,6 @@ wss.on('connection', (ws) => {
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
-      // ── Дзвінки ──────────────────────────────
       if (msg.type === 'call_offer') {
         const target = onlineUsers.get(msg.to);
         if (target) {
