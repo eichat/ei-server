@@ -868,4 +868,67 @@ wss.on('connection', (ws) => {
       if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
       if (msg.type === 'edit_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text })); }
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
-      if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.ms
+      if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
+      if (msg.type === 'read_receipt') { await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to); const target = onlineUsers.get(msg.to); if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); } }
+      if (msg.type === 'delete_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId })); else await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
+      if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
+      if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
+
+      if (msg.type === 'call_offer') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
+        } else {
+          await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
+          if (!fcmTokens.has(msg.to)) {
+            ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
+          }
+          await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
+        }
+      }
+
+      if (msg.type === 'call_answer') {
+        const target = onlineUsers.get(msg.to);
+        if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer }));
+      }
+
+      if (msg.type === 'call_ice') {
+        const target = onlineUsers.get(msg.to);
+        if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate }));
+      }
+
+      if (msg.type === 'call_reject') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick }));
+        } else {
+          await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
+        }
+        await supabase.from('call_logs').insert({
+          from_nick: msg.to, to_nick: userNick,
+          has_video: msg.hasVideo || false,
+          started_at: Date.now(),
+          duration_seconds: null,
+          status: 'rejected'
+        }).catch(() => {});
+      }
+
+      if (msg.type === 'call_end') {
+        const target = onlineUsers.get(msg.to);
+        if (target) {
+          target.ws.send(JSON.stringify({ type: 'call_end', from: userNick }));
+        } else {
+          await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
+        }
+      }
+
+    } catch (e) { console.error('Помилка:', e); }
+  });
+  ws.on('close', () => { if (userNick) onlineUsers.delete(userNick); });
+});
+
+setInterval(() => { const now = Date.now(); for (const [nick, user] of onlineUsers) if (now - user.lastSeen > 60000) onlineUsers.delete(nick); }, 60000);
+setInterval(async () => { const week = Date.now() - 7 * 24 * 60 * 60 * 1000; await supabase.from('messages').delete().eq('delivered', true).lt('timestamp', week); }, 60 * 60 * 1000);
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`EION сервер запущено на порті ${PORT}`));
