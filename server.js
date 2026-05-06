@@ -54,21 +54,42 @@ setInterval(() => {
 app.get('/link-preview', async (req, res) => {
   const { url } = req.query;
   if (!url) return res.json({ ok: false, error: 'url обов\'язковий' });
-
-  // Перевіряємо кеш
   const cached = linkPreviewCache.get(url);
   if (cached) return res.json({ ok: true, ...cached.data });
-
   try {
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) {
+      const videoId = ytMatch[1];
+      let title = null;
+      try {
+        const oembed = await fetchJson(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
+        title = oembed.title || null;
+      } catch (_) {}
+      const preview = { title, description: null, image: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`, siteName: 'YouTube', domain: 'youtube.com', url };
+      linkPreviewCache.set(url, { data: preview, expires: Date.now() + 3600000 });
+      return res.json({ ok: true, ...preview });
+    }
     const html = await fetchUrl(url);
     const preview = parseOpenGraph(html, url);
-    // Кешуємо на 1 годину
     linkPreviewCache.set(url, { data: preview, expires: Date.now() + 3600000 });
     res.json({ ok: true, ...preview });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
 });
+
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : httpModule;
+    const req = client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, timeout: 5000 }, (resp) => {
+      let data = '';
+      resp.on('data', chunk => data += chunk);
+      resp.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+}
 
 function fetchUrl(url) {
   return new Promise((resolve, reject) => {
