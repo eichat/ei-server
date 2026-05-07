@@ -49,7 +49,7 @@ app.get('/link-preview', async (req, res) => {
   const cached = linkPreviewCache.get(url);
   if (cached) return res.json({ ok: true, ...cached.data });
   try {
-    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
     if (ytMatch) {
       const videoId = ytMatch[1];
       let title = null;
