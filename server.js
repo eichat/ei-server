@@ -579,13 +579,13 @@ app.get('/channel/messages', async (req, res) => {
 });
 
 app.post('/channel/message', async (req, res) => {
-  const { channelId, fromNick, text, imageUrl } = req.body;
-  if (!channelId || !fromNick || (!text && !imageUrl)) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { channelId, fromNick, text, imageUrl, fileData, fileName } = req.body;
+  if (!channelId || !fromNick || (!text && !imageUrl && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Тільки власник або адмін може писати' });
   const ts = Date.now(); const msgId = `ch_${channelId}_${ts}`;
-  const { data: msg } = await supabase.from('channel_messages').insert({ channel_id: channelId, from_nick: fromNick, content: text || null, image_url: imageUrl || null, timestamp: ts, msg_id: msgId }).select().single();
-  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, timestamp: ts, msgId }, fromNick);
+  const { data: msg } = await supabase.from('channel_messages').insert({ channel_id: channelId, from_nick: fromNick, content: text || null, image_url: imageUrl || null, file_data: fileData || null, file_name: fileName || null, timestamp: ts, msg_id: msgId }).select().single();
+  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId }, fromNick);
   res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } });
 });
 
@@ -597,8 +597,8 @@ app.get('/channel/comments', async (req, res) => {
 });
 
 app.post('/channel/comment', async (req, res) => {
-  const { channelId, postId, fromNick, text } = req.body;
-  if (!channelId || !postId || !fromNick || !text) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { channelId, postId, fromNick, text, fileData, fileName } = req.body;
+  if (!channelId || !postId || !fromNick || (!text && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   // Перевіряємо чи не заблокований
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
@@ -606,9 +606,9 @@ app.post('/channel/comment', async (req, res) => {
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member) return res.json({ ok: false, error: 'Підпишіться на канал щоб коментувати' });
   const ts = Date.now();
-  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text, timestamp: ts }).select().single();
+  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || null, file_data: fileData || null, file_name: fileName || null, timestamp: ts }).select().single();
   // Сповіщаємо підписників
-  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text, timestamp: ts, commentId: comment.id }, fromNick);
+  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, fileName: fileName || null, timestamp: ts, commentId: comment.id }, fromNick);
   res.json({ ok: true, comment });
 });
 
