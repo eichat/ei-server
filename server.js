@@ -524,12 +524,23 @@ app.get('/ping', (req, res) => res.json({ ok: true }));
 
 // ── Канали ──────────────────────────────────────
 app.post('/channel/create', async (req, res) => {
-  const { ownerNick, name, description, type } = req.body;
+  const { ownerNick, name, description, type, subscribers } = req.body;
   if (!ownerNick || !name || name.trim().length < 1) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data: channel, error } = await supabase.from('channels').insert({ name: name.trim(), description: description || null, owner_nick: ownerNick, type: type || 'public', created_at: Date.now() }).select().single();
+  const { data: channel, error } = await supabase.from('channels').insert({
+    name: name.trim(), description: description || null,
+    owner_nick: ownerNick, type: type || 'public',
+    created_at: Date.now(), last_post_at: null, last_post_text: null,
+  }).select().single();
   if (error) return res.json({ ok: false, error: 'Помилка створення каналу' });
+  // Додаємо власника
   await supabase.from('channel_members').insert({ channel_id: channel.id, nick: ownerNick, role: 'owner' });
-  res.json({ ok: true, channel });
+  // Додаємо підписників зі списку
+  for (const nick of (subscribers || [])) {
+    if (nick === ownerNick) continue;
+    const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channel.id).eq('nick', nick).single();
+    if (!blocked) await supabase.from('channel_members').insert({ channel_id: channel.id, nick, role: 'subscriber' }).catch(() => {});
+  }
+  res.json({ ok: true, channel: { ...channel, myRole: 'owner', subscriberCount: 1 + (subscribers || []).length, lastPostAt: null, lastPostText: null } });
 });
 
 app.get('/channel/list', async (req, res) => {
@@ -542,8 +553,21 @@ app.get('/channel/list', async (req, res) => {
   const result = [];
   for (const c of channels || []) {
     const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', c.id);
-    result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0 });
+    // Останній пост
+    const { data: lastPosts } = await supabase.from('channel_messages')
+      .select('content, image_url, timestamp')
+      .eq('channel_id', c.id)
+      .order('timestamp', { ascending: false })
+      .limit(1);
+    const lastPost = lastPosts && lastPosts.length > 0 ? lastPosts[0] : null;
+    const lastPostAt = lastPost ? lastPost.timestamp : (c.last_post_at || c.created_at || null);
+    const lastPostText = lastPost
+      ? (lastPost.content ? lastPost.content.substring(0, 50) : (lastPost.image_url ? '🖼 Зображення' : ''))
+      : null;
+    result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0, lastPostAt, lastPostText });
   }
+  // Сортуємо по часу останнього поста (спочатку найновіші)
+  result.sort((a, b) => (b.lastPostAt || 0) - (a.lastPostAt || 0));
   res.json({ ok: true, channels: result });
 });
 
@@ -599,7 +623,15 @@ app.post('/channel/message', async (req, res) => {
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Тільки власник або адмін може писати' });
   const ts = Date.now(); const msgId = `ch_${channelId}_${ts}`;
-  const { data: msg } = await supabase.from('channel_messages').insert({ channel_id: channelId, from_nick: fromNick, content: text || null, image_url: imageUrl || null, timestamp: ts, msg_id: msgId }).select().single();
+  const { data: msg } = await supabase.from('channel_messages').insert({
+    channel_id: channelId, from_nick: fromNick,
+    content: text || null, image_url: imageUrl || null,
+    timestamp: ts, msg_id: msgId,
+  }).select().single();
+  // Оновлюємо час останнього поста в каналі
+  const lastText = text ? text.substring(0, 50) : (imageUrl ? '🖼 Зображення' : '');
+  await supabase.from('channels').update({ last_post_at: ts, last_post_text: lastText }).eq('id', channelId);
+  // Сповіщаємо підписників
   await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, timestamp: ts, msgId }, fromNick);
   res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } });
 });
@@ -722,6 +754,52 @@ app.post('/channel/contact-owner', async (req, res) => {
   const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -CONTACT_PRICE, total: (sender.coins || 0) - CONTACT_PRICE }));
   const ownerWs = onlineUsers.get(channel.owner_nick); if (ownerWs) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: OWNER_SHARE, total: (owner.coins || 0) + OWNER_SHARE }));
   res.json({ ok: true, ownerNick: channel.owner_nick });
+});
+
+// Редагування поста
+app.post('/channel/edit-message', async (req, res) => {
+  const { channelId, postId, fromNick, text } = req.body;
+  if (!channelId || !postId || !fromNick || !text) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
+  const canEdit = post.from_nick === fromNick || (member && ['owner', 'admin'].includes(member.role));
+  if (!canEdit) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_messages').update({ content: text, edited: true }).eq('id', postId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_post_edited', channelId, postId, text }, null);
+  res.json({ ok: true });
+});
+
+// Видалення поста
+app.delete('/channel/post', async (req, res) => {
+  const { postId, channelId, requesterNick } = req.body;
+  if (!postId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
+  const canDelete = post.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
+  if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_comments').delete().eq('post_id', postId);
+  await supabase.from('channel_reactions').delete().eq('post_id', postId);
+  await supabase.from('channel_messages').delete().eq('id', postId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
+  res.json({ ok: true });
+});
+
+// Оновлення налаштувань каналу (назва, опис, тип, аватар)
+app.post('/channel/update', async (req, res) => {
+  const { channelId, ownerNick, name, description, type, avatar_url } = req.body;
+  if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (description !== undefined) updates.description = description;
+  if (type !== undefined) updates.type = type;
+  if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+  if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати' });
+  await supabase.from('channels').update(updates).eq('id', channelId);
+  res.json({ ok: true });
 });
 
 app.post('/channel/delete', async (req, res) => {
