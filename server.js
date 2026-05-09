@@ -11,7 +11,7 @@ const httpModule = require('http');
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-app.use(express.json({ limit: '20mb' }));
+app.use(express.json({ limit: '60mb' }));
 
 const BCRYPT_ROUNDS = 8;
 const REQUIRE_EMAIL_VERIFICATION = false;
@@ -204,7 +204,6 @@ app.post('/login', async (req, res) => {
   const { nick, password } = req.body;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  // Перевіряємо бан
   const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', user.nick).single();
   if (ban) return res.json({ ok: false, error: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` });
   const valid = await bcrypt.compare(password, user.password_hash);
@@ -294,18 +293,12 @@ app.get('/search-user', async (req, res) => {
   res.json({ ok: true, users: (data || []).map(u => u.nick) });
 });
 
-// Пошук зареєстрованих користувачів за номерами телефонів (для екрану Контакти)
 app.post('/users/by-phones', async (req, res) => {
   const { phones } = req.body;
   if (!phones || !Array.isArray(phones) || phones.length === 0) return res.json({ ok: false, error: 'Невірні параметри' });
-  // phones — масив нормалізованих номерів (останні 9 цифр)
   const { data } = await supabase.from('users').select('nick, phone_normalized').not('phone_normalized', 'is', null);
   const result = {};
-  for (const user of data || []) {
-    if (phones.includes(user.phone_normalized)) {
-      result[user.phone_normalized] = user.nick;
-    }
-  }
+  for (const user of data || []) { if (phones.includes(user.phone_normalized)) result[user.phone_normalized] = user.nick; }
   res.json({ ok: true, users: result });
 });
 
@@ -532,9 +525,7 @@ app.post('/channel/create', async (req, res) => {
     created_at: Date.now(), last_post_at: null, last_post_text: null,
   }).select().single();
   if (error) return res.json({ ok: false, error: 'Помилка створення каналу' });
-  // Додаємо власника
   await supabase.from('channel_members').insert({ channel_id: channel.id, nick: ownerNick, role: 'owner' });
-  // Додаємо підписників зі списку
   for (const nick of (subscribers || [])) {
     if (nick === ownerNick) continue;
     const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channel.id).eq('nick', nick).single();
@@ -553,20 +544,12 @@ app.get('/channel/list', async (req, res) => {
   const result = [];
   for (const c of channels || []) {
     const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', c.id);
-    // Останній пост
-    const { data: lastPosts } = await supabase.from('channel_messages')
-      .select('content, image_url, timestamp')
-      .eq('channel_id', c.id)
-      .order('timestamp', { ascending: false })
-      .limit(1);
+    const { data: lastPosts } = await supabase.from('channel_messages').select('content, image_url, file_name, timestamp').eq('channel_id', c.id).order('timestamp', { ascending: false }).limit(1);
     const lastPost = lastPosts && lastPosts.length > 0 ? lastPosts[0] : null;
     const lastPostAt = lastPost ? lastPost.timestamp : (c.last_post_at || c.created_at || null);
-    const lastPostText = lastPost
-      ? (lastPost.content ? lastPost.content.substring(0, 50) : (lastPost.image_url ? '🖼 Зображення' : ''))
-      : null;
+    const lastPostText = lastPost ? (lastPost.content ? lastPost.content.substring(0, 50) : (lastPost.image_url ? '🖼 Зображення' : (lastPost.file_name ? '📎 ' + lastPost.file_name.substring(0, 30) : ''))) : null;
     result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0, lastPostAt, lastPostText });
   }
-  // Сортуємо по часу останнього поста (спочатку найновіші)
   result.sort((a, b) => (b.lastPostAt || 0) - (a.lastPostAt || 0));
   res.json({ ok: true, channels: result });
 });
@@ -574,10 +557,11 @@ app.get('/channel/list', async (req, res) => {
 app.get('/channel/search', async (req, res) => {
   const { query, nick } = req.query;
   if (!query || query.trim().length < 2) return res.json({ ok: false, error: 'Введіть мін. 2 символи' });
+  // Шукаємо публічні канали — nick може бути відсутній (незареєстрований пошук)
   const { data: channels } = await supabase.from('channels').select('*').ilike('name', `%${query}%`).eq('type', 'public');
   const result = [];
   for (const c of channels || []) {
-    const { data: membership } = await supabase.from('channel_members').select('role').eq('channel_id', c.id).eq('nick', nick).single();
+    const { data: membership } = nick ? await supabase.from('channel_members').select('role').eq('channel_id', c.id).eq('nick', nick).single() : { data: null };
     const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', c.id);
     result.push({ ...c, myRole: membership?.role || null, subscriberCount: count || 0 });
   }
@@ -586,6 +570,9 @@ app.get('/channel/search', async (req, res) => {
 
 app.post('/channel/subscribe', async (req, res) => {
   const { channelId, nick } = req.body; if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: channel } = await supabase.from('channels').select('type').eq('id', channelId).single();
+  if (!channel) return res.json({ ok: false, error: 'Канал не знайдено' });
+  if (channel.type === 'private') return res.json({ ok: false, error: 'Приватний канал — тільки за запрошенням' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
@@ -606,7 +593,6 @@ app.post('/channel/unsubscribe', async (req, res) => {
 app.get('/channel/messages', async (req, res) => {
   const { channelId } = req.query; if (!channelId) return res.json({ ok: false, error: 'channelId обов\'язковий' });
   const { data: posts } = await supabase.from('channel_messages').select('*').eq('channel_id', channelId).order('timestamp', { ascending: true });
-  // Додаємо кількість коментарів і реакції до кожного поста
   const result = [];
   for (const p of posts || []) {
     const { count: commentCount } = await supabase.from('channel_comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
@@ -617,23 +603,86 @@ app.get('/channel/messages', async (req, res) => {
   res.json({ ok: true, messages: result });
 });
 
+// POST /channel/message — підтримує text, imageUrl, fileData, fileName
 app.post('/channel/message', async (req, res) => {
-  const { channelId, fromNick, text, imageUrl } = req.body;
-  if (!channelId || !fromNick || (!text && !imageUrl)) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { channelId, fromNick, text, imageUrl, fileData, fileName, waveform } = req.body;
+  if (!channelId || !fromNick || (!text && !imageUrl && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Тільки власник або адмін може писати' });
   const ts = Date.now(); const msgId = `ch_${channelId}_${ts}`;
+  const isVideo = fileName && /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName);
+  const isVoice = fileName && fileName.startsWith('voice_');
   const { data: msg } = await supabase.from('channel_messages').insert({
     channel_id: channelId, from_nick: fromNick,
-    content: text || null, image_url: imageUrl || null,
+    content: text || null,
+    image_url: imageUrl || null,
+    file_data: fileData || null,
+    file_name: fileName || null,
     timestamp: ts, msg_id: msgId,
+    ...(waveform ? { waveform: JSON.stringify(waveform) } : {}),
   }).select().single();
-  // Оновлюємо час останнього поста в каналі
-  const lastText = text ? text.substring(0, 50) : (imageUrl ? '🖼 Зображення' : '');
+  const lastText = text ? text.substring(0, 50) : (imageUrl ? '🖼 Зображення' : (isVideo ? '🎬 Відео' : (isVoice ? '🎤 Голосове' : (fileName ? '📎 ' + fileName.substring(0, 30) : ''))));
   await supabase.from('channels').update({ last_post_at: ts, last_post_text: lastText }).eq('id', channelId);
-  // Сповіщаємо підписників
-  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, timestamp: ts, msgId }, fromNick);
-  res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } });
+  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId }, fromNick);
+  res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [], waveform: waveform || null } });
+});
+
+// Редагування поста (обидва шляхи для сумісності)
+app.post('/channel/message/edit', async (req, res) => {
+  const { channelId, postId, nick, content } = req.body;
+  if (!channelId || !postId || !nick || !content) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
+  const canEdit = post.from_nick === nick || (member && ['owner', 'admin'].includes(member.role));
+  if (!canEdit) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_messages').update({ content, edited: true, edited_at: Date.now() }).eq('id', postId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_post_edited', channelId, postId, text: content }, null);
+  res.json({ ok: true });
+});
+
+app.post('/channel/edit-message', async (req, res) => {
+  const { channelId, postId, fromNick, text } = req.body;
+  if (!channelId || !postId || !fromNick || !text) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
+  const canEdit = post.from_nick === fromNick || (member && ['owner', 'admin'].includes(member.role));
+  if (!canEdit) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_messages').update({ content: text, edited: true, edited_at: Date.now() }).eq('id', postId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_post_edited', channelId, postId, text }, null);
+  res.json({ ok: true });
+});
+
+// Видалення поста (обидва шляхи)
+app.post('/channel/message/delete', async (req, res) => {
+  const { channelId, postId, nick } = req.body;
+  if (!postId || !channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
+  const canDelete = post.from_nick === nick || (member && ['owner', 'admin'].includes(member.role));
+  if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_comments').delete().eq('post_id', postId);
+  await supabase.from('channel_reactions').delete().eq('post_id', postId);
+  await supabase.from('channel_messages').delete().eq('id', postId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
+  res.json({ ok: true });
+});
+
+app.delete('/channel/post', async (req, res) => {
+  const { postId, channelId, requesterNick } = req.body;
+  if (!postId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
+  const canDelete = post.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
+  if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_comments').delete().eq('post_id', postId);
+  await supabase.from('channel_reactions').delete().eq('post_id', postId);
+  await supabase.from('channel_messages').delete().eq('id', postId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
+  res.json({ ok: true });
 });
 
 // Коментарі
@@ -644,18 +693,15 @@ app.get('/channel/comments', async (req, res) => {
 });
 
 app.post('/channel/comment', async (req, res) => {
-  const { channelId, postId, fromNick, text } = req.body;
-  if (!channelId || !postId || !fromNick || !text) return res.json({ ok: false, error: 'Невірні параметри' });
-  // Перевіряємо чи не заблокований
+  const { channelId, postId, fromNick, text, fileData, fileName } = req.body;
+  if (!channelId || !postId || !fromNick || (!text && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
-  // Перевіряємо чи підписаний
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member) return res.json({ ok: false, error: 'Підпишіться на канал щоб коментувати' });
   const ts = Date.now();
-  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text, timestamp: ts }).select().single();
-  // Сповіщаємо підписників
-  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text, timestamp: ts, commentId: comment.id }, fromNick);
+  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts }).select().single();
+  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id }, fromNick);
   res.json({ ok: true, comment });
 });
 
@@ -671,19 +717,15 @@ app.delete('/channel/comment', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Реакції на пости
+// Реакції
 app.post('/channel/reaction', async (req, res) => {
   const { postId, channelId, nick, emoji } = req.body;
   if (!postId || !channelId || !nick || !emoji) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані' });
-  // Toggle реакцію
   const { data: existing } = await supabase.from('channel_reactions').select('id').eq('post_id', postId).eq('nick', nick).eq('emoji', emoji).single();
-  if (existing) {
-    await supabase.from('channel_reactions').delete().eq('id', existing.id);
-  } else {
-    await supabase.from('channel_reactions').insert({ post_id: postId, nick, emoji });
-  }
+  if (existing) { await supabase.from('channel_reactions').delete().eq('id', existing.id); }
+  else { await supabase.from('channel_reactions').insert({ post_id: postId, nick, emoji }); }
   const { data: reactions } = await supabase.from('channel_reactions').select('emoji, nick').eq('post_id', postId);
   await notifyChannelSubscribers(channelId, { type: 'channel_reaction', channelId, postId, reactions }, null);
   res.json({ ok: true, reactions: reactions || [] });
@@ -696,7 +738,6 @@ app.post('/channel/block-subscriber', async (req, res) => {
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('channel_blocked').upsert({ channel_id: channelId, nick: targetNick, blocked_at: Date.now() });
-  // Якщо підписаний — не видаляємо, просто блокуємо коментарі
   res.json({ ok: true });
 });
 
@@ -735,32 +776,24 @@ app.get('/channel/subscribers', async (req, res) => {
   res.json({ ok: true, subscribers: (members || []).map(m => ({ ...m, isBlocked: blockedSet.has(m.nick) })) });
 });
 
-// Запросити користувача в канал (власник/адмін)
 app.post('/channel/invite', async (req, res) => {
   const { channelId, ownerNick, targetNick } = req.body;
   if (!channelId || !ownerNick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  // Перевіряємо права
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
-  // Перевіряємо чи вже підписаний
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', targetNick).single();
   if (existing) return res.json({ ok: false, error: 'Користувач вже є підписником' });
-  // Перевіряємо чи не заблокований
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', targetNick).single();
   if (blocked) return res.json({ ok: false, error: 'Цей користувач заблокований у каналі' });
-  // Перевіряємо що користувач існує
   const { data: targetUser } = await supabase.from('users').select('nick').eq('nick', targetNick).single();
   if (!targetUser) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  // Додаємо
   await supabase.from('channel_members').insert({ channel_id: channelId, nick: targetNick, role: 'subscriber' });
-  // Сповіщаємо цільового користувача через WS якщо онлайн
   const { data: channel } = await supabase.from('channels').select('name').eq('id', channelId).single();
   const targetWs = onlineUsers.get(targetNick);
   if (targetWs) targetWs.ws.send(JSON.stringify({ type: 'channel_invited', channelId, channelName: channel?.name, byNick: ownerNick }));
   res.json({ ok: true });
 });
 
-// Написати автору (100 EION: 70 → автору, 30 → eion_company)
 app.post('/channel/contact-owner', async (req, res) => {
   const { channelId, fromNick } = req.body;
   if (!channelId || !fromNick) return res.json({ ok: false, error: 'Невірні параметри' });
@@ -781,37 +814,6 @@ app.post('/channel/contact-owner', async (req, res) => {
   res.json({ ok: true, ownerNick: channel.owner_nick });
 });
 
-// Редагування поста
-app.post('/channel/edit-message', async (req, res) => {
-  const { channelId, postId, fromNick, text } = req.body;
-  if (!channelId || !postId || !fromNick || !text) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
-  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
-  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
-  const canEdit = post.from_nick === fromNick || (member && ['owner', 'admin'].includes(member.role));
-  if (!canEdit) return res.json({ ok: false, error: 'Недостатньо прав' });
-  await supabase.from('channel_messages').update({ content: text, edited: true }).eq('id', postId);
-  await notifyChannelSubscribers(channelId, { type: 'channel_post_edited', channelId, postId, text }, null);
-  res.json({ ok: true });
-});
-
-// Видалення поста
-app.delete('/channel/post', async (req, res) => {
-  const { postId, channelId, requesterNick } = req.body;
-  if (!postId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
-  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
-  if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
-  const canDelete = post.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
-  if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
-  await supabase.from('channel_comments').delete().eq('post_id', postId);
-  await supabase.from('channel_reactions').delete().eq('post_id', postId);
-  await supabase.from('channel_messages').delete().eq('id', postId);
-  await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
-  res.json({ ok: true });
-});
-
-// Оновлення налаштувань каналу (назва, опис, тип, аватар)
 app.post('/channel/update', async (req, res) => {
   const { channelId, ownerNick, name, description, type, avatar_url } = req.body;
   if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
@@ -859,7 +861,6 @@ app.post('/admin/ban', async (req, res) => {
   const { adminNick, targetNick, reason } = req.body;
   if (adminNick !== 'eion_company') return res.json({ ok: false, error: 'Доступ заборонено' });
   await supabase.from('platform_bans').upsert({ nick: targetNick, reason: reason || null, banned_at: Date.now(), banned_by: adminNick });
-  // Закриваємо активну сесію
   const t = onlineUsers.get(targetNick); if (t) { t.ws.send(JSON.stringify({ type: 'kicked', reason: 'Акаунт заблоковано' })); t.ws.close(); }
   res.json({ ok: true });
 });
@@ -887,7 +888,6 @@ wss.on('connection', (ws) => {
 
       if (msg.type === 'login') {
         userNick = msg.nick;
-        // Перевіряємо бан
         const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', userNick).single();
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` })); ws.close(); return; }
         if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився' })); old.ws.close(); }
@@ -994,52 +994,26 @@ wss.on('connection', (ws) => {
 
       if (msg.type === 'call_offer') {
         const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
-        } else {
+        if (target) { target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false })); }
+        else {
           await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
-          if (!fcmTokens.has(msg.to)) {
-            ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
-          }
+          if (!fcmTokens.has(msg.to)) ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
           await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
         }
       }
-
-      if (msg.type === 'call_answer') {
-        const target = onlineUsers.get(msg.to);
-        if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer }));
-      }
-
-      if (msg.type === 'call_ice') {
-        const target = onlineUsers.get(msg.to);
-        if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate }));
-      }
-
+      if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
+      if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
       if (msg.type === 'call_reject') {
         const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick }));
-        } else {
-          await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
-        }
-        await supabase.from('call_logs').insert({
-          from_nick: msg.to, to_nick: userNick,
-          has_video: msg.hasVideo || false,
-          started_at: Date.now(),
-          duration_seconds: null,
-          status: 'rejected'
-        }).catch(() => {});
+        if (target) { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
+        else { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }); }
+        await supabase.from('call_logs').insert({ from_nick: msg.to, to_nick: userNick, has_video: msg.hasVideo || false, started_at: Date.now(), duration_seconds: null, status: 'rejected' }).catch(() => {});
       }
-
       if (msg.type === 'call_end') {
         const target = onlineUsers.get(msg.to);
-        if (target) {
-          target.ws.send(JSON.stringify({ type: 'call_end', from: userNick }));
-        } else {
-          await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
-        }
+        if (target) { target.ws.send(JSON.stringify({ type: 'call_end', from: userNick })); }
+        else { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }); }
       }
-
     } catch (e) { console.error('Помилка:', e); }
   });
   ws.on('close', () => { if (userNick) onlineUsers.delete(userNick); });
