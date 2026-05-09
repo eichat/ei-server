@@ -735,6 +735,31 @@ app.get('/channel/subscribers', async (req, res) => {
   res.json({ ok: true, subscribers: (members || []).map(m => ({ ...m, isBlocked: blockedSet.has(m.nick) })) });
 });
 
+// Запросити користувача в канал (власник/адмін)
+app.post('/channel/invite', async (req, res) => {
+  const { channelId, ownerNick, targetNick } = req.body;
+  if (!channelId || !ownerNick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  // Перевіряємо права
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  // Перевіряємо чи вже підписаний
+  const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', targetNick).single();
+  if (existing) return res.json({ ok: false, error: 'Користувач вже є підписником' });
+  // Перевіряємо чи не заблокований
+  const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', targetNick).single();
+  if (blocked) return res.json({ ok: false, error: 'Цей користувач заблокований у каналі' });
+  // Перевіряємо що користувач існує
+  const { data: targetUser } = await supabase.from('users').select('nick').eq('nick', targetNick).single();
+  if (!targetUser) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  // Додаємо
+  await supabase.from('channel_members').insert({ channel_id: channelId, nick: targetNick, role: 'subscriber' });
+  // Сповіщаємо цільового користувача через WS якщо онлайн
+  const { data: channel } = await supabase.from('channels').select('name').eq('id', channelId).single();
+  const targetWs = onlineUsers.get(targetNick);
+  if (targetWs) targetWs.ws.send(JSON.stringify({ type: 'channel_invited', channelId, channelName: channel?.name, byNick: ownerNick }));
+  res.json({ ok: true });
+});
+
 // Написати автору (100 EION: 70 → автору, 30 → eion_company)
 app.post('/channel/contact-owner', async (req, res) => {
   const { channelId, fromNick } = req.body;
