@@ -593,13 +593,21 @@ app.post('/channel/unsubscribe', async (req, res) => {
 app.get('/channel/messages', async (req, res) => {
   const { channelId } = req.query; if (!channelId) return res.json({ ok: false, error: 'channelId обов\'язковий' });
   const { data: posts } = await supabase.from('channel_messages').select('*').eq('channel_id', channelId).order('timestamp', { ascending: true });
-  const result = [];
-  for (const p of posts || []) {
-    const { count: commentCount } = await supabase.from('channel_comments').select('*', { count: 'exact', head: true }).eq('post_id', p.id);
-    const { data: reactions } = await supabase.from('channel_reactions').select('emoji, nick').eq('post_id', p.id);
-    const { data: topCommenters } = await supabase.from('channel_comments').select('from_nick').eq('post_id', p.id).order('timestamp', { ascending: false }).limit(3);
-    result.push({ ...p, commentCount: commentCount || 0, reactions: reactions || [], topCommenters: [...new Set((topCommenters || []).map(c => c.from_nick))].slice(0, 3) });
-  }
+  if (!posts || posts.length === 0) return res.json({ ok: true, messages: [] });
+  const postIds = posts.map(p => p.id);
+  // Завантажуємо всі коментарі і реакції одним запитом
+  const [commentsRes, reactionsRes] = await Promise.all([
+    supabase.from('channel_comments').select('post_id, from_nick').in('post_id', postIds).order('timestamp', { ascending: false }),
+    supabase.from('channel_reactions').select('post_id, emoji, nick').in('post_id', postIds),
+  ]);
+  const allComments = commentsRes.data || [];
+  const allReactions = reactionsRes.data || [];
+  const result = posts.map(p => {
+    const postComments = allComments.filter(c => c.post_id === p.id);
+    const postReactions = allReactions.filter(r => r.post_id === p.id);
+    const topCommenters = [...new Set(postComments.map(c => c.from_nick))].slice(0, 3);
+    return { ...p, commentCount: postComments.length, reactions: postReactions, topCommenters };
+  });
   res.json({ ok: true, messages: result });
 });
 
