@@ -717,6 +717,17 @@ app.delete('/channel/comment', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Інкремент переглядів поста
+app.post('/channel/view', async (req, res) => {
+  const { postId } = req.body;
+  if (!postId) return res.json({ ok: false });
+  const { data: post } = await supabase.from('channel_messages').select('view_count').eq('id', postId).single();
+  if (!post) return res.json({ ok: false });
+  const newCount = (post.view_count || 0) + 1;
+  await supabase.from('channel_messages').update({ view_count: newCount }).eq('id', postId);
+  res.json({ ok: true, viewCount: newCount });
+});
+
 // Реакції
 app.post('/channel/reaction', async (req, res) => {
   const { postId, channelId, nick, emoji } = req.body;
