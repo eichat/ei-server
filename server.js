@@ -169,7 +169,7 @@ async function sendGroupInvite(groupId, groupName, inviterNick, targetNick) {
 
 // ── Реєстрація / Авторизація ──────────────────
 app.post('/register', async (req, res) => {
-  const { nick, password, email, color } = req.body;
+  const { nick, password, email, color, phone, phoneNormalized } = req.body;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
   if (!password || password.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 4 символи)' });
   if (!email || !email.includes('@')) return res.json({ ok: false, error: 'Невірний email' });
@@ -177,14 +177,25 @@ app.post('/register', async (req, res) => {
   if (existing) return res.json({ ok: false, error: 'Нік вже зайнятий' });
   const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
   if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
+  // Перевіряємо унікальність телефону
+  if (phoneNormalized) {
+    const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
+    if (phoneExists) return res.json({ ok: false, error: 'Цей номер телефону вже зареєстрований в EION' });
+  }
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  const userData = {
+    nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash,
+    email, color: color || 4280391411, coins: 50,
+    ...(phone ? { phone } : {}),
+    ...(phoneNormalized ? { phone_normalized: phoneNormalized } : {}),
+  };
   if (REQUIRE_EMAIL_VERIFICATION) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    pendingRegistrations.set(email, { nick, passwordHash, color: color || 4280391411, code, expires: Date.now() + 15 * 60 * 1000 });
+    pendingRegistrations.set(email, { ...userData, code, expires: Date.now() + 15 * 60 * 1000 });
     try { await sendEmail(email, 'EION — Підтвердження реєстрації', `Ваш код підтвердження: ${code}\n\nКод дійсний 15 хвилин.`); res.json({ ok: true, needVerification: true }); }
     catch (e) { res.json({ ok: false, error: 'Помилка відправки email: ' + e.message }); }
   } else {
-    const { error } = await supabase.from('users').insert({ nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash, email, color: color || 4280391411, coins: 50 });
+    const { error } = await supabase.from('users').insert(userData);
     if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
     res.json({ ok: true, needVerification: false });
   }
