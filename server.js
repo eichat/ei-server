@@ -524,6 +524,13 @@ app.get('/group/messages', async (req, res) => {
   res.json({ ok: true, messages: (data || []).map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null })) });
 });
 
+app.get('/check-phone', async (req, res) => {
+  const { phoneNormalized } = req.query;
+  if (!phoneNormalized) return res.json({ exists: false });
+  const { data } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
+  res.json({ exists: !!data });
+});
+
 app.get('/ping', (req, res) => res.json({ ok: true }));
 
 // ── Канали ──────────────────────────────────────
