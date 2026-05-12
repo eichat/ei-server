@@ -553,6 +553,21 @@ app.post('/shop/buy-premium', async (req, res) => {
   res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
 });
 
+// ── Оновлення групи (аватар, назва) ──────────
+app.post('/group/update', async (req, res) => {
+  const { groupId, requesterNick, name, avatarUrl } = req.body;
+  if (!groupId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
+  if (!member || !['creator', 'moderator'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const updates = {};
+  if (name !== undefined && name.trim().length > 0) updates.name = name.trim();
+  if (avatarUrl !== undefined) updates.avatar_url = avatarUrl;
+  if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати' });
+  await supabase.from('groups').update(updates).eq('id', groupId);
+  await notifyMembers(groupId, { type: 'group_updated', groupId, ...updates });
+  res.json({ ok: true });
+});
+
 app.get('/ping', (req, res) => res.json({ ok: true }));
 
 // ── Канали ──────────────────────────────────────
