@@ -531,6 +531,28 @@ app.get('/check-phone', async (req, res) => {
   res.json({ exists: !!data });
 });
 
+// ── Магазин Premium ──────────────────────────
+app.post('/shop/buy-premium', async (req, res) => {
+  const { nick, plan } = req.body;
+  if (!nick || !plan) return res.json({ ok: false, error: 'Невірні параметри' });
+  const PRICES = { monthly: 500, yearly: 4200 };
+  const price = PRICES[plan];
+  if (!price) return res.json({ ok: false, error: 'Невідомий план' });
+  const { data: user } = await supabase.from('users').select('coins, premium_expires_at').eq('nick', nick).single();
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if ((user.coins || 0) < price) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  const now = new Date();
+  let expiresAt = (user.premium_expires_at && new Date(user.premium_expires_at) > now)
+    ? new Date(user.premium_expires_at) : new Date(now);
+  if (plan === 'monthly') expiresAt.setMonth(expiresAt.getMonth() + 1);
+  else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  const newBalance = (user.coins || 0) - price;
+  await supabase.from('users').update({ coins: newBalance, premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
+  const ws = onlineUsers.get(nick);
+  if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
+  res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
+});
+
 app.get('/ping', (req, res) => res.json({ ok: true }));
 
 // ── Канали ──────────────────────────────────────
