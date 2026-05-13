@@ -531,43 +531,6 @@ app.get('/check-phone', async (req, res) => {
   res.json({ exists: !!data });
 });
 
-// ── Магазин Premium ──────────────────────────
-app.post('/shop/buy-premium', async (req, res) => {
-  const { nick, plan } = req.body;
-  if (!nick || !plan) return res.json({ ok: false, error: 'Невірні параметри' });
-  const PRICES = { monthly: 500, yearly: 4200 };
-  const price = PRICES[plan];
-  if (!price) return res.json({ ok: false, error: 'Невідомий план' });
-  const { data: user } = await supabase.from('users').select('coins, premium_expires_at').eq('nick', nick).single();
-  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if ((user.coins || 0) < price) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
-  const now = new Date();
-  let expiresAt = (user.premium_expires_at && new Date(user.premium_expires_at) > now)
-    ? new Date(user.premium_expires_at) : new Date(now);
-  if (plan === 'monthly') expiresAt.setMonth(expiresAt.getMonth() + 1);
-  else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-  const newBalance = (user.coins || 0) - price;
-  await supabase.from('users').update({ coins: newBalance, premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
-  const ws = onlineUsers.get(nick);
-  if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
-  res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
-});
-
-// ── Оновлення групи (аватар, назва) ──────────
-app.post('/group/update', async (req, res) => {
-  const { groupId, requesterNick, name, avatarUrl } = req.body;
-  if (!groupId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
-  if (!member || !['creator', 'moderator'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
-  const updates = {};
-  if (name !== undefined && name.trim().length > 0) updates.name = name.trim();
-  if (avatarUrl !== undefined) updates.avatar_url = avatarUrl;
-  if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати' });
-  await supabase.from('groups').update(updates).eq('id', groupId);
-  await notifyMembers(groupId, { type: 'group_updated', groupId, ...updates });
-  res.json({ ok: true });
-});
-
 app.get('/ping', (req, res) => res.json({ ok: true }));
 
 // ── Канали ──────────────────────────────────────
@@ -861,11 +824,30 @@ app.post('/channel/invite', async (req, res) => {
   if (blocked) return res.json({ ok: false, error: 'Цей користувач заблокований у каналі' });
   const { data: targetUser } = await supabase.from('users').select('nick').eq('nick', targetNick).single();
   if (!targetUser) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  await supabase.from('channel_members').insert({ channel_id: channelId, nick: targetNick, role: 'subscriber' });
   const { data: channel } = await supabase.from('channels').select('name').eq('id', channelId).single();
+  // Надсилаємо ЗАПРОШЕННЯ — користувач має підтвердити (не додаємо одразу)
   const targetWs = onlineUsers.get(targetNick);
-  if (targetWs) targetWs.ws.send(JSON.stringify({ type: 'channel_invited', channelId, channelName: channel?.name, byNick: ownerNick }));
-  res.json({ ok: true });
+  if (targetWs) {
+    targetWs.ws.send(JSON.stringify({ type: 'channel_invite_request', channelId, channelName: channel?.name, byNick: ownerNick }));
+  } else {
+    await supabase.from('pending_channel_invites').upsert({ channel_id: channelId, target_nick: targetNick, inviter_nick: ownerNick });
+  }
+  res.json({ ok: true, pending: true });
+});
+
+// Відповідь на запрошення в канал
+app.post('/channel/invite-response', async (req, res) => {
+  const { channelId, nick, accepted } = req.body;
+  if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  await supabase.from('pending_channel_invites').delete().eq('channel_id', channelId).eq('target_nick', nick);
+  if (!accepted) return res.json({ ok: true });
+  const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
+  if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
+  const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
+  if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+  const { data: channel } = await supabase.from('channels').select('*').eq('id', channelId).single();
+  const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', channelId);
+  res.json({ ok: true, channel: { ...channel, myRole: 'subscriber', subscriberCount: count || 0 } });
 });
 
 app.post('/channel/contact-owner', async (req, res) => {
@@ -1014,6 +996,15 @@ wss.on('connection', (ws) => {
         const { data: groupInvites } = await supabase.from('pending_group_invites').select('*').eq('target_nick', userNick);
         if (groupInvites && groupInvites.length > 0) {
           for (const inv of groupInvites) { const { data: g } = await supabase.from('groups').select('name').eq('id', inv.group_id).single(); if (g) ws.send(JSON.stringify({ type: 'group_invite', groupId: inv.group_id, groupName: g.name, inviterNick: inv.inviter_nick })); }
+        }
+
+        // Pending channel invites
+        const { data: channelInvites } = await supabase.from('pending_channel_invites').select('*').eq('target_nick', userNick);
+        if (channelInvites && channelInvites.length > 0) {
+          for (const inv of channelInvites) {
+            const { data: ch } = await supabase.from('channels').select('name').eq('id', inv.channel_id).single();
+            if (ch) ws.send(JSON.stringify({ type: 'channel_invite_request', channelId: inv.channel_id, channelName: ch.name, byNick: inv.inviter_nick }));
+          }
         }
       }
 
