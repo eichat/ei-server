@@ -531,6 +531,43 @@ app.get('/check-phone', async (req, res) => {
   res.json({ exists: !!data });
 });
 
+// ── Магазин Premium ──────────────────────────
+app.post('/shop/buy-premium', async (req, res) => {
+  const { nick, plan } = req.body;
+  if (!nick || !plan) return res.json({ ok: false, error: 'Невірні параметри' });
+  const PRICES = { monthly: 500, yearly: 4200 };
+  const price = PRICES[plan];
+  if (!price) return res.json({ ok: false, error: 'Невідомий план' });
+  const { data: user } = await supabase.from('users').select('coins, premium_expires_at').eq('nick', nick).single();
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if ((user.coins || 0) < price) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  const now = new Date();
+  let expiresAt = (user.premium_expires_at && new Date(user.premium_expires_at) > now)
+    ? new Date(user.premium_expires_at) : new Date(now);
+  if (plan === 'monthly') expiresAt.setMonth(expiresAt.getMonth() + 1);
+  else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+  const newBalance = (user.coins || 0) - price;
+  await supabase.from('users').update({ coins: newBalance, premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
+  const ws = onlineUsers.get(nick);
+  if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
+  res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
+});
+
+// ── Оновлення групи (аватар, назва) ──────────
+app.post('/group/update', async (req, res) => {
+  const { groupId, requesterNick, name, avatarUrl } = req.body;
+  if (!groupId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
+  if (!member || !['creator', 'moderator'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const updates = {};
+  if (name !== undefined && name.trim().length > 0) updates.name = name.trim();
+  if (avatarUrl !== undefined) updates.avatar_url = avatarUrl;
+  if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати' });
+  await supabase.from('groups').update(updates).eq('id', groupId);
+  await notifyMembers(groupId, { type: 'group_updated', groupId, ...updates });
+  res.json({ ok: true });
+});
+
 app.get('/ping', (req, res) => res.json({ ok: true }));
 
 // ── Канали ──────────────────────────────────────
@@ -825,7 +862,7 @@ app.post('/channel/invite', async (req, res) => {
   const { data: targetUser } = await supabase.from('users').select('nick').eq('nick', targetNick).single();
   if (!targetUser) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const { data: channel } = await supabase.from('channels').select('name').eq('id', channelId).single();
-  // Надсилаємо ЗАПРОШЕННЯ — користувач має підтвердити (не додаємо одразу)
+  // Надсилаємо ЗАПРОШЕННЯ — користувач має підтвердити
   const targetWs = onlineUsers.get(targetNick);
   if (targetWs) {
     targetWs.ws.send(JSON.stringify({ type: 'channel_invite_request', channelId, channelName: channel?.name, byNick: ownerNick }));
@@ -835,7 +872,6 @@ app.post('/channel/invite', async (req, res) => {
   res.json({ ok: true, pending: true });
 });
 
-// Відповідь на запрошення в канал
 app.post('/channel/invite-response', async (req, res) => {
   const { channelId, nick, accepted } = req.body;
   if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
@@ -849,6 +885,8 @@ app.post('/channel/invite-response', async (req, res) => {
   const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', channelId);
   res.json({ ok: true, channel: { ...channel, myRole: 'subscriber', subscriberCount: count || 0 } });
 });
+
+
 
 app.post('/channel/contact-owner', async (req, res) => {
   const { channelId, fromNick } = req.body;
