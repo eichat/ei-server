@@ -213,9 +213,7 @@ app.post('/verify-email', async (req, res) => {
 
 app.post('/login', async (req, res) => {
   const { nick, password } = req.body;
-  console.log('LOGIN attempt:', nick, '| lower:', nick?.toLowerCase());
-  const { data: user, error: userError } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
-  console.log('LOGIN result:', user ? user.nick : null, '| error:', userError?.message);
+  const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', user.nick).single();
   if (ban) return res.json({ ok: false, error: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` });
@@ -295,7 +293,7 @@ app.get('/online-users', (req, res) => res.json({ ok: true, users: [...onlineUse
 
 app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
-  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color').eq('nick_lower', nick.toLowerCase()).single();
+  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null });
 });
