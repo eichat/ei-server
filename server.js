@@ -251,8 +251,34 @@ app.post('/update-nick', async (req, res) => {
   if (!newNick || newNick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий' });
   const { data: exists } = await supabase.from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
   if (exists) return res.json({ ok: false, error: 'Нік вже зайнятий' });
+  const oldNick = user.nick;
   await supabase.from('users').update({ nick: newNick, nick_lower: newNick.toLowerCase() }).eq('nick_lower', nick.toLowerCase());
-  res.json({ ok: true });
+  await Promise.all([
+    supabase.from('messages').update({ from_nick: newNick }).eq('from_nick', oldNick),
+    supabase.from('messages').update({ to_nick: newNick }).eq('to_nick', oldNick),
+    supabase.from('group_members').update({ nick: newNick }).eq('nick', oldNick),
+    supabase.from('group_messages').update({ from_nick: newNick }).eq('from_nick', oldNick),
+    supabase.from('groups').update({ creator_nick: newNick }).eq('creator_nick', oldNick),
+    supabase.from('channel_members').update({ nick: newNick }).eq('nick', oldNick),
+    supabase.from('channel_messages').update({ from_nick: newNick }).eq('from_nick', oldNick),
+    supabase.from('channel_comments').update({ from_nick: newNick }).eq('from_nick', oldNick),
+    supabase.from('channel_reactions').update({ nick: newNick }).eq('nick', oldNick),
+    supabase.from('channels').update({ owner_nick: newNick }).eq('owner_nick', oldNick),
+    supabase.from('deleted_messages').update({ from_nick: newNick }).eq('from_nick', oldNick),
+    supabase.from('deleted_messages').update({ to_nick: newNick }).eq('to_nick', oldNick),
+    supabase.from('pending_reactions').update({ from_nick: newNick }).eq('from_nick', oldNick),
+    supabase.from('pending_reactions').update({ to_nick: newNick }).eq('to_nick', oldNick),
+    supabase.from('call_logs').update({ from_nick: newNick }).eq('from_nick', oldNick),
+    supabase.from('call_logs').update({ to_nick: newNick }).eq('to_nick', oldNick),
+    supabase.from('pending_group_invites').update({ target_nick: newNick }).eq('target_nick', oldNick),
+    supabase.from('pending_group_invites').update({ inviter_nick: newNick }).eq('inviter_nick', oldNick),
+    supabase.from('pending_channel_invites').update({ target_nick: newNick }).eq('target_nick', oldNick),
+    supabase.from('pending_channel_invites').update({ inviter_nick: newNick }).eq('inviter_nick', oldNick),
+  ]);
+  const userWs = onlineUsers.get(oldNick);
+  if (userWs) { onlineUsers.delete(oldNick); onlineUsers.set(newNick, userWs); }
+  for (const [n, u] of onlineUsers) if (n !== newNick) u.ws.send(JSON.stringify({ type: 'nick_changed', oldNick, newNick }));
+  res.json({ ok: true, newNick });
 });
 
 app.post('/update-password', async (req, res) => {
