@@ -172,11 +172,13 @@ app.post('/register', async (req, res) => {
   const { nick, password, email, color, phone, phoneNormalized } = req.body;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
   if (!password || password.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 4 символи)' });
-  if (!email || !email.includes('@')) return res.json({ ok: false, error: 'Невірний email' });
+  if (email && !email.includes('@')) return res.json({ ok: false, error: 'Невірний email' });
   const { data: existing } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
   if (existing) return res.json({ ok: false, error: 'Нік вже зайнятий' });
-  const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
-  if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
+  if (email) {
+    const { data: emailExists } = await supabase.from('users').select('nick').eq('email', email).single();
+    if (emailExists) return res.json({ ok: false, error: 'Цей email вже використовується' });
+  }
   // Перевіряємо унікальність телефону
   if (phoneNormalized) {
     const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
