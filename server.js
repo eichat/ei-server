@@ -347,15 +347,6 @@ app.post('/register-fcm-token', (req, res) => {
   fcmTokens.set(nick, token); res.json({ ok: true });
 });
 
-app.post('/update-avatar', async (req, res) => {
-  const { nick, avatarUrl } = req.body;
-  if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
-  for (const [n, user] of onlineUsers) {
-    if (n !== nick) user.ws.send(JSON.stringify({ type: 'avatar_changed', nick, avatarUrl: avatarUrl || null }));
-  }
-  res.json({ ok: true });
-});
-
 app.post('/update-nick-color', async (req, res) => {
   const { nick, nickColor } = req.body; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
   await supabase.from('users').update({ nick_color: nickColor || null }).eq('nick', nick);
