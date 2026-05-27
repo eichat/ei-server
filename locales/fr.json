@@ -349,5 +349,14 @@
   "ei_chat": "Chat",
   "voice_message_emoji": "🎤 Message vocal",
   "open_lock": "🔓 Ouvert",
-  "access_denied_settings": "Autoriser l'accès dans les paramètres du téléphone"
+  "access_denied_settings": "Autoriser l'accès dans les paramètres du téléphone",
+  "hint_avatar_tap": "Appuyez sur l'avatar pour choisir une photo",
+  "hint_email_optional": "E-mail (facultatif, pour récupération de mot de passe)",
+  "hint_phone_optional": "Facultatif. Pour récupération de compte",
+  "hint_sms_code": "Code SMS",
+  "title_login_profile": "Se connecter au profil",
+  "btn_login_existing": "Se connecter à un profil existant",
+  "action_delete_profile": "Supprimer le profil ?",
+  "label_language": "Langue",
+  "title_language": "Langue"
 }
