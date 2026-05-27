@@ -358,5 +358,7 @@
   "btn_login_existing": "Sign in to existing profile",
   "action_delete_profile": "Delete profile?",
   "label_language": "Interface language",
-  "title_language": "Language"
+  "title_language": "Language",
+  "msg_invalid_email": "Invalid email",
+  "msg_sending_sms": "Sending SMS to"
 }

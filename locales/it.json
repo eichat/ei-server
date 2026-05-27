@@ -358,5 +358,7 @@
   "btn_login_existing": "Accedi al profilo esistente",
   "action_delete_profile": "Elimina profilo?",
   "label_language": "Lingua",
-  "title_language": "Lingua"
+  "title_language": "Lingua",
+  "msg_invalid_email": "Email non valida",
+  "msg_sending_sms": "Invio SMS a"
 }

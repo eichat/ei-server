@@ -358,5 +358,7 @@
   "btn_login_existing": "Войти в существующий профиль",
   "action_delete_profile": "Удалить профиль?",
   "label_language": "Язык интерфейса",
-  "title_language": "Язык"
+  "title_language": "Язык",
+  "msg_invalid_email": "Неверный email",
+  "msg_sending_sms": "Отправляем SMS на"
 }

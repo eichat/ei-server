@@ -358,5 +358,7 @@
   "btn_login_existing": "Iniciar sesión en perfil existente",
   "action_delete_profile": "¿Eliminar perfil?",
   "label_language": "Idioma",
-  "title_language": "Idioma"
+  "title_language": "Idioma",
+  "msg_invalid_email": "Correo inválido",
+  "msg_sending_sms": "Enviando SMS a"
 }

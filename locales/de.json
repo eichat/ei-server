@@ -358,5 +358,7 @@
   "btn_login_existing": "In vorhandenem Profil anmelden",
   "action_delete_profile": "Profil löschen?",
   "label_language": "Sprache",
-  "title_language": "Sprache"
+  "title_language": "Sprache",
+  "msg_invalid_email": "Ungültige E-Mail",
+  "msg_sending_sms": "SMS wird gesendet an"
 }

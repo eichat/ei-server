@@ -358,5 +358,7 @@
   "btn_login_existing": "Увійти в існуючий профіль",
   "action_delete_profile": "Видалити профіль?",
   "label_language": "Мова інтерфейсу",
-  "title_language": "Мова"
+  "title_language": "Мова",
+  "msg_invalid_email": "Невірний email",
+  "msg_sending_sms": "Надсилаємо SMS на"
 }

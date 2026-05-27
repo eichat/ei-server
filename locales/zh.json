@@ -358,5 +358,7 @@
   "btn_login_existing": "登录已有账户",
   "action_delete_profile": "删除账户？",
   "label_language": "界面语言",
-  "title_language": "语言"
+  "title_language": "语言",
+  "msg_invalid_email": "邮箱格式错误",
+  "msg_sending_sms": "正在发送短信至"
 }
