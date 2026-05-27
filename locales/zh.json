@@ -65,7 +65,7 @@
   "label_recipient_nick": "Recipient nickname",
   "label_type": "Type:",
   "hint_message": "Message...",
-  "hint_enter_nick": "Enter nickname",
+  "hint_enter_nick": "输入昵称",
   "hint_enter_password": "Enter password",
   "hint_enter_current_password": "Enter current password",
   "hint_enter_new_password": "Enter new password",
@@ -349,5 +349,14 @@
   "ei_chat": "Chat",
   "voice_message_emoji": "🎤 Voice message",
   "open_lock": "🔓 Open",
-  "access_denied_settings": "Allow access in phone settings"
+  "access_denied_settings": "Allow access in phone settings",
+  "hint_avatar_tap": "点击头像选择照片",
+  "hint_email_optional": "邮箱（可选，用于找回密码）",
+  "hint_phone_optional": "可选。用于账户恢复",
+  "hint_sms_code": "短信验证码",
+  "title_login_profile": "登录账户",
+  "btn_login_existing": "登录已有账户",
+  "action_delete_profile": "删除账户？",
+  "label_language": "界面语言",
+  "title_language": "语言"
 }
