@@ -349,5 +349,14 @@
   "ei_chat": "Chat",
   "voice_message_emoji": "🎤 Voice message",
   "open_lock": "🔓 Open",
-  "access_denied_settings": "Allow access in phone settings"
+  "access_denied_settings": "Allow access in phone settings",
+  "hint_avatar_tap": "Нажмите на аватар чтобы выбрать фото",
+  "hint_email_optional": "Email (необязательно, для восстановления пароля)",
+  "hint_phone_optional": "Необязательно. Для восстановления доступа",
+  "hint_sms_code": "Код из SMS",
+  "title_login_profile": "Войти в профиль",
+  "btn_login_existing": "Войти в существующий профиль",
+  "action_delete_profile": "Удалить профиль?",
+  "label_language": "Язык интерфейса",
+  "title_language": "Язык"
 }
