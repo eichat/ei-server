@@ -349,5 +349,14 @@
   "ei_chat": "Chat",
   "voice_message_emoji": "🎤 Voice message",
   "open_lock": "🔓 Open",
-  "access_denied_settings": "Allow access in phone settings"
+  "access_denied_settings": "Allow access in phone settings",
+  "hint_avatar_tap": "Tippen Sie auf Avatar um ein Foto zu wählen",
+  "hint_email_optional": "E-Mail (optional, zur Passwortwiederherstellung)",
+  "hint_phone_optional": "Optional. Zur Kontowiederherstellung",
+  "hint_sms_code": "SMS-Code",
+  "title_login_profile": "Im Profil anmelden",
+  "btn_login_existing": "In vorhandenem Profil anmelden",
+  "action_delete_profile": "Profil löschen?",
+  "label_language": "Sprache",
+  "title_language": "Sprache"
 }
