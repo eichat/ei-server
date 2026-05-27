@@ -65,7 +65,7 @@
   "label_recipient_nick": "Recipient nickname",
   "label_type": "Type:",
   "hint_message": "Message...",
-  "hint_enter_nick": "Enter nickname",
+  "hint_enter_nick": "Introduce el apodo",
   "hint_enter_password": "Enter password",
   "hint_enter_current_password": "Enter current password",
   "hint_enter_new_password": "Enter new password",
@@ -349,5 +349,14 @@
   "ei_chat": "Chat",
   "voice_message_emoji": "🎤 Voice message",
   "open_lock": "🔓 Open",
-  "access_denied_settings": "Allow access in phone settings"
+  "access_denied_settings": "Allow access in phone settings",
+  "hint_avatar_tap": "Toca el avatar para elegir una foto",
+  "hint_email_optional": "Correo (opcional, para recuperación de contraseña)",
+  "hint_phone_optional": "Opcional. Para recuperación de cuenta",
+  "hint_sms_code": "Código SMS",
+  "title_login_profile": "Iniciar sesión en perfil",
+  "btn_login_existing": "Iniciar sesión en perfil existente",
+  "action_delete_profile": "¿Eliminar perfil?",
+  "label_language": "Idioma",
+  "title_language": "Idioma"
 }
