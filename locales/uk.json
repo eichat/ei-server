@@ -1,7 +1,6 @@
 {
   "app_name": "EION",
   "messenger_tagline": "Месенджер нового покоління",
-
   "btn_login": "Увійти",
   "btn_register": "Створити профіль",
   "btn_save": "Зберегти",
@@ -40,7 +39,6 @@
   "btn_add_profile": "Додати профіль",
   "btn_new_profile": "Новий профіль",
   "btn_forgot_password": "Забули пароль?",
-
   "label_nickname": "Нікнейм",
   "label_password": "Пароль",
   "label_email": "Email",
@@ -66,7 +64,6 @@
   "label_max_coins": "Кількість (макс. {max})",
   "label_recipient_nick": "Нік отримувача",
   "label_type": "Тип:",
-
   "hint_message": "Повідомлення...",
   "hint_enter_nick": "Введіть нік",
   "hint_enter_password": "Введіть пароль",
@@ -89,13 +86,11 @@
   "hint_6digit_code": "6-значний код",
   "hint_enter_6digit": "Введіть 6-значний код",
   "hint_password_min4": "Пароль (мін. 4 символи)",
-
   "nav_chats": "Чати",
   "nav_contacts": "Контакти",
   "nav_channels": "Канали",
   "nav_groups": "Групи",
   "nav_profile": "Профіль",
-
   "section_personal_chats": "Особисті чати",
   "section_groups": "Групи",
   "section_my_channels": "Мої канали",
@@ -105,7 +100,6 @@
   "section_admins": "Адміністратори",
   "section_join_requests": "Запити на вступ ({count}):",
   "section_phone_contacts": "Контакти телефону",
-
   "title_select_profile": "Оберіть профіль",
   "title_new_chat": "Новий чат",
   "title_new_group": "Нова група",
@@ -137,12 +131,10 @@
   "title_add_members": "Додати учасників:",
   "title_ban_user": "Забанити користувача?",
   "title_registration": "Реєстрація (одноразово)",
-
   "role_owner": "Власник",
   "role_admin": "Адмін",
   "role_moderator": "Модератор",
   "role_subscriber": "Підписник",
-
   "action_make_admin": "Призначити адміном",
   "action_remove_admin": "Зняти адміна",
   "action_make_moderator": "Зробити модератором",
@@ -184,7 +176,6 @@
   "action_comment": "Коментувати",
   "action_invite_subscriber": "Запросити підписника",
   "action_invite_friends": "Запросити друзів приєднатись до EION",
-
   "msg_saved": "Збережено",
   "msg_copied": "Скопійовано",
   "msg_deleted": "Видалено",
@@ -281,7 +272,6 @@
   "msg_subscribers_count": "{count} підписників",
   "msg_members_count": "{count} учасників",
   "msg_selected_count": "{count} обрано",
-
   "call_incoming": "Вхідний дзвінок...",
   "call_audio": "Аудіодзвінок",
   "call_video": "Відеодзвінок",
@@ -292,7 +282,6 @@
   "call_speaker": "Динамік",
   "call_camera": "Камера",
   "call_mic": "Голосове введення",
-
   "media_voice_message": "Голосове повідомлення",
   "media_audio": "аудіо",
   "media_video": "відео",
@@ -301,7 +290,6 @@
   "media_file_not_found": "Файл не знайдено",
   "media_recording": "Запис...",
   "media_cancel_recording": "Скасувати",
-
   "premium_active": "Premium активний",
   "premium_inactive": "Premium не активний",
   "premium_monthly": "Місячний",
@@ -318,7 +306,6 @@
   "premium_node_data": "Надання місця для даних мережі EION",
   "premium_balance": "Баланс: {coins} EION",
   "premium_your_balance": "Ваш баланс: {coins} EION",
-
   "color_blue": "Синій",
   "color_green": "Зелений",
   "color_red": "Червоний",
@@ -329,30 +316,24 @@
   "color_gold": "Золотий",
   "color_light_blue": "Блакитний",
   "color_standard": "Стандартний",
-
   "theme_dark": "Нічний режим",
   "theme_light": "Денний режим",
-
   "translation_auto": "Автопереклад у живому чаті",
   "translation_to_uk": "Перекладати повідомлення на українську",
   "translation_label": "Переклад",
   "translation_eion": "EION (переклад)",
-
   "channel_your": "Ваш канал",
   "channel_admin_only": "📢 Тільки адміни можуть писати в цей канал",
   "channel_write_price": "Написати ({price} EION)",
   "channel_write_author": "Написати автору (100 EION)",
-
   "notification_enabled": "🔔 Сповіщення увімкнено",
   "notification_disabled": "🔕 Сповіщення вимкнено",
   "notification_mute": "Не сповіщати",
   "notification_enable": "Увімкнути сповіщення",
-
   "group_invitation": "Запрошення до групи",
   "channel_invitation": "Запрошення на канал",
   "connection_request": "Запит на підключення",
   "join_request": "⏳ За схваленням",
-
   "confirm_delete_contact": "{nick} і вся переписка будуть видалені. Якщо він напише вам — ви отримаєте запит на підключення.",
   "confirm_delete_conversation": "Переписка з {nick} буде видалена. Контакт залишиться і нові повідомлення не потребують запиту.",
   "confirm_kick_member": "{nick} буде видалено з групи.",
@@ -360,16 +341,22 @@
   "confirm_delete_all_messages": "Всі повідомлення від {nick} в цій групі будуть видалені.",
   "confirm_leave_group": "Ви покинете групу",
   "confirm_delete_group": "Видалити групу?",
-
   "search_find_group": "Знайти групу",
   "search_nick": "Пошук по нікнейму",
   "search_nothing_found_for": "Нічого не знайдено за",
-
   "ei_chat_list": "Список чатів EI",
   "ei_new_chat": "Новий чат EI",
   "ei_chat": "Чат",
-
   "voice_message_emoji": "🎤 Голосове повідомлення",
   "open_lock": "🔓 Відкрита",
-  "access_denied_settings": "Дозвольте доступ в налаштуваннях телефону"
+  "access_denied_settings": "Дозвольте доступ в налаштуваннях телефону",
+  "hint_avatar_tap": "Натисни на аватар щоб вибрати фото",
+  "hint_email_optional": "Email (необов'язково, для відновлення пароля)",
+  "hint_phone_optional": "Необов'язково. Для відновлення доступу",
+  "hint_sms_code": "Код з SMS",
+  "title_login_profile": "Увійти в профіль",
+  "btn_login_existing": "Увійти в існуючий профіль",
+  "action_delete_profile": "Видалити профіль?",
+  "label_language": "Мова інтерфейсу",
+  "title_language": "Мова"
 }
