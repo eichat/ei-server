@@ -64,7 +64,7 @@
   "label_max_coins": "Кількість (макс. {max})",
   "label_recipient_nick": "Нік отримувача",
   "label_type": "Тип:",
-  "hint_message": "Повідомлення...",
+  "hint_message": "Повідомлення",
   "hint_enter_nick": "Введіть нік",
   "hint_enter_password": "Введіть пароль",
   "hint_enter_current_password": "Введіть поточний пароль",

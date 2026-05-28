@@ -64,7 +64,7 @@
   "label_max_coins": "Montant (max. {max})",
   "label_recipient_nick": "Pseudo du destinataire",
   "label_type": "Type :",
-  "hint_message": "Message...",
+  "hint_message": "Message",
   "hint_enter_nick": "Entrer le pseudo",
   "hint_enter_password": "Entrer le mot de passe",
   "hint_enter_current_password": "Entrer le mot de passe actuel",

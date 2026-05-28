@@ -64,7 +64,7 @@
   "label_max_coins": "Amount (max. {max})",
   "label_recipient_nick": "Recipient nickname",
   "label_type": "Type:",
-  "hint_message": "Message...",
+  "hint_message": "消息",
   "hint_enter_nick": "输入昵称",
   "hint_enter_password": "Enter password",
   "hint_enter_current_password": "Enter current password",
