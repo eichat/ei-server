@@ -246,6 +246,7 @@
   "msg_choose_contact": "Оберіть співрозмовника зліва",
   "msg_no_channels": "У вас немає каналів",
   "msg_forwarded": "Переслано в {count} {chat}",
+  "forwarded_from": "Переслано від",
   "msg_chat_singular": "чат",
   "msg_chat_few": "чати",
   "msg_chat_many": "чатів",

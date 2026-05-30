@@ -246,6 +246,7 @@
   "msg_choose_contact": "Choose a contact on the left",
   "msg_no_channels": "You have no channels",
   "msg_forwarded": "Forwarded to {count} {chat}",
+  "forwarded_from": "Forwarded from",
   "msg_chat_singular": "chat",
   "msg_chat_few": "chats",
   "msg_chat_many": "chats",
