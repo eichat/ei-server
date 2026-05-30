@@ -1090,7 +1090,7 @@ wss.on('connection', (ws) => {
         const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-        if (target) { target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+        if (target) { target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
       }
 
       if (msg.type === 'file_message') {
@@ -1102,11 +1102,11 @@ wss.on('connection', (ws) => {
           const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
           const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: fileData, ...(msg.waveform ? { waveform: msg.waveform } : {}) });
-          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}) }));
+          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
         } else {
           const target = onlineUsers.get(msg.to); const status = target ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}) });
-          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
         }
       }
 
@@ -1117,7 +1117,7 @@ wss.on('connection', (ws) => {
         const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
         const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
         await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers] });
-        for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId }));
+        for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
       }
 
       if (msg.type === 'ei_message') { /* нарахування прибрано */ }
