@@ -354,6 +354,13 @@ app.post('/update-nick-color', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/update-avatar', async (req, res) => {
+  const { nick, avatarUrl } = req.body; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
+  await supabase.from('users').update({ avatar_url: avatarUrl || null }).eq('nick', nick);
+  for (const [n, user] of onlineUsers) if (n !== nick) user.ws.send(JSON.stringify({ type: 'avatar_changed', nick, avatarUrl: avatarUrl || null }));
+  res.json({ ok: true });
+});
+
 app.post('/update-status', async (req, res) => {
   const { nick, status } = req.body; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
   const newStatus = status && status.trim().length > 0 ? status.trim().substring(0, 60) : null;
