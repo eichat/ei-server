@@ -791,14 +791,14 @@ app.get('/channel/comments', async (req, res) => {
 });
 
 app.post('/channel/comment', async (req, res) => {
-  const { channelId, postId, fromNick, text, fileData, fileName } = req.body;
+  const { channelId, postId, fromNick, text, fileData, fileName, replyToNick, replyToText } = req.body;
   if (!channelId || !postId || !fromNick || (!text && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member) return res.json({ ok: false, error: 'Підпишіться на канал щоб коментувати' });
   const ts = Date.now();
-  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts }).select().single();
+  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts, reply_to_nick: replyToNick || null, reply_to_text: replyToText || null }).select().single();
   await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id }, fromNick);
   res.json({ ok: true, comment });
 });
