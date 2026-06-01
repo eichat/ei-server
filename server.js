@@ -799,7 +799,8 @@ app.post('/channel/comment', async (req, res) => {
   if (!member) return res.json({ ok: false, error: 'Підпишіться на канал щоб коментувати' });
   const ts = Date.now();
   const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts, reply_to_nick: replyToNick || null, reply_to_text: replyToText || null }).select().single();
-  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id }, fromNick);
+  const { count: commentCount } = await supabase.from('channel_comments').select('*', { count: 'exact', head: true }).eq('post_id', postId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id, commentCount: commentCount || 0 }, fromNick);
   res.json({ ok: true, comment });
 });
 
@@ -819,7 +820,7 @@ app.delete('/channel/comment', async (req, res) => {
 app.post('/channel/view', async (req, res) => {
   const { postId, nick } = req.body;
   if (!postId) return res.json({ ok: false });
-  const { data: post } = await supabase.from('channel_messages').select('view_count').eq('id', postId).single();
+  const { data: post } = await supabase.from('channel_messages').select('view_count, channel_id').eq('id', postId).single();
   if (!post) return res.json({ ok: false });
   // Рахуємо лише унікальних глядачів: 1 людина = 1 перегляд.
   if (nick) {
@@ -829,6 +830,8 @@ app.post('/channel/view', async (req, res) => {
   }
   const newCount = (post.view_count || 0) + 1;
   await supabase.from('channel_messages').update({ view_count: newCount }).eq('id', postId);
+  // Розсилаємо новий лічильник переглядів усім підписникам (real-time)
+  await notifyChannelSubscribers(post.channel_id, { type: 'channel_view', channelId: post.channel_id, postId, viewCount: newCount }, null);
   res.json({ ok: true, viewCount: newCount, counted: true });
 });
 
