@@ -817,13 +817,19 @@ app.delete('/channel/comment', async (req, res) => {
 
 // Інкремент переглядів поста
 app.post('/channel/view', async (req, res) => {
-  const { postId } = req.body;
+  const { postId, nick } = req.body;
   if (!postId) return res.json({ ok: false });
   const { data: post } = await supabase.from('channel_messages').select('view_count').eq('id', postId).single();
   if (!post) return res.json({ ok: false });
+  // Рахуємо лише унікальних глядачів: 1 людина = 1 перегляд.
+  if (nick) {
+    const { data: seen } = await supabase.from('channel_post_views').select('id').eq('post_id', postId).eq('nick', nick).maybeSingle();
+    if (seen) return res.json({ ok: true, viewCount: post.view_count || 0, counted: false });
+    await supabase.from('channel_post_views').insert({ post_id: postId, nick });
+  }
   const newCount = (post.view_count || 0) + 1;
   await supabase.from('channel_messages').update({ view_count: newCount }).eq('id', postId);
-  res.json({ ok: true, viewCount: newCount });
+  res.json({ ok: true, viewCount: newCount, counted: true });
 });
 
 // Реакції
