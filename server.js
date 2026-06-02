@@ -703,7 +703,7 @@ app.get('/channel/messages', async (req, res) => {
 
 // POST /channel/message — підтримує text, imageUrl, fileData, fileName
 app.post('/channel/message', async (req, res) => {
-  const { channelId, fromNick, text, imageUrl, fileData, fileName, waveform } = req.body;
+  const { channelId, fromNick, text, imageUrl, fileData, fileName, waveform, forwardedFrom } = req.body;
   if (!channelId || !fromNick || (!text && !imageUrl && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Тільки власник або адмін може писати' });
@@ -717,11 +717,12 @@ app.post('/channel/message', async (req, res) => {
     file_data: fileData || null,
     file_name: fileName || null,
     timestamp: ts, msg_id: msgId,
+    ...(forwardedFrom ? { forwarded_from: forwardedFrom } : {}),
     ...(waveform ? { waveform: JSON.stringify(waveform) } : {}),
   }).select().single();
   const lastText = text ? text.substring(0, 50) : (imageUrl ? '🖼 Зображення' : (isVideo ? '🎬 Відео' : (isVoice ? '🎤 Голосове' : (fileName ? '📎 ' + fileName.substring(0, 30) : ''))));
   await supabase.from('channels').update({ last_post_at: ts, last_post_text: lastText }).eq('id', channelId);
-  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId }, fromNick);
+  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}) }, fromNick);
   res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [], waveform: waveform || null } });
 });
 
