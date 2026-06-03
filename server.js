@@ -860,6 +860,15 @@ app.post('/channel/block-subscriber', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/channel/blocked-list', async (req, res) => {
+  const { channelId, ownerNick } = req.query;
+  if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const { data: blocked } = await supabase.from('channel_blocked').select('nick, blocked_at').eq('channel_id', channelId).order('blocked_at', { ascending: false });
+  res.json({ ok: true, blocked: blocked || [] });
+});
+
 app.post('/channel/unblock-subscriber', async (req, res) => {
   const { channelId, ownerNick, targetNick } = req.body;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
