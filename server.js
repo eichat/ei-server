@@ -129,10 +129,13 @@ async function sendFcmPush(toNick, data) {
 
 async function notifyChannelSubscribers(channelId, payload, excludeNick = null) {
   const { data: members } = await supabase.from('channel_members').select('nick').eq('channel_id', channelId);
+  const msg = JSON.stringify(payload);
   for (const m of members || []) {
     if (m.nick === excludeNick) continue;
     const t = onlineUsers.get(m.nick);
-    if (t) t.ws.send(JSON.stringify(payload));
+    // ws.send кидає на мертвому/напіввідкритому сокеті (Render flapping) —
+    // не дати одному битому сокету зірвати решту розсилки й сам HTTP-запит.
+    if (t) { try { t.ws.send(msg); } catch (_) {} }
   }
 }
 
@@ -157,7 +160,8 @@ async function isModOrCreator(groupId, nick) {
 
 async function notifyMembers(groupId, payload, excludeNick = null) {
   const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
-  for (const m of members || []) { if (m.nick === excludeNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); }
+  const msg = JSON.stringify(payload);
+  for (const m of members || []) { if (m.nick === excludeNick) continue; const t = onlineUsers.get(m.nick); if (t) { try { t.ws.send(msg); } catch (_) {} } }
 }
 
 async function sendGroupInvite(groupId, groupName, inviterNick, targetNick) {
