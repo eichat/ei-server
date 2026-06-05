@@ -269,6 +269,7 @@ app.post('/update-nick', async (req, res) => {
     supabase.from('channel_messages').update({ from_nick: newNick }).eq('from_nick', oldNick),
     supabase.from('channel_comments').update({ from_nick: newNick }).eq('from_nick', oldNick),
     supabase.from('channel_reactions').update({ nick: newNick }).eq('nick', oldNick),
+    supabase.from('channel_comment_reactions').update({ nick: newNick }).eq('nick', oldNick),
     supabase.from('channels').update({ owner_nick: newNick }).eq('owner_nick', oldNick),
     supabase.from('deleted_messages').update({ from_nick: newNick }).eq('from_nick', oldNick),
     supabase.from('deleted_messages').update({ to_nick: newNick }).eq('to_nick', oldNick),
@@ -792,7 +793,18 @@ app.delete('/channel/post', async (req, res) => {
 app.get('/channel/comments', async (req, res) => {
   const { postId } = req.query; if (!postId) return res.json({ ok: false, error: 'postId обов\'язковий' });
   const { data } = await supabase.from('channel_comments').select('*').eq('post_id', postId).order('timestamp', { ascending: true });
-  res.json({ ok: true, comments: data || [] });
+  const comments = data || [];
+  // Підтягуємо реакції для всіх коментарів цього поста
+  const ids = comments.map(c => c.id);
+  const reactionsByComment = {};
+  if (ids.length > 0) {
+    const { data: reacts } = await supabase.from('channel_comment_reactions').select('comment_id, emoji, nick').in('comment_id', ids);
+    for (const r of reacts || []) {
+      if (!reactionsByComment[r.comment_id]) reactionsByComment[r.comment_id] = [];
+      reactionsByComment[r.comment_id].push({ emoji: r.emoji, nick: r.nick });
+    }
+  }
+  res.json({ ok: true, comments: comments.map(c => ({ ...c, reactions: reactionsByComment[c.id] || [] })) });
 });
 
 app.post('/channel/comment', async (req, res) => {
@@ -817,7 +829,38 @@ app.delete('/channel/comment', async (req, res) => {
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   const canDelete = comment.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_comment_reactions').delete().eq('comment_id', commentId);
   await supabase.from('channel_comments').delete().eq('id', commentId);
+  res.json({ ok: true });
+});
+
+// Реакція на коментар (toggle) — дзеркало /channel/reaction
+app.post('/channel/comment/reaction', async (req, res) => {
+  const { commentId, channelId, nick, emoji } = req.body;
+  if (!commentId || !channelId || !nick || !emoji) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
+  if (blocked) return res.json({ ok: false, error: 'Ви заблоковані' });
+  const { data: existing } = await supabase.from('channel_comment_reactions').select('id').eq('comment_id', commentId).eq('nick', nick).eq('emoji', emoji).single();
+  if (existing) { await supabase.from('channel_comment_reactions').delete().eq('id', existing.id); }
+  else { await supabase.from('channel_comment_reactions').insert({ comment_id: commentId, nick, emoji }); }
+  const { data: reactions } = await supabase.from('channel_comment_reactions').select('emoji, nick').eq('comment_id', commentId);
+  const { data: c } = await supabase.from('channel_comments').select('post_id').eq('id', commentId).single();
+  await notifyChannelSubscribers(channelId, { type: 'channel_comment_reaction', channelId, postId: c ? c.post_id : null, commentId, reactions }, null);
+  res.json({ ok: true, reactions: reactions || [] });
+});
+
+// Редагування коментаря (свій або owner/admin) — дзеркало /channel/message/edit
+app.post('/channel/comment/edit', async (req, res) => {
+  const { channelId, commentId, nick, content } = req.body;
+  if (!channelId || !commentId || !nick || !content) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: comment } = await supabase.from('channel_comments').select('from_nick, post_id').eq('id', commentId).single();
+  if (!comment) return res.json({ ok: false, error: 'Коментар не знайдено' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
+  const canEdit = comment.from_nick === nick || (member && ['owner', 'admin'].includes(member.role));
+  if (!canEdit) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const editedAt = Date.now();
+  await supabase.from('channel_comments').update({ content, edited: true, edited_at: editedAt }).eq('id', commentId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_comment_edited', channelId, postId: comment.post_id, commentId, text: content, editedAt }, null);
   res.json({ ok: true });
 });
 
