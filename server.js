@@ -326,9 +326,9 @@ app.get('/online-users', (req, res) => res.json({ ok: true, users: [...onlineUse
 
 app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
-  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color').eq('nick', nick).single();
+  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null });
+  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null });
 });
 
 app.get('/search-user', async (req, res) => {
@@ -794,7 +794,6 @@ app.get('/channel/comments', async (req, res) => {
   const { postId } = req.query; if (!postId) return res.json({ ok: false, error: 'postId обов\'язковий' });
   const { data } = await supabase.from('channel_comments').select('*').eq('post_id', postId).order('timestamp', { ascending: true });
   const comments = data || [];
-  // Підтягуємо реакції для всіх коментарів цього поста
   const ids = comments.map(c => c.id);
   const reactionsByComment = {};
   if (ids.length > 0) {
