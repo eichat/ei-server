@@ -561,7 +561,7 @@ app.post('/group/delete', async (req, res) => {
 app.get('/group/messages', async (req, res) => {
   const { groupId } = req.query;
   const { data } = await supabase.from('group_messages').select('*').eq('group_id', groupId).order('timestamp', { ascending: true });
-  res.json({ ok: true, messages: (data || []).map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null })) });
+  res.json({ ok: true, messages: (data || []).map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null, replyToMsgId: m.reply_to_msg_id || null, replyToText: m.reply_to_text || null, replyToFrom: m.reply_to_from || null })) });
 });
 
 app.get('/check-phone', async (req, res) => {
@@ -1182,7 +1182,7 @@ wss.on('connection', (ws) => {
         if (!membership) return;
         const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
         const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
-        await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], ...(msg.isFile ? { type: 'file', file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}) });
+        await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], ...(msg.isFile ? { type: 'file', file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}) });
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
       }
 
