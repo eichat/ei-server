@@ -559,9 +559,23 @@ app.post('/group/delete', async (req, res) => {
 });
 
 app.get('/group/messages', async (req, res) => {
-  const { groupId } = req.query;
+  const { groupId, nick } = req.query;
+  let clearedAt = 0;
+  if (nick) {
+    const { data: clRows } = await supabase.from('group_history_cleared').select('cleared_at').eq('nick', nick).eq('group_id', groupId).limit(1);
+    if (clRows && clRows[0] && clRows[0].cleared_at) clearedAt = Number(clRows[0].cleared_at);
+  }
   const { data } = await supabase.from('group_messages').select('*').eq('group_id', groupId).order('timestamp', { ascending: true });
-  res.json({ ok: true, messages: (data || []).map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null, replyToMsgId: m.reply_to_msg_id || null, replyToText: m.reply_to_text || null, replyToFrom: m.reply_to_from || null })) });
+  const visible = (data || []).filter(m => !clearedAt || Number(m.timestamp) > clearedAt);
+  res.json({ ok: true, messages: visible.map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null, replyToMsgId: m.reply_to_msg_id || null, replyToText: m.reply_to_text || null, replyToFrom: m.reply_to_from || null })) });
+});
+
+// Очистити історію групи лише для себе (персистентний маркер часу)
+app.post('/group/clear-history', async (req, res) => {
+  const { groupId, nick } = req.body;
+  if (!groupId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  await supabase.from('group_history_cleared').upsert({ nick, group_id: groupId, cleared_at: Date.now() }, { onConflict: 'nick,group_id' });
+  res.json({ ok: true });
 });
 
 app.get('/check-phone', async (req, res) => {
