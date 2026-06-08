@@ -837,11 +837,23 @@ app.post('/channel/comment', async (req, res) => {
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member) return res.json({ ok: false, error: 'Підпишіться на канал щоб коментувати' });
+  const { data: postRow } = await supabase.from('channel_messages').select('comments_enabled').eq('id', postId).single();
+  if (postRow && postRow.comments_enabled === false) return res.json({ ok: false, error: 'Коментарі вимкнені' });
+  if (fileData) { const { data: chRow } = await supabase.from('channels').select('comments_allow_media').eq('id', channelId).single(); if (chRow && chRow.comments_allow_media === false) return res.json({ ok: false, error: 'Медіа в коментарях вимкнено' }); }
   const ts = Date.now();
   const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts, reply_to_nick: replyToNick || null, reply_to_text: replyToText || null, reply_to_image: replyToImage || null }).select().single();
   const { count: commentCount } = await supabase.from('channel_comments').select('*', { count: 'exact', head: true }).eq('post_id', postId);
   await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id, commentCount: commentCount || 0 }, fromNick);
   res.json({ ok: true, comment });
+});
+
+app.post('/channel/post/comments-toggle', async (req, res) => {
+  const { channelId, postId, requesterNick, enabled } = req.body;
+  if (!channelId || !postId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channel_messages').update({ comments_enabled: !!enabled }).eq('id', postId);
+  res.json({ ok: true });
 });
 
 app.delete('/channel/comment', async (req, res) => {
@@ -1033,7 +1045,7 @@ app.post('/channel/contact-owner', async (req, res) => {
 });
 
 app.post('/channel/update', async (req, res) => {
-  const { channelId, ownerNick, name, description, type, avatar_url } = req.body;
+  const { channelId, ownerNick, name, description, type, avatar_url, comments_allow_media } = req.body;
   if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1042,6 +1054,7 @@ app.post('/channel/update', async (req, res) => {
   if (description !== undefined) updates.description = description;
   if (type !== undefined) updates.type = type;
   if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+  if (comments_allow_media !== undefined) updates.comments_allow_media = comments_allow_media;
   if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати' });
   await supabase.from('channels').update(updates).eq('id', channelId);
   res.json({ ok: true });
