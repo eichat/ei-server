@@ -299,6 +299,20 @@ app.post('/update-password', async (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/update-phone', async (req, res) => {
+  const { nick, password, phone, phoneNormalized } = req.body;
+  const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
+  if (!phoneNormalized) return res.json({ ok: false, error: 'Невірний номер' });
+  // Унікальність номера (крім самого себе)
+  const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
+  if (phoneExists && phoneExists.nick !== user.nick) return res.json({ ok: false, error: 'Цей номер телефону вже зареєстрований в EION' });
+  const { error } = await supabase.from('users').update({ phone, phone_normalized: phoneNormalized }).eq('nick_lower', nick.toLowerCase());
+  if (error) return res.json({ ok: false, error: 'Помилка оновлення номера' });
+  res.json({ ok: true });
+});
+
 app.post('/update-email', async (req, res) => {
   const { nick, password, newEmail } = req.body;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
