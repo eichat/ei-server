@@ -367,7 +367,7 @@ app.post('/phone/request-code', async (req, res) => {
     expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     attempts: 0, last_sent_at: new Date().toISOString(),
   });
-  if (error) return res.json({ ok: false, error: 'Помилка збереження коду' });
+  if (error) { console.error('[OTP] phone_codes upsert:', error); return res.json({ ok: false, error: 'DB: ' + (error.message || JSON.stringify(error)) }); }
   const sent = await sendOtp(phone, `EION код підтвердження: ${code}`);
   if (!sent.ok) return res.json({ ok: false, error: 'Не вдалося надіслати код' });
   // У dev-режимі (без шлюзу) можна повернути код для тесту, якщо явно дозволено env
