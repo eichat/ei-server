@@ -177,8 +177,27 @@ function httpPostJson(targetUrl, headers, bodyObj) {
   });
 }
 
-// Відправляє OTP через налаштований шлюз. Без SMS_GATEWAY_URL — dev-режим (лог у консоль).
-async function sendOtp(phoneE164, text) {
+// Відправляє OTP: спершу Telegram Gateway (дешево, масштабовано), далі SMS-шлюз (резерв).
+// Без жодного каналу — dev-режим (лог у консоль).
+async function sendOtp(phoneE164, code, text) {
+  // 1. Telegram Gateway — основний канал (доставляє НАШ код у Telegram)
+  if (process.env.TG_GATEWAY_TOKEN) {
+    const tg = await httpPostJson(
+      'https://gatewayapi.telegram.org/sendVerificationMessage',
+      { 'Authorization': `Bearer ${process.env.TG_GATEWAY_TOKEN}` },
+      { phone_number: phoneE164, code: code, ttl: 300 },
+    );
+    try {
+      const body = JSON.parse(tg.body || '{}');
+      if (tg.status >= 200 && tg.status < 300 && body.ok === true) return { ok: true, via: 'telegram' };
+      console.error('[OTP] Telegram не доставив:', body.error || tg.status, '— пробую SMS-резерв');
+    } catch (_) {
+      console.error('[OTP] Telegram HTTP', tg.status, '— пробую SMS-резерв');
+    }
+    // не вдалось — падаємо у SMS-резерв нижче
+  }
+
+  // 2. SMS-шлюз (SMSGate) — резерв
   const url = process.env.SMS_GATEWAY_URL;
   if (!url) { console.log(`[OTP dev] -> ${phoneE164}: ${text}`); return { ok: true, dev: true }; }
   const headers = {};
@@ -186,8 +205,8 @@ async function sendOtp(phoneE164, text) {
   else if (process.env.SMS_GATEWAY_BASIC) headers['Authorization'] = `Basic ${Buffer.from(process.env.SMS_GATEWAY_BASIC).toString('base64')}`;
   // Тіло під актуальний API SMSGate (sms-gate.app): { textMessage:{text}, phoneNumbers:[...] }
   const r = await httpPostJson(url, headers, { textMessage: { text: text }, phoneNumbers: [phoneE164] });
-  if (r.status >= 200 && r.status < 300) return { ok: true };
-  console.error('[OTP] шлюз помилка', r.status, r.error || r.body);
+  if (r.status >= 200 && r.status < 300) return { ok: true, via: 'sms' };
+  console.error('[OTP] SMS-шлюз помилка', r.status, r.error || r.body);
   return { ok: false };
 }
 
@@ -368,7 +387,7 @@ app.post('/phone/request-code', async (req, res) => {
     attempts: 0, last_sent_at: new Date().toISOString(),
   });
   if (error) { console.error('[OTP] phone_codes upsert:', error); return res.json({ ok: false, error: 'Помилка збереження коду' }); }
-  const sent = await sendOtp(phone, `EION код підтвердження: ${code}`);
+  const sent = await sendOtp(phone, code, `EION код підтвердження: ${code}`);
   if (!sent.ok) return res.json({ ok: false, error: 'Не вдалося надіслати код' });
   // У dev-режимі (без шлюзу) можна повернути код для тесту, якщо явно дозволено env
   const devCode = (sent.dev && process.env.OTP_DEV_RETURN_CODE === 'true') ? code : undefined;
