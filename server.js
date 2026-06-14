@@ -365,7 +365,7 @@ app.post('/update-phone', async (req, res) => {
   // Унікальність номера (крім самого себе)
   const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
   if (phoneExists && phoneExists.nick !== user.nick) return res.json({ ok: false, error: 'Цей номер телефону вже зареєстрований в EION' });
-  const { error } = await supabase.from('users').update({ phone, phone_normalized: phoneNormalized }).eq('nick_lower', nick.toLowerCase());
+  const { error } = await supabase.from('users').update({ phone, phone_normalized: phoneNormalized, phone_verified: verifiedPhones.has(phoneNormalized) }).eq('nick_lower', nick.toLowerCase());
   if (error) return res.json({ ok: false, error: 'Помилка оновлення номера' });
   res.json({ ok: true });
 });
@@ -467,7 +467,7 @@ app.get('/search-user', async (req, res) => {
 app.post('/users/by-phones', async (req, res) => {
   const { phones } = req.body;
   if (!phones || !Array.isArray(phones) || phones.length === 0) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data } = await supabase.from('users').select('nick, phone_normalized').not('phone_normalized', 'is', null);
+  const { data } = await supabase.from('users').select('nick, phone_normalized').not('phone_normalized', 'is', null).eq('phone_verified', true);
   const result = {};
   for (const user of data || []) { if (phones.includes(user.phone_normalized)) result[user.phone_normalized] = user.nick; }
   res.json({ ok: true, users: result });
