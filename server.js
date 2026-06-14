@@ -24,6 +24,7 @@ const mailer = nodemailer.createTransport({
 const onlineUsers = new Map();
 const resetCodes = new Map();
 const pendingRegistrations = new Map();
+const verifiedPhones = new Map(); // нормалізований номер -> expires (підтверджені, для реєстрації)
 const fcmTokens = new Map();
 const pendingCallOffers = new Map();
 const linkPreviewCache = new Map();
@@ -40,6 +41,7 @@ setInterval(() => {
   const now = Date.now();
   for (const [id, data] of pendingCallOffers) if (now > data.expires) pendingCallOffers.delete(id);
   for (const [url, data] of linkPreviewCache) if (now > data.expires) linkPreviewCache.delete(url);
+  for (const [p, exp] of verifiedPhones) if (now > exp) verifiedPhones.delete(p);
 }, 120000);
 
 // ── Link Preview ──────────────────────────────
@@ -153,6 +155,42 @@ app.post('/decline-call', (req, res) => {
 
 async function sendEmail(to, subject, text) { await mailer.sendMail({ from: 'EI° <eichatserver@gmail.com>', to, subject, text }); }
 
+// ── OTP: підключюваний відправник SMS ──────────
+function httpPostJson(targetUrl, headers, bodyObj) {
+  return new Promise((resolve) => {
+    try {
+      const u = new URL(targetUrl);
+      const mod = u.protocol === 'http:' ? httpModule : https;
+      const payload = JSON.stringify(bodyObj);
+      const r = mod.request(u, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), ...headers },
+      }, (resp) => {
+        let data = '';
+        resp.on('data', (c) => data += c);
+        resp.on('end', () => resolve({ status: resp.statusCode, body: data }));
+      });
+      r.on('error', (e) => resolve({ status: 0, error: e.message }));
+      r.write(payload);
+      r.end();
+    } catch (e) { resolve({ status: 0, error: e.message }); }
+  });
+}
+
+// Відправляє OTP через налаштований шлюз. Без SMS_GATEWAY_URL — dev-режим (лог у консоль).
+async function sendOtp(phoneE164, text) {
+  const url = process.env.SMS_GATEWAY_URL;
+  if (!url) { console.log(`[OTP dev] -> ${phoneE164}: ${text}`); return { ok: true, dev: true }; }
+  const headers = {};
+  if (process.env.SMS_GATEWAY_TOKEN) headers['Authorization'] = `Bearer ${process.env.SMS_GATEWAY_TOKEN}`;
+  else if (process.env.SMS_GATEWAY_BASIC) headers['Authorization'] = `Basic ${Buffer.from(process.env.SMS_GATEWAY_BASIC).toString('base64')}`;
+  // Тіло сумісне зі SMSGate (sms-gate.app): { message, phoneNumbers:[...] }. Для іншого шлюзу — підправ поля.
+  const r = await httpPostJson(url, headers, { message: text, phoneNumbers: [phoneE164] });
+  if (r.status >= 200 && r.status < 300) return { ok: true };
+  console.error('[OTP] шлюз помилка', r.status, r.error || r.body);
+  return { ok: false };
+}
+
 async function isModOrCreator(groupId, nick) {
   const { data } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', nick).single();
   return data && (data.role === 'creator' || data.role === 'moderator');
@@ -193,7 +231,7 @@ app.post('/register', async (req, res) => {
     nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash,
     email, color: color || 4280391411, coins: 50,
     ...(phone ? { phone } : {}),
-    ...(phoneNormalized ? { phone_normalized: phoneNormalized } : {}),
+    ...(phoneNormalized ? { phone_normalized: phoneNormalized, phone_verified: verifiedPhones.has(phoneNormalized) } : {}),
   };
   if (REQUIRE_EMAIL_VERIFICATION) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -311,6 +349,62 @@ app.post('/update-phone', async (req, res) => {
   const { error } = await supabase.from('users').update({ phone, phone_normalized: phoneNormalized }).eq('nick_lower', nick.toLowerCase());
   if (error) return res.json({ ok: false, error: 'Помилка оновлення номера' });
   res.json({ ok: true });
+});
+
+// ── Підтвердження номера власним OTP (без Firebase) ──
+app.post('/phone/request-code', async (req, res) => {
+  const { phone, phoneNormalized } = req.body;
+  if (!phoneNormalized || !phone) return res.json({ ok: false, error: 'Невірний номер' });
+  // rate-limit: не частіше ніж раз на 60 с
+  const { data: existing } = await supabase.from('phone_codes').select('last_sent_at').eq('phone', phoneNormalized).single();
+  if (existing && existing.last_sent_at) {
+    const elapsed = Date.now() - new Date(existing.last_sent_at).getTime();
+    if (elapsed < 60000) return res.json({ ok: false, error: `Зачекайте ${Math.ceil((60000 - elapsed) / 1000)} с` });
+  }
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const { error } = await supabase.from('phone_codes').upsert({
+    phone: phoneNormalized, code,
+    expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    attempts: 0, last_sent_at: new Date().toISOString(),
+  });
+  if (error) return res.json({ ok: false, error: 'Помилка збереження коду' });
+  const sent = await sendOtp(phone, `EION код підтвердження: ${code}`);
+  if (!sent.ok) return res.json({ ok: false, error: 'Не вдалося надіслати код' });
+  // У dev-режимі (без шлюзу) можна повернути код для тесту, якщо явно дозволено env
+  const devCode = (sent.dev && process.env.OTP_DEV_RETURN_CODE === 'true') ? code : undefined;
+  res.json({ ok: true, ...(devCode ? { devCode } : {}) });
+});
+
+app.post('/phone/verify-code', async (req, res) => {
+  const { phone, phoneNormalized, code, nick } = req.body;
+  if (!phoneNormalized || !code) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: row } = await supabase.from('phone_codes').select('*').eq('phone', phoneNormalized).single();
+  if (!row) return res.json({ ok: false, error: 'Код не знайдено. Запросіть новий' });
+  if (new Date(row.expires_at).getTime() < Date.now()) {
+    await supabase.from('phone_codes').delete().eq('phone', phoneNormalized);
+    return res.json({ ok: false, error: 'Код протерміновано. Запросіть новий' });
+  }
+  if (row.attempts >= 5) {
+    await supabase.from('phone_codes').delete().eq('phone', phoneNormalized);
+    return res.json({ ok: false, error: 'Забагато спроб. Запросіть новий код' });
+  }
+  if (row.code !== String(code)) {
+    await supabase.from('phone_codes').update({ attempts: row.attempts + 1 }).eq('phone', phoneNormalized);
+    return res.json({ ok: false, error: 'Невірний код' });
+  }
+  await supabase.from('phone_codes').delete().eq('phone', phoneNormalized); // успіх — код видаляємо
+  // Наявний користувач (зміна номера / discovery) — ставимо номер + phone_verified
+  if (nick) {
+    const { data: user } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
+    if (user) {
+      const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
+      if (phoneExists && phoneExists.nick !== user.nick) return res.json({ ok: false, error: 'Цей номер вже зареєстрований в EION' });
+      await supabase.from('users').update({ ...(phone ? { phone } : {}), phone_normalized: phoneNormalized, phone_verified: true }).eq('nick_lower', nick.toLowerCase());
+    }
+  }
+  // Для реєстрації (ще без ніка) — запам'ятовуємо підтверджений номер на 15 хв
+  verifiedPhones.set(phoneNormalized, Date.now() + 15 * 60 * 1000);
+  res.json({ ok: true, verified: true });
 });
 
 app.post('/update-email', async (req, res) => {
