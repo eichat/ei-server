@@ -184,8 +184,8 @@ async function sendOtp(phoneE164, text) {
   const headers = {};
   if (process.env.SMS_GATEWAY_TOKEN) headers['Authorization'] = `Bearer ${process.env.SMS_GATEWAY_TOKEN}`;
   else if (process.env.SMS_GATEWAY_BASIC) headers['Authorization'] = `Basic ${Buffer.from(process.env.SMS_GATEWAY_BASIC).toString('base64')}`;
-  // Тіло сумісне зі SMSGate (sms-gate.app): { message, phoneNumbers:[...] }. Для іншого шлюзу — підправ поля.
-  const r = await httpPostJson(url, headers, { message: text, phoneNumbers: [phoneE164] });
+  // Тіло під актуальний API SMSGate (sms-gate.app): { textMessage:{text}, phoneNumbers:[...] }
+  const r = await httpPostJson(url, headers, { textMessage: { text: text }, phoneNumbers: [phoneE164] });
   if (r.status >= 200 && r.status < 300) return { ok: true };
   console.error('[OTP] шлюз помилка', r.status, r.error || r.body);
   return { ok: false };
@@ -367,7 +367,7 @@ app.post('/phone/request-code', async (req, res) => {
     expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
     attempts: 0, last_sent_at: new Date().toISOString(),
   });
-  if (error) { console.error('[OTP] phone_codes upsert:', error); return res.json({ ok: false, error: 'DB: ' + (error.message || JSON.stringify(error)) }); }
+  if (error) { console.error('[OTP] phone_codes upsert:', error); return res.json({ ok: false, error: 'Помилка збереження коду' }); }
   const sent = await sendOtp(phone, `EION код підтвердження: ${code}`);
   if (!sent.ok) return res.json({ ok: false, error: 'Не вдалося надіслати код' });
   // У dev-режимі (без шлюзу) можна повернути код для тесту, якщо явно дозволено env
