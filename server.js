@@ -968,11 +968,12 @@ app.get('/channel/comments', async (req, res) => {
       reactionsByComment[r.comment_id].push({ emoji: r.emoji, nick: r.nick });
     }
   }
-  res.json({ ok: true, comments: comments.map(c => ({ ...c, reactions: reactionsByComment[c.id] || [] })) });
+  const parseWf = (w) => { if (!w) return null; if (Array.isArray(w)) return w; try { return JSON.parse(w); } catch { return null; } };
+  res.json({ ok: true, comments: comments.map(c => ({ ...c, waveform: parseWf(c.waveform), reactions: reactionsByComment[c.id] || [] })) });
 });
 
 app.post('/channel/comment', async (req, res) => {
-  const { channelId, postId, fromNick, text, fileData, fileName, replyToNick, replyToText, replyToImage } = req.body;
+  const { channelId, postId, fromNick, text, fileData, fileName, waveform, durationSec, replyToNick, replyToText, replyToImage } = req.body;
   if (!channelId || !postId || !fromNick || (!text && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
@@ -982,10 +983,10 @@ app.post('/channel/comment', async (req, res) => {
   if (postRow && postRow.comments_enabled === false) return res.json({ ok: false, error: 'Коментарі вимкнені' });
   if (fileData) { const { data: chRow } = await supabase.from('channels').select('comments_allow_media').eq('id', channelId).single(); if (chRow && chRow.comments_allow_media === false) return res.json({ ok: false, error: 'Медіа в коментарях вимкнено' }); }
   const ts = Date.now();
-  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts, reply_to_nick: replyToNick || null, reply_to_text: replyToText || null, reply_to_image: replyToImage || null }).select().single();
+  const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts, reply_to_nick: replyToNick || null, reply_to_text: replyToText || null, reply_to_image: replyToImage || null, waveform: waveform ? JSON.stringify(waveform) : null, duration_sec: durationSec || null }).select().single();
   const { count: commentCount } = await supabase.from('channel_comments').select('*', { count: 'exact', head: true }).eq('post_id', postId);
   await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id, commentCount: commentCount || 0 }, fromNick);
-  res.json({ ok: true, comment });
+  res.json({ ok: true, comment: { ...comment, waveform: waveform || null } });
 });
 
 app.post('/channel/post/comments-toggle', async (req, res) => {
