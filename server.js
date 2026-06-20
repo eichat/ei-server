@@ -893,7 +893,7 @@ app.post('/channel/message', async (req, res) => {
   }).select().single();
   const lastText = text ? text.substring(0, 50) : (imageUrl ? '🖼 Зображення' : (isVideo ? '🎬 Відео' : (isVoice ? '🎤 Голосове' : (fileName ? '📎 ' + fileName.substring(0, 30) : ''))));
   await supabase.from('channels').update({ last_post_at: ts, last_post_text: lastText }).eq('id', channelId);
-  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}) }, fromNick);
+  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}), message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } }, fromNick);
   res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [], waveform: waveform || null, duration_sec: durationSec || null } });
 });
 
