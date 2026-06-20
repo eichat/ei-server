@@ -775,6 +775,29 @@ app.post('/group/update', async (req, res) => {
 
 app.get('/ping', (req, res) => res.json({ ok: true }));
 
+// ── Закріплені повідомлення груп ──────────────────────────────
+// Закріпити (creator/moderator). Клієнт шле прев'ю (text) + автора (from) + msgId.
+app.post('/group/pin', async (req, res) => {
+  const { groupId, requesterNick, msgId, text, from } = req.body;
+  if (!groupId || !requesterNick || !msgId) return res.json({ ok: false, error: 'Невірні параметри' });
+  if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const pinnedAt = Date.now();
+  await supabase.from('groups').update({ pinned_msg_id: msgId, pinned_text: text || null, pinned_from: from || null, pinned_at: pinnedAt }).eq('id', groupId);
+  await notifyMembers(groupId, { type: 'group_pinned', groupId: Number(groupId), msgId, text: text || null, from: from || null, pinnedAt });
+  res.json({ ok: true });
+});
+
+// Відкріпити (creator/moderator)
+app.post('/group/unpin', async (req, res) => {
+  const { groupId, requesterNick } = req.body;
+  if (!groupId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('groups').update({ pinned_msg_id: null, pinned_text: null, pinned_from: null, pinned_at: null }).eq('id', groupId);
+  await notifyMembers(groupId, { type: 'group_unpinned', groupId: Number(groupId) });
+  res.json({ ok: true });
+});
+
+
 // ── Канали ──────────────────────────────────────
 app.post('/channel/create', async (req, res) => {
   const { ownerNick, name, description, type, subscribers } = req.body;
