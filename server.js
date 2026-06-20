@@ -798,6 +798,29 @@ app.post('/group/unpin', async (req, res) => {
 });
 
 
+// ── Закріплені пости каналів (owner/admin) ──────────────────────────────
+app.post('/channel/pin', async (req, res) => {
+  const { channelId, requesterNick, postId, text, from } = req.body;
+  if (!channelId || !requesterNick || !postId) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const pinnedAt = Date.now();
+  await supabase.from('channels').update({ pinned_post_id: String(postId), pinned_text: text || null, pinned_from: from || null, pinned_at: pinnedAt }).eq('id', channelId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_pinned', channelId: Number(channelId), postId: String(postId), text: text || null, from: from || null, pinnedAt }, null);
+  res.json({ ok: true });
+});
+
+app.post('/channel/unpin', async (req, res) => {
+  const { channelId, requesterNick } = req.body;
+  if (!channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channels').update({ pinned_post_id: null, pinned_text: null, pinned_from: null, pinned_at: null }).eq('id', channelId);
+  await notifyChannelSubscribers(channelId, { type: 'channel_unpinned', channelId: Number(channelId) }, null);
+  res.json({ ok: true });
+});
+
+
 // ── Канали ──────────────────────────────────────
 app.post('/channel/create', async (req, res) => {
   const { ownerNick, name, description, type, subscribers } = req.body;
@@ -874,7 +897,21 @@ app.post('/channel/unsubscribe', async (req, res) => {
 });
 
 app.get('/channel/messages', async (req, res) => {
-  const { channelId } = req.query; if (!channelId) return res.json({ ok: false, error: 'channelId обов\'язковий' });
+  const { channelId, nick } = req.query; if (!channelId) return res.json({ ok: false, error: 'channelId обов\'язковий' });
+  // Гейт платного каналу: доступ мають власник/адмін або активна підписка
+  const { data: paidCh } = await supabase.from('channels').select('is_paid, price, sub_days').eq('id', channelId).single();
+  if (paidCh && paidCh.is_paid) {
+    let hasAccess = false;
+    if (nick) {
+      const { data: mem } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
+      if (mem && ['owner', 'admin'].includes(mem.role)) hasAccess = true;
+      if (!hasAccess) {
+        const { data: psub } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).single();
+        if (psub && Number(psub.expires_at) > Date.now()) hasAccess = true;
+      }
+    }
+    if (!hasAccess) return res.json({ ok: true, locked: true, price: paidCh.price || 0, subDays: paidCh.sub_days || 30, messages: [] });
+  }
   const { data: posts } = await supabase.from('channel_messages').select('*').eq('channel_id', channelId).order('timestamp', { ascending: true });
   if (!posts || posts.length === 0) return res.json({ ok: true, messages: [] });
   const postIds = posts.map(p => p.id);
@@ -1208,6 +1245,53 @@ app.post('/channel/contact-owner', async (req, res) => {
   const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -CONTACT_PRICE, total: (sender.coins || 0) - CONTACT_PRICE }));
   const ownerWs = onlineUsers.get(channel.owner_nick); if (ownerWs) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: OWNER_SHARE, total: (owner.coins || 0) + OWNER_SHARE }));
   res.json({ ok: true, ownerNick: channel.owner_nick });
+});
+
+// ── Платна підписка на канал (монети, комісія 30% платформі) ──────────────
+app.post('/channel/subscribe-paid', async (req, res) => {
+  const { channelId, nick } = req.body;
+  if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const COMPANY_NICK = 'eion_company'; const FEE_PCT = 30;
+  const { data: ch } = await supabase.from('channels').select('owner_nick, is_paid, price, sub_days').eq('id', channelId).single();
+  if (!ch) return res.json({ ok: false, error: 'Канал не знайдено' });
+  if (!ch.is_paid) return res.json({ ok: false, error: 'Канал безкоштовний' });
+  const price = ch.price || 0;
+  const { data: user } = await supabase.from('users').select('coins').eq('nick', nick).single();
+  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
+  if ((user.coins || 0) < price) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  const companyShare = Math.floor(price * FEE_PCT / 100);
+  const ownerShare = price - companyShare;
+  const newBalance = (user.coins || 0) - price;
+  await supabase.from('users').update({ coins: newBalance }).eq('nick', nick);
+  if (ch.owner_nick && ch.owner_nick !== nick) {
+    const { data: owner } = await supabase.from('users').select('coins').eq('nick', ch.owner_nick).single();
+    if (owner) {
+      const ownerNew = (owner.coins || 0) + ownerShare;
+      await supabase.from('users').update({ coins: ownerNew }).eq('nick', ch.owner_nick);
+      const ownerWs = onlineUsers.get(ch.owner_nick);
+      if (ownerWs) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew }));
+    }
+  }
+  const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
+  if (company) await supabase.from('users').update({ coins: (company.coins || 0) + companyShare }).eq('nick', COMPANY_NICK);
+  const subDays = ch.sub_days || 30;
+  const expiresAt = Date.now() + subDays * 86400000;
+  await supabase.from('channel_paid_subs').upsert({ channel_id: Number(channelId), nick, expires_at: expiresAt }, { onConflict: 'channel_id,nick' });
+  const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
+  if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+  const subWs = onlineUsers.get(nick);
+  if (subWs) subWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
+  res.json({ ok: true, newBalance, expiresAt });
+});
+
+// Власник вмикає/вимикає платність і ставить ціну/період
+app.post('/channel/set-paid', async (req, res) => {
+  const { channelId, requesterNick, isPaid, price, subDays } = req.body;
+  if (!channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
+  if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Лише власник' });
+  await supabase.from('channels').update({ is_paid: !!isPaid, price: Math.max(0, parseInt(price) || 0), sub_days: Math.max(1, parseInt(subDays) || 30) }).eq('id', channelId);
+  res.json({ ok: true });
 });
 
 app.post('/channel/update', async (req, res) => {
