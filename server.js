@@ -1286,12 +1286,19 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   const subDays = ch.sub_days || 30;
   const expiresAt = Date.now() + subDays * 86400000;
   // Запис підписки БЕЗ залежності від unique-констрейнта (upsert+onConflict міг тихо падати)
-  const { data: existArr } = await supabase.from('channel_paid_subs').select('nick').eq('channel_id', channelId).eq('nick', nick).limit(1);
-  if (existArr && existArr.length > 0) {
-    await supabase.from('channel_paid_subs').update({ expires_at: expiresAt }).eq('channel_id', channelId).eq('nick', nick);
+  const { data: existArr, error: existErr } = await supabase.from('channel_paid_subs').select('nick').eq('channel_id', channelId).eq('nick', nick).limit(1);
+  if (existErr) console.error('[paid-sub] existArr ERROR:', JSON.stringify(existErr));
+  const subBranch = (existArr && existArr.length > 0) ? 'update' : 'insert';
+  let subWriteErr = null;
+  if (subBranch === 'update') {
+    const { error } = await supabase.from('channel_paid_subs').update({ expires_at: expiresAt }).eq('channel_id', channelId).eq('nick', nick);
+    subWriteErr = error;
   } else {
-    await supabase.from('channel_paid_subs').insert({ channel_id: Number(channelId), nick, expires_at: expiresAt });
+    const { error } = await supabase.from('channel_paid_subs').insert({ channel_id: Number(channelId), nick, expires_at: expiresAt });
+    subWriteErr = error;
   }
+  console.log('[paid-sub] write', { branch: subBranch, channelId, channelIdType: typeof channelId, channelIdNum: Number(channelId), nick, expiresAt });
+  if (subWriteErr) console.error('[paid-sub] WRITE ERROR:', JSON.stringify(subWriteErr));
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
   if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
   const subWs = onlineUsers.get(nick);
