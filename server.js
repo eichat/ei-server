@@ -906,8 +906,8 @@ app.get('/channel/messages', async (req, res) => {
       const { data: mem } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
       if (mem && ['owner', 'admin'].includes(mem.role)) hasAccess = true;
       if (!hasAccess) {
-        const { data: psub } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).single();
-        if (psub && Number(psub.expires_at) > Date.now()) hasAccess = true;
+        const { data: psubArr } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).order('expires_at', { ascending: false }).limit(1);
+        if (psubArr && psubArr[0] && Number(psubArr[0].expires_at) > Date.now()) hasAccess = true;
       }
     }
     if (!hasAccess) return res.json({ ok: true, locked: true, price: paidCh.price || 0, subDays: paidCh.sub_days || 30, messages: [] });
@@ -1255,6 +1255,9 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   const { data: ch } = await supabase.from('channels').select('owner_nick, is_paid, price, sub_days').eq('id', channelId).single();
   if (!ch) return res.json({ ok: false, error: 'Канал не знайдено' });
   if (!ch.is_paid) return res.json({ ok: false, error: 'Канал безкоштовний' });
+  // Вже є активна підписка — не списувати повторно
+  const { data: curArr } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).order('expires_at', { ascending: false }).limit(1);
+  if (curArr && curArr[0] && Number(curArr[0].expires_at) > Date.now()) return res.json({ ok: true, alreadySubscribed: true, expiresAt: Number(curArr[0].expires_at) });
   const price = ch.price || 0;
   const { data: user } = await supabase.from('users').select('coins').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
@@ -1276,7 +1279,13 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   if (company) await supabase.from('users').update({ coins: (company.coins || 0) + companyShare }).eq('nick', COMPANY_NICK);
   const subDays = ch.sub_days || 30;
   const expiresAt = Date.now() + subDays * 86400000;
-  await supabase.from('channel_paid_subs').upsert({ channel_id: Number(channelId), nick, expires_at: expiresAt }, { onConflict: 'channel_id,nick' });
+  // Запис підписки БЕЗ залежності від unique-констрейнта (upsert+onConflict міг тихо падати)
+  const { data: existArr } = await supabase.from('channel_paid_subs').select('nick').eq('channel_id', channelId).eq('nick', nick).limit(1);
+  if (existArr && existArr.length > 0) {
+    await supabase.from('channel_paid_subs').update({ expires_at: expiresAt }).eq('channel_id', channelId).eq('nick', nick);
+  } else {
+    await supabase.from('channel_paid_subs').insert({ channel_id: Number(channelId), nick, expires_at: expiresAt });
+  }
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
   if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
   const subWs = onlineUsers.get(nick);
