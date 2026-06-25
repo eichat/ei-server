@@ -1533,7 +1533,98 @@ wss.on('connection', (ws) => {
 });
 
 setInterval(() => { const now = Date.now(); for (const [nick, user] of onlineUsers) if (now - user.lastSeen > 60000) onlineUsers.delete(nick); }, 60000);
-setInterval(async () => { const week = Date.now() - 7 * 24 * 60 * 60 * 1000; await supabase.from('messages').delete().eq('delivered', true).lt('timestamp', week); }, 60 * 60 * 1000);
+
+// ── Прибирання транзитного сховища (БЕЗПЕЧНО) ──────────────────────────────
+// Принцип «сервер = транзит, не архів»: доставлені повідомлення прибираються за TTL,
+// і ПАРНО з рядком видаляються байти у Storage (фікс «осиротілих» файлів).
+// ЗАПОБІЖНИК: за замовчуванням DRY-RUN — лише ЛОГУЄ, що видалив би, нічого не чіпає.
+// Перевіривши логи на реальних даних — постав env CLEANUP_DRY_RUN=false, щоб увімкнути реальне видалення.
+const CLEANUP_DRY_RUN = (process.env.CLEANUP_DRY_RUN || 'true') !== 'false';
+const DIRECT_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // direct: 7 днів після доставки
+const GROUP_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // групи: 30 днів І лише якщо доставлено ВСІМ поточним учасникам
+
+function storagePathFromUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  const marker = '/object/public/files/';
+  const i = url.indexOf(marker);
+  if (i === -1) return null;
+  const tail = url.slice(i + marker.length);
+  try { return decodeURIComponent(tail); } catch (_) { return tail; }
+}
+
+// Чи посилається на цей файл ще якийсь рядок (окрім тих, що ЗАРАЗ видаляємо)?
+// Це захищає переслані копії: файл прибираємо лише коли на нього більше нема посилань.
+async function fileStillReferenced(fileData, delDirectIds, delGroupIds) {
+  const { data: m } = await supabase.from('messages').select('id').eq('file_data', fileData);
+  if ((m || []).some(r => !delDirectIds.has(r.id))) return true;
+  const { data: g } = await supabase.from('group_messages').select('id').eq('file_data', fileData);
+  if ((g || []).some(r => !delGroupIds.has(r.id))) return true;
+  return false;
+}
+
+async function removeOrphanFile(fileData, delDirectIds, delGroupIds) {
+  const path = storagePathFromUrl(fileData);
+  if (!path) return;
+  if (await fileStillReferenced(fileData, delDirectIds, delGroupIds)) return; // ще використовується — не чіпаємо
+  if (CLEANUP_DRY_RUN) { console.log('[cleanup][dry] would remove storage:', path); return; }
+  try { await supabase.storage.from('files').remove([path]); console.log('[cleanup] removed storage:', path); }
+  catch (e) { console.log('[cleanup] storage remove error:', path, e.message); }
+}
+
+async function cleanupDirect() {
+  const cutoff = Date.now() - DIRECT_TTL_MS;
+  const { data: old } = await supabase.from('messages').select('id, file_data').eq('delivered', true).lt('timestamp', cutoff);
+  const rows = old || [];
+  if (!rows.length) return;
+  const delIds = new Set(rows.map(r => r.id));
+  const seen = new Set();
+  for (const r of rows) {
+    if (!r.file_data || seen.has(r.file_data)) continue;
+    seen.add(r.file_data);
+    await removeOrphanFile(r.file_data, delIds, new Set());
+  }
+  if (CLEANUP_DRY_RUN) { console.log(`[cleanup][dry] direct: would delete ${rows.length} rows (${seen.size} unique files)`); return; }
+  await supabase.from('messages').delete().eq('delivered', true).lt('timestamp', cutoff);
+  console.log(`[cleanup] direct: deleted ${rows.length} rows`);
+}
+
+async function cleanupGroups() {
+  const cutoff = Date.now() - GROUP_TTL_MS;
+  const { data: old } = await supabase.from('group_messages').select('id, group_id, file_data, delivered_to').lt('timestamp', cutoff);
+  const rows = old || [];
+  if (!rows.length) return;
+  const byGroup = new Map();
+  for (const r of rows) { if (!byGroup.has(r.group_id)) byGroup.set(r.group_id, []); byGroup.get(r.group_id).push(r); }
+  const delRows = [];
+  for (const [gid, grows] of byGroup) {
+    const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', gid);
+    const memberNicks = (members || []).map(m => m.nick);
+    if (!memberNicks.length) continue; // підстрахування: групу без учасників не чіпаємо
+    for (const r of grows) {
+      const dt = new Set(r.delivered_to || []);
+      if (memberNicks.every(n => dt.has(n))) delRows.push(r); // доставлено ВСІМ поточним учасникам
+    }
+  }
+  if (!delRows.length) return;
+  const delIds = new Set(delRows.map(r => r.id));
+  const seen = new Set();
+  for (const r of delRows) {
+    if (!r.file_data || seen.has(r.file_data)) continue;
+    seen.add(r.file_data);
+    await removeOrphanFile(r.file_data, new Set(), delIds);
+  }
+  if (CLEANUP_DRY_RUN) { console.log(`[cleanup][dry] groups: would delete ${delRows.length} delivered-to-all rows (${seen.size} unique files)`); return; }
+  const ids = [...delIds];
+  for (let i = 0; i < ids.length; i += 100) {
+    await supabase.from('group_messages').delete().in('id', ids.slice(i, i + 100));
+  }
+  console.log(`[cleanup] groups: deleted ${delRows.length} rows`);
+}
+
+setInterval(async () => {
+  try { await cleanupDirect(); } catch (e) { console.log('[cleanup] direct error:', e.message); }
+  try { await cleanupGroups(); } catch (e) { console.log('[cleanup] groups error:', e.message); }
+}, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`EION сервер запущено на порті ${PORT}`));
