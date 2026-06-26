@@ -1476,11 +1476,26 @@ wss.on('connection', (ws) => {
           const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
           const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: fileData, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
+          await trackFileObject(fileData, (members || []).map(m => m.nick).filter(n => n !== userNick)); // 2C
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
         } else {
           const target = onlineUsers.get(msg.to); const status = target ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
+          await trackFileObject(fileData, [msg.to]); // 2C
           if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+        }
+      }
+
+      if (msg.type === 'file_downloaded') {
+        const path = storagePathFromUrl(msg.fileUrl || msg.path || msg.fileData || '');
+        if (path && userNick) {
+          try {
+            const { data: rows } = await supabase.from('file_objects').select('downloaded_by').eq('storage_path', path).limit(1);
+            if (rows && rows.length) {
+              const set = new Set(rows[0].downloaded_by || []);
+              if (!set.has(userNick)) { set.add(userNick); await supabase.from('file_objects').update({ downloaded_by: [...set] }).eq('storage_path', path); }
+            }
+          } catch (e) { console.log('[2C] file_downloaded error:', e.message); }
         }
       }
 
@@ -1566,6 +1581,7 @@ async function removeOrphanFile(fileData, delDirectIds, delGroupIds) {
   const path = storagePathFromUrl(fileData);
   if (!path) return;
   if (await fileStillReferenced(fileData, delDirectIds, delGroupIds)) return; // ще використовується — не чіпаємо
+  if (await fileObjectActive(path)) return; // 2C: ще не всі забрали і TTL не вийшов — лишаємо 2C
   if (CLEANUP_DRY_RUN) { console.log('[cleanup][dry] would remove storage:', path); return; }
   try { await supabase.storage.from('files').remove([path]); console.log('[cleanup] removed storage:', path); }
   catch (e) { console.log('[cleanup] storage remove error:', path, e.message); }
@@ -1621,9 +1637,63 @@ async function cleanupGroups() {
   console.log(`[cleanup] groups: deleted ${delRows.length} rows`);
 }
 
+// ── 2C: облік завантажень файлів (видаляємо зі Storage лише коли ВСІ забрали АБО вийшов TTL) ──
+const FILE_OBJECT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // жорсткий TTL: 30 днів
+
+// Заводимо облік для надісланого файлу: хто має забрати (recipients).
+async function trackFileObject(fileData, recipients) {
+  const path = storagePathFromUrl(fileData);
+  if (!path || !recipients || !recipients.length) return;
+  const now = Date.now();
+  try {
+    await supabase.from('file_objects').upsert({
+      storage_path: path, recipients, downloaded_by: [],
+      created_at: now, expires_at: now + FILE_OBJECT_TTL_MS,
+    }, { onConflict: 'storage_path' });
+  } catch (e) { console.log('[2C] trackFileObject error:', e.message); }
+}
+
+// true, якщо для шляху є активний облік (ще не всі забрали І TTL не вийшов) → 2A не чіпає.
+async function fileObjectActive(path) {
+  try {
+    const { data } = await supabase.from('file_objects').select('recipients, downloaded_by, expires_at').eq('storage_path', path).limit(1);
+    if (!data || !data.length) return false;
+    const r = data[0];
+    const recips = r.recipients || [];
+    const dl = new Set(r.downloaded_by || []);
+    const allDownloaded = recips.length > 0 && recips.every(x => dl.has(x));
+    const expired = Date.now() > (r.expires_at || 0);
+    return !(allDownloaded || expired);
+  } catch (_) { return false; }
+}
+
+async function cleanupFileObjects() {
+  const now = Date.now();
+  const { data: rows } = await supabase.from('file_objects').select('storage_path, recipients, downloaded_by, expires_at');
+  const list = rows || [];
+  if (!list.length) return;
+  let removed = 0;
+  for (const r of list) {
+    const recips = r.recipients || [];
+    const dl = new Set(r.downloaded_by || []);
+    const allDownloaded = recips.length > 0 && recips.every(x => dl.has(x));
+    const expired = now > (r.expires_at || 0);
+    if (!allDownloaded && !expired) continue;
+    if (CLEANUP_DRY_RUN) {
+      console.log(`[cleanup][dry] 2C would remove ${r.storage_path} (allDownloaded=${allDownloaded}, expired=${expired})`);
+      continue;
+    }
+    try { await supabase.storage.from('files').remove([r.storage_path]); } catch (e) { console.log('[2C] remove err:', e.message); }
+    await supabase.from('file_objects').delete().eq('storage_path', r.storage_path);
+    removed++;
+  }
+  if (!CLEANUP_DRY_RUN && removed) console.log(`[cleanup] 2C removed ${removed} files`);
+}
+
 setInterval(async () => {
   try { await cleanupDirect(); } catch (e) { console.log('[cleanup] direct error:', e.message); }
   try { await cleanupGroups(); } catch (e) { console.log('[cleanup] groups error:', e.message); }
+  try { await cleanupFileObjects(); } catch (e) { console.log('[cleanup] fileObjects error:', e.message); }
 }, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
