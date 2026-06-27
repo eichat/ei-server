@@ -989,13 +989,16 @@ app.post('/channel/message/delete', async (req, res) => {
   const { channelId, postId, nick } = req.body;
   if (!postId || !channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
-  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick, image_url, file_data').eq('id', postId).single();
   if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
   const canDelete = post.from_nick === nick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const { data: postComments } = await supabase.from('channel_comments').select('file_data, image_url').eq('post_id', postId);
   await supabase.from('channel_comments').delete().eq('post_id', postId);
   await supabase.from('channel_reactions').delete().eq('post_id', postId);
   await supabase.from('channel_messages').delete().eq('id', postId);
+  await removeChannelFile(post.image_url, post.file_data);
+  for (const c of (postComments || [])) await removeChannelFile(c.file_data, c.image_url);
   await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
   res.json({ ok: true });
 });
@@ -1004,13 +1007,16 @@ app.delete('/channel/post', async (req, res) => {
   const { postId, channelId, requesterNick } = req.body;
   if (!postId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
-  const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
+  const { data: post } = await supabase.from('channel_messages').select('from_nick, image_url, file_data').eq('id', postId).single();
   if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
   const canDelete = post.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const { data: postComments } = await supabase.from('channel_comments').select('file_data, image_url').eq('post_id', postId);
   await supabase.from('channel_comments').delete().eq('post_id', postId);
   await supabase.from('channel_reactions').delete().eq('post_id', postId);
   await supabase.from('channel_messages').delete().eq('id', postId);
+  await removeChannelFile(post.image_url, post.file_data);
+  for (const c of (postComments || [])) await removeChannelFile(c.file_data, c.image_url);
   await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
   res.json({ ok: true });
 });
@@ -1062,13 +1068,14 @@ app.post('/channel/post/comments-toggle', async (req, res) => {
 app.delete('/channel/comment', async (req, res) => {
   const { commentId, channelId, requesterNick } = req.body;
   if (!commentId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data: comment } = await supabase.from('channel_comments').select('from_nick').eq('id', commentId).single();
+  const { data: comment } = await supabase.from('channel_comments').select('from_nick, file_data, image_url').eq('id', commentId).single();
   if (!comment) return res.json({ ok: false, error: 'Коментар не знайдено' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   const canDelete = comment.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('channel_comment_reactions').delete().eq('comment_id', commentId);
   await supabase.from('channel_comments').delete().eq('id', commentId);
+  await removeChannelFile(comment.file_data, comment.image_url);
   res.json({ ok: true });
 });
 
@@ -1335,12 +1342,17 @@ app.post('/channel/delete', async (req, res) => {
   const { channelId, ownerNick } = req.body;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Тільки власник може видалити канал' });
+  // Збираємо файли постів і коментарів перед видаленням — щоб прибрати зі Storage.
+  const { data: chPosts } = await supabase.from('channel_messages').select('id, image_url, file_data').eq('channel_id', channelId);
+  const { data: chComments } = await supabase.from('channel_comments').select('file_data, image_url').eq('channel_id', channelId);
   await supabase.from('channel_comments').delete().eq('channel_id', channelId);
-  await supabase.from('channel_reactions').delete().in('post_id', (await supabase.from('channel_messages').select('id').eq('channel_id', channelId)).data?.map(m => m.id) || []);
+  await supabase.from('channel_reactions').delete().in('post_id', (chPosts || []).map(m => m.id));
   await supabase.from('channel_messages').delete().eq('channel_id', channelId);
   await supabase.from('channel_members').delete().eq('channel_id', channelId);
   await supabase.from('channel_blocked').delete().eq('channel_id', channelId);
   await supabase.from('channels').delete().eq('id', channelId);
+  for (const p of (chPosts || [])) await removeChannelFile(p.image_url, p.file_data);
+  for (const c of (chComments || [])) await removeChannelFile(c.file_data, c.image_url);
   res.json({ ok: true });
 });
 
@@ -1582,6 +1594,17 @@ setInterval(() => {
 const CLEANUP_DRY_RUN = (process.env.CLEANUP_DRY_RUN || 'true') !== 'false';
 const DIRECT_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // direct: 7 днів після доставки
 const GROUP_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // групи: 30 днів І лише якщо доставлено ВСІМ поточним учасникам
+
+// Видалення файлу каналу (пост/коментар) зі Storage при видаленні запису.
+// Безпечний: пропускає base64/порожнє, ковтає помилки, не блокує відповідь.
+async function removeChannelFile(...urls) {
+  for (const u of urls) {
+    const path = storagePathFromUrl(u);
+    if (!path) continue; // base64 або не-Storage URL — нічого видаляти
+    try { await supabase.storage.from('files').remove([path]); console.log('[channel-cleanup] removed:', path); }
+    catch (e) { console.log('[channel-cleanup] remove error:', path, e.message); }
+  }
+}
 
 function storagePathFromUrl(url) {
   if (!url || typeof url !== 'string') return null;
