@@ -1384,6 +1384,9 @@ app.post('/admin/resolve-report', async (req, res) => {
 // ── WebSocket ────────────────────────────────
 wss.on('connection', (ws) => {
   let userNick = null;
+  // Серверний heartbeat (проти code=1006: мертвий транспорт виявляємо швидко).
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); });
   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw);
@@ -1557,6 +1560,19 @@ wss.on('connection', (ws) => {
 });
 
 setInterval(() => { const now = Date.now(); for (const [nick, user] of onlineUsers) if (now - user.lastSeen > 60000) onlineUsers.delete(nick); }, 60000);
+
+// Серверний WS-heartbeat: кожні 30с пінгуємо всі сокети; хто не відповів pong
+// з минулого циклу — транспорт мертвий (code=1006) → термінуємо й чистимо presence.
+setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      try { ws.terminate(); } catch (_) {}
+      return;
+    }
+    ws.isAlive = false;
+    try { ws.ping(); } catch (_) {}
+  });
+}, 30000);
 
 // ── Прибирання транзитного сховища (БЕЗПЕЧНО) ──────────────────────────────
 // Принцип «сервер = транзит, не архів»: доставлені повідомлення прибираються за TTL,
