@@ -1549,7 +1549,11 @@ wss.on('connection', (ws) => {
       }
     } catch (e) { console.error('Помилка:', e); }
   });
-  ws.on('close', () => { if (userNick) onlineUsers.delete(userNick); });
+  ws.on('close', (code, reason) => {
+    console.log(`[ws] close nick=${userNick || '?'} code=${code} reason=${reason ? reason.toString() : ''}`);
+    if (userNick) onlineUsers.delete(userNick);
+  });
+  ws.on('error', (e) => { console.log(`[ws] error nick=${userNick || '?'}: ${e && e.message}`); });
 });
 
 setInterval(() => { const now = Date.now(); for (const [nick, user] of onlineUsers) if (now - user.lastSeen > 60000) onlineUsers.delete(nick); }, 60000);
