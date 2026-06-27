@@ -1719,7 +1719,7 @@ setInterval(async () => {
   try { await cleanupDirect(); } catch (e) { console.log('[cleanup] direct error:', e.message); }
   try { await cleanupGroups(); } catch (e) { console.log('[cleanup] groups error:', e.message); }
   try { await cleanupFileObjects(); } catch (e) { console.log('[cleanup] fileObjects error:', e.message); }
-}, 60 * 60 * 1000);
+}, 3 * 60 * 1000); // ⚠️ ТЕСТ: 3 хв. ПОВЕРНУТИ на 60 * 60 * 1000 (1 год) після перевірки 2C!
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`EION сервер запущено на порті ${PORT}`));
