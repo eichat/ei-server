@@ -1535,6 +1535,17 @@ wss.on('connection', (ws) => {
       if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text })); }
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
       if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
+      if (msg.type === 'delete_comment') {
+        const { data: c } = await supabase.from('channel_comments').select('from_nick, channel_id, post_id, file_data, image_url').eq('id', msg.commentId).single();
+        if (!c) return;
+        const { data: cm } = await supabase.from('channel_members').select('role').eq('channel_id', c.channel_id).eq('nick', userNick).single();
+        const canDel = c.from_nick === userNick || (cm && ['owner', 'admin'].includes(cm.role));
+        if (!canDel) return;
+        await supabase.from('channel_comment_reactions').delete().eq('comment_id', msg.commentId);
+        await supabase.from('channel_comments').delete().eq('id', msg.commentId);
+        await removeChannelFile(c.file_data, c.image_url);
+        await notifyChannelSubscribers(c.channel_id, { type: 'channel_comment_deleted', channelId: c.channel_id, postId: c.post_id, commentId: msg.commentId }, userNick);
+      }
       if (msg.type === 'read_receipt') { await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to); const target = onlineUsers.get(msg.to); if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); } }
       if (msg.type === 'delete_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId })); else await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
