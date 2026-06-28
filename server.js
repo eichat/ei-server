@@ -993,12 +993,12 @@ app.post('/channel/message/delete', async (req, res) => {
   if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
   const canDelete = post.from_nick === nick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
-  const { data: postComments } = await supabase.from('channel_comments').select('file_data, image_url').eq('post_id', postId);
+  const { data: postComments } = await supabase.from('channel_comments').select('file_data').eq('post_id', postId);
   await supabase.from('channel_comments').delete().eq('post_id', postId);
   await supabase.from('channel_reactions').delete().eq('post_id', postId);
   await supabase.from('channel_messages').delete().eq('id', postId);
   await removeChannelFile(post.image_url, post.file_data);
-  for (const c of (postComments || [])) await removeChannelFile(c.file_data, c.image_url);
+  for (const c of (postComments || [])) await removeChannelFile(c.file_data);
   await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
   res.json({ ok: true });
 });
@@ -1011,12 +1011,12 @@ app.delete('/channel/post', async (req, res) => {
   if (!post) return res.json({ ok: false, error: 'Пост не знайдено' });
   const canDelete = post.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
-  const { data: postComments } = await supabase.from('channel_comments').select('file_data, image_url').eq('post_id', postId);
+  const { data: postComments } = await supabase.from('channel_comments').select('file_data').eq('post_id', postId);
   await supabase.from('channel_comments').delete().eq('post_id', postId);
   await supabase.from('channel_reactions').delete().eq('post_id', postId);
   await supabase.from('channel_messages').delete().eq('id', postId);
   await removeChannelFile(post.image_url, post.file_data);
-  for (const c of (postComments || [])) await removeChannelFile(c.file_data, c.image_url);
+  for (const c of (postComments || [])) await removeChannelFile(c.file_data);
   await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
   res.json({ ok: true });
 });
@@ -1068,14 +1068,14 @@ app.post('/channel/post/comments-toggle', async (req, res) => {
 app.delete('/channel/comment', async (req, res) => {
   const { commentId, channelId, requesterNick } = req.body;
   if (!commentId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data: comment } = await supabase.from('channel_comments').select('from_nick, file_data, image_url').eq('id', commentId).single();
+  const { data: comment } = await supabase.from('channel_comments').select('from_nick, file_data').eq('id', commentId).single();
   if (!comment) return res.json({ ok: false, error: 'Коментар не знайдено' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   const canDelete = comment.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('channel_comment_reactions').delete().eq('comment_id', commentId);
   await supabase.from('channel_comments').delete().eq('id', commentId);
-  await removeChannelFile(comment.file_data, comment.image_url);
+  await removeChannelFile(comment.file_data);
   res.json({ ok: true });
 });
 
@@ -1344,7 +1344,7 @@ app.post('/channel/delete', async (req, res) => {
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Тільки власник може видалити канал' });
   // Збираємо файли постів і коментарів перед видаленням — щоб прибрати зі Storage.
   const { data: chPosts } = await supabase.from('channel_messages').select('id, image_url, file_data').eq('channel_id', channelId);
-  const { data: chComments } = await supabase.from('channel_comments').select('file_data, image_url').eq('channel_id', channelId);
+  const { data: chComments } = await supabase.from('channel_comments').select('file_data').eq('channel_id', channelId);
   await supabase.from('channel_comments').delete().eq('channel_id', channelId);
   await supabase.from('channel_reactions').delete().in('post_id', (chPosts || []).map(m => m.id));
   await supabase.from('channel_messages').delete().eq('channel_id', channelId);
@@ -1352,7 +1352,7 @@ app.post('/channel/delete', async (req, res) => {
   await supabase.from('channel_blocked').delete().eq('channel_id', channelId);
   await supabase.from('channels').delete().eq('id', channelId);
   for (const p of (chPosts || [])) await removeChannelFile(p.image_url, p.file_data);
-  for (const c of (chComments || [])) await removeChannelFile(c.file_data, c.image_url);
+  for (const c of (chComments || [])) await removeChannelFile(c.file_data);
   res.json({ ok: true });
 });
 
@@ -1536,14 +1536,14 @@ wss.on('connection', (ws) => {
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
       if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
       if (msg.type === 'delete_comment') {
-        const { data: c } = await supabase.from('channel_comments').select('from_nick, channel_id, post_id, file_data, image_url').eq('id', msg.commentId).single();
+        const { data: c } = await supabase.from('channel_comments').select('from_nick, channel_id, post_id, file_data').eq('id', msg.commentId).single();
         if (!c) return;
         const { data: cm } = await supabase.from('channel_members').select('role').eq('channel_id', c.channel_id).eq('nick', userNick).single();
         const canDel = c.from_nick === userNick || (cm && ['owner', 'admin'].includes(cm.role));
         if (!canDel) return;
         await supabase.from('channel_comment_reactions').delete().eq('comment_id', msg.commentId);
         await supabase.from('channel_comments').delete().eq('id', msg.commentId);
-        await removeChannelFile(c.file_data, c.image_url);
+        await removeChannelFile(c.file_data);
         await notifyChannelSubscribers(c.channel_id, { type: 'channel_comment_deleted', channelId: c.channel_id, postId: c.post_id, commentId: msg.commentId }, userNick);
       }
       if (msg.type === 'read_receipt') { await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to); const target = onlineUsers.get(msg.to); if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); } }
