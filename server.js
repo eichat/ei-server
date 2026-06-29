@@ -1475,7 +1475,7 @@ wss.on('connection', (ws) => {
       if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
 
       if (msg.type === 'chat_message') {
-        const ts = Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
+        const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         const hasFile = msg.isFile && (msg.fileData || msg.fileUrl);
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: hasFile ? 'file' : 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(hasFile ? { file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
@@ -1487,7 +1487,7 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'file_message') {
-        const ts = Date.now(); const msgId = msg.msgId || null;
+        const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const msgId = msg.msgId || null;
         const fileData = msg.fileUrl || msg.data || null;
         if (msg.groupId) {
           const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
@@ -1520,7 +1520,7 @@ wss.on('connection', (ws) => {
       }
 
       if (msg.type === 'group_message') {
-        const ts = Date.now(); const msgId = msg.msgId || `${userNick}_g${msg.groupId}_${ts}`;
+        const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const msgId = msg.msgId || `${userNick}_g${msg.groupId}_${ts}`;
         const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
         if (!membership) return;
         const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
