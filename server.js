@@ -522,6 +522,9 @@ app.post('/call-log', async (req, res) => {
   const { fromNick, toNick, hasVideo, startedAt, durationSeconds, status } = req.body;
   if (!fromNick || !toNick || !startedAt || !status) return res.json({ ok: false, error: 'Невірні параметри' });
   await supabase.from('call_logs').insert({ from_nick: fromNick, to_nick: toNick, has_video: hasVideo || false, started_at: startedAt, duration_seconds: durationSeconds || null, status });
+  // Realtime: повідомляємо обидві онлайн-сторони перезавантажити логи (each reloads counterpart)
+  const fromWs = onlineUsers.get(fromNick); if (fromWs) fromWs.ws.send(JSON.stringify({ type: 'call_log_new', otherNick: toNick }));
+  const toWs = onlineUsers.get(toNick); if (toWs) toWs.ws.send(JSON.stringify({ type: 'call_log_new', otherNick: fromNick }));
   res.json({ ok: true });
 });
 
@@ -1566,7 +1569,6 @@ wss.on('connection', (ws) => {
         const target = onlineUsers.get(msg.to);
         if (target) { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
         else { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }); }
-        await supabase.from('call_logs').insert({ from_nick: msg.to, to_nick: userNick, has_video: msg.hasVideo || false, started_at: Date.now(), duration_seconds: null, status: 'rejected' }).catch(() => {});
       }
       if (msg.type === 'call_end') {
         const target = onlineUsers.get(msg.to);
