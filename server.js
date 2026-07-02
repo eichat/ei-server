@@ -1569,6 +1569,10 @@ wss.on('connection', (ws) => {
       }
       if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
       if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
+      // Перемикання аудіо↔відео посеред дзвінка (renegotiation)
+      if (msg.type === 'call_renegotiate') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_renegotiate', from: userNick, offer: msg.offer })); }
+      if (msg.type === 'call_renegotiate_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_renegotiate_answer', from: userNick, answer: msg.answer })); }
+      if (msg.type === 'call_video_state') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_video_state', from: userNick, on: !!msg.on })); }
       if (msg.type === 'call_reject') {
         const target = onlineUsers.get(msg.to);
         if (target) { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
