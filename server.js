@@ -522,9 +522,13 @@ app.post('/call-log', async (req, res) => {
   const { fromNick, toNick, hasVideo, startedAt, durationSeconds, status } = req.body;
   if (!fromNick || !toNick || !startedAt || !status) return res.json({ ok: false, error: 'Невірні параметри' });
   await supabase.from('call_logs').insert({ from_nick: fromNick, to_nick: toNick, has_video: hasVideo || false, started_at: startedAt, duration_seconds: durationSeconds || null, status });
-  // Realtime: повідомляємо обидві онлайн-сторони перезавантажити логи (each reloads counterpart)
-  const fromWs = onlineUsers.get(fromNick); if (fromWs) fromWs.ws.send(JSON.stringify({ type: 'call_log_new', otherNick: toNick }));
-  const toWs = onlineUsers.get(toNick); if (toWs) toWs.ws.send(JSON.stringify({ type: 'call_log_new', otherNick: fromNick }));
+  // Realtime: повідомляємо обидві онлайн-сторони перезавантажити логи (each reloads counterpart).
+  // Кожен send у try/catch: мертвий сокет першого не має зривати пуш другому.
+  const fromWs = onlineUsers.get(fromNick);
+  const toWs = onlineUsers.get(toNick);
+  console.log(`call-log: ${fromNick}->${toNick} ${status}; push from=${!!fromWs} to=${!!toWs}`);
+  try { if (fromWs) fromWs.ws.send(JSON.stringify({ type: 'call_log_new', otherNick: toNick })); } catch (e) { console.log('call-log push from failed:', e.message); }
+  try { if (toWs) toWs.ws.send(JSON.stringify({ type: 'call_log_new', otherNick: fromNick })); } catch (e) { console.log('call-log push to failed:', e.message); }
   res.json({ ok: true });
 });
 
