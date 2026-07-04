@@ -558,7 +558,14 @@ app.post('/delete-account', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/online-users', (req, res) => res.json({ ok: true, users: [...onlineUsers.keys()] }));
+// Приватний presence: повертаємо лише тих із КОНТАКТІВ запитувача, хто онлайн.
+// (Раніше GET віддавав список УСІХ онлайн будь-кому — витік ніків + не масштабно.)
+app.post('/online-users', (req, res) => {
+  const { contacts } = req.body || {};
+  if (!Array.isArray(contacts)) return res.json({ ok: true, users: [] });
+  const online = contacts.filter(n => typeof n === 'string' && onlineUsers.has(n)).slice(0, 5000);
+  res.json({ ok: true, users: online });
+});
 
 app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
