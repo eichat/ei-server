@@ -145,6 +145,22 @@ async function sendFcmPush(toNick, data) {
   catch (e) { console.error(`FCM push error до ${toNick}:`, e.message); if (e.code === 'messaging/registration-token-not-registered') fcmTokens.delete(toNick); }
 }
 
+// ── Єдина точка доставки повідомлення одному користувачу ──────────────────
+// Уся адресна доставка йде через цю функцію. Коли знадобиться кілька
+// інстансів — саме тут (і лише тут) вмикається Redis pub/sub: якщо сокет не на
+// цьому інстансі, публікуємо в канал, а інстанс-власник доставить. Решта коду
+// не зміниться. Повертає true, якщо доставлено локально.
+function sendToUser(nick, payload) {
+  const u = onlineUsers.get(nick);
+  if (!u || !u.ws || u.ws.readyState !== 1 /* OPEN */) return false;
+  try {
+    u.ws.send(typeof payload === 'string' ? payload : JSON.stringify(payload));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function notifyChannelSubscribers(channelId, payload, excludeNick = null) {
   const { data: members } = await supabase.from('channel_members').select('nick').eq('channel_id', channelId);
   const msg = JSON.stringify(payload);
@@ -165,7 +181,7 @@ app.get('/call-offer', (req, res) => {
 
 app.post('/decline-call', (req, res) => {
   const { fromNick, toNick } = req.body; if (!fromNick || !toNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  const target = onlineUsers.get(toNick); if (target) target.ws.send(JSON.stringify({ type: 'call_reject', from: fromNick }));
+  sendToUser(toNick, { type: 'call_reject', from: fromNick });
   res.json({ ok: true });
 });
 
@@ -707,7 +723,7 @@ app.post('/group/remove-member', async (req, res) => {
   const { groupId, requesterNick, targetNick } = req.body;
   if (requesterNick !== targetNick && !(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Тільки модератор або творець може видаляти учасників' });
   await supabase.from('group_members').delete().eq('group_id', groupId).eq('nick', targetNick);
-  const target = onlineUsers.get(targetNick); if (target) target.ws.send(JSON.stringify({ type: 'group_removed', groupId }));
+  sendToUser(targetNick, { type: 'group_removed', groupId });
   await notifyMembers(groupId, { type: 'group_member_removed', groupId, nick: targetNick });
   res.json({ ok: true });
 });
@@ -1228,7 +1244,7 @@ app.post('/channel/remove-subscriber', async (req, res) => {
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('nick', targetNick);
-  const t = onlineUsers.get(targetNick); if (t) t.ws.send(JSON.stringify({ type: 'channel_removed', channelId }));
+  sendToUser(targetNick, { type: 'channel_removed', channelId });
   res.json({ ok: true });
 });
 
@@ -1519,8 +1535,8 @@ wss.on('connection', (ws) => {
 
       if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { fcmTokens.set(userNick, msg.token); if (msg.deviceId) nickDevices.set(userNick, msg.deviceId); } }
       if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
-      if (msg.type === 'connect_request') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick })); else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
-      if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
+      if (msg.type === 'connect_request') { if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
+      if (msg.type === 'connect_response') { sendToUser(msg.to, { type: 'connect_response', from: userNick, accepted: msg.accepted }); }
 
       if (msg.type === 'chat_message') {
         const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
@@ -1580,7 +1596,7 @@ wss.on('connection', (ws) => {
       if (msg.type === 'ei_message') { /* нарахування прибрано */ }
       if (msg.type === 'group_typing') { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } } }
       if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: ex } = await supabase.from('group_message_reactions').select('id').eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick).eq('emoji', emoji).maybeSingle(); if (ex) { await supabase.from('group_message_reactions').delete().eq('id', ex.id); } else { await supabase.from('group_message_reactions').delete().eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick); await supabase.from('group_message_reactions').insert({ msg_id: msgId, group_id: groupId, nick: userNick, emoji }); } const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const pairKey = [userNick, chatNick].sort().join('|'); const { data: dex } = await supabase.from('direct_message_reactions').select('id').eq('msg_id', msgId).eq('from_nick', userNick).eq('emoji', emoji).maybeSingle(); if (dex) { await supabase.from('direct_message_reactions').delete().eq('id', dex.id); } else { await supabase.from('direct_message_reactions').delete().eq('msg_id', msgId).eq('from_nick', userNick).eq('pair_key', pairKey); await supabase.from('direct_message_reactions').insert({ msg_id: msgId, from_nick: userNick, emoji, pair_key: pairKey }); } const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
-      if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text })); }
+      if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); sendToUser(msg.to, { type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }); }
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
       if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
       if (msg.type === 'delete_comment') {
@@ -1595,7 +1611,7 @@ wss.on('connection', (ws) => {
         await notifyChannelSubscribers(c.channel_id, { type: 'channel_comment_deleted', channelId: c.channel_id, postId: c.post_id, commentId: msg.commentId }, userNick);
       }
       if (msg.type === 'read_receipt') { await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to); const target = onlineUsers.get(msg.to); if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); } }
-      if (msg.type === 'delete_message') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'delete_message', from: userNick, msgId: msg.msgId })); else await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
+      if (msg.type === 'delete_message') { if (!sendToUser(msg.to, { type: 'delete_message', from: userNick, msgId: msg.msgId })) await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
