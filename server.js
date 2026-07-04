@@ -825,14 +825,25 @@ app.get('/direct/reactions', async (req, res) => {
 });
 
 app.get('/group/messages', async (req, res) => {
-  const { groupId, nick } = req.query;
+  const { groupId, nick, before } = req.query;
+  const limit = Math.min(parseInt(req.query.limit) || 100, 200);
   let clearedAt = 0;
   if (nick) {
     const { data: clRows } = await supabase.from('group_history_cleared').select('cleared_at').eq('nick', nick).eq('group_id', groupId).limit(1);
     if (clRows && clRows[0] && clRows[0].cleared_at) clearedAt = Number(clRows[0].cleared_at);
   }
-  const { data } = await supabase.from('group_messages').select('*').eq('group_id', groupId).order('timestamp', { ascending: true });
-  const visible = (data || []).filter(m => !clearedAt || Number(m.timestamp) > clearedAt);
+  // Беремо ОСТАННІ limit повідомлень (descending + limit), потім розвертаємо в
+  // ascending — порядок на виході той самий, що був, тож клієнт сумісний.
+  // before (timestamp) — для підвантаження старіших (Б2, прокрутка вгору).
+  let q = supabase.from('group_messages').select('*').eq('group_id', groupId);
+  if (before) q = q.lt('timestamp', Number(before));
+  if (clearedAt) q = q.gt('timestamp', clearedAt);
+  q = q.order('timestamp', { ascending: false }).limit(limit + 1);
+  const { data: rawDesc } = await q;
+  const rows = rawDesc || [];
+  const hasMore = rows.length > limit;        // є ще старіші
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const visible = page.slice().reverse();     // назад в ascending
   const msgIds = visible.map(m => m.msg_id).filter(Boolean);
   const reactionsByMsg = {};
   if (msgIds.length) {
@@ -843,7 +854,7 @@ app.get('/group/messages', async (req, res) => {
       reactionsByMsg[r.msg_id][r.emoji].push(r.nick);
     }
   }
-  res.json({ ok: true, messages: visible.map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null, duration_sec: m.duration_sec || null, replyToMsgId: m.reply_to_msg_id || null, replyToText: m.reply_to_text || null, replyToFrom: m.reply_to_from || null, replyToImage: m.reply_to_image || null, reactions: reactionsByMsg[m.msg_id] || {} })) });
+  res.json({ ok: true, hasMore, oldest: visible[0]?.timestamp ?? null, messages: visible.map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null, duration_sec: m.duration_sec || null, replyToMsgId: m.reply_to_msg_id || null, replyToText: m.reply_to_text || null, replyToFrom: m.reply_to_from || null, replyToImage: m.reply_to_image || null, reactions: reactionsByMsg[m.msg_id] || {} })) });
 });
 
 // Очистити історію групи лише для себе (персистентний маркер часу)
