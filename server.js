@@ -9,9 +9,63 @@ const https = require('https');
 const httpModule = require('http');
 
 const app = express();
+// Render стоїть за балансувальником: реальний IP клієнта — у X-Forwarded-For.
+// Без цього rate-limit бачив би один IP проксі для всіх і різав би всіх гуртом.
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 app.use(express.json({ limit: '60mb' }));
+
+// ── Простий in-memory rate-limit (без зовнішніх залежностей) ──────────────
+// Один інстанс → лічильники в пам'яті достатньо. Коли буде кілька інстансів —
+// винести в Redis (як і sendToUser). Ключ — IP клієнта.
+function makeRateLimiter({ windowMs, max }) {
+  const hits = new Map(); // ip -> { count, resetAt }
+  // періодичне прибирання застарілих записів, щоб мапа не росла
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, rec] of hits) if (now > rec.resetAt) hits.delete(ip);
+  }, windowMs).unref?.();
+  return (req, res, next) => {
+    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
+    const now = Date.now();
+    let rec = hits.get(ip);
+    if (!rec || now > rec.resetAt) { rec = { count: 0, resetAt: now + windowMs }; hits.set(ip, rec); }
+    rec.count++;
+    if (rec.count > max) {
+      const retry = Math.ceil((rec.resetAt - now) / 1000);
+      res.set('Retry-After', String(retry));
+      return res.status(429).json({ ok: false, error: 'Забагато запитів, спробуйте пізніше' });
+    }
+    next();
+  };
+}
+
+// Загальний помірний ліміт на всі HTTP-запити
+app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120 }));
+// Суворіший ліміт на чутливе (вхід/реєстрація/скидання) — проти brute-force
+const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
+app.use(['/login', '/register', '/request-reset', '/reset-password', '/verify-email'], authLimiter);
+
+// ── Моніторинг ────────────────────────────────────────────────────────────
+// Публічний liveness — БЕЗ чутливих даних (його бачить будь-хто): лише «живий».
+app.get('/health', (req, res) => res.json({ ok: true }));
+// Приватна статистика — лише за секретним токеном з env (STATS_KEY).
+app.get('/stats', (req, res) => {
+  const key = process.env.STATS_KEY;
+  if (!key || req.query.key !== key) return res.status(403).json({ ok: false });
+  const mem = process.memoryUsage();
+  res.json({
+    ok: true,
+    online: onlineUsers.size,
+    fcmTokens: fcmTokens.size,
+    pendingCallOffers: pendingCallOffers.size,
+    uptimeSec: Math.floor(process.uptime()),
+    memoryMB: Math.round(mem.rss / 1024 / 1024),
+    ts: Date.now(),
+  });
+});
+
 
 const BCRYPT_ROUNDS = 8;
 const REQUIRE_EMAIL_VERIFICATION = false;
