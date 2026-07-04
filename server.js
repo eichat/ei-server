@@ -26,6 +26,10 @@ const resetCodes = new Map();
 const pendingRegistrations = new Map();
 const verifiedPhones = new Map(); // нормалізований номер -> expires (підтверджені, для реєстрації)
 const fcmTokens = new Map();
+// nick -> deviceId: щоб не дзвонити/не слати пуш на ТОЙ САМИЙ фізичний
+// пристрій (кілька акаунтів на одному телефоні мають спільний FCM-токен,
+// інакше дзвінок «сам собі»).
+const nickDevices = new Map();
 const pendingCallOffers = new Map();
 const linkPreviewCache = new Map();
 
@@ -475,8 +479,10 @@ app.post('/users/by-phones', async (req, res) => {
 
 app.post('/unregister', (req, res) => { const { nick } = req.body; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
 app.post('/register-fcm-token', (req, res) => {
-  const { nick, token } = req.body; if (!nick || !token) return res.json({ ok: false, error: 'Невірні параметри' });
-  fcmTokens.set(nick, token); res.json({ ok: true });
+  const { nick, token, deviceId } = req.body; if (!nick || !token) return res.json({ ok: false, error: 'Невірні параметри' });
+  fcmTokens.set(nick, token);
+  if (deviceId) nickDevices.set(nick, deviceId);
+  res.json({ ok: true });
 });
 
 app.post('/update-nick-color', async (req, res) => {
@@ -1476,7 +1482,7 @@ wss.on('connection', (ws) => {
         }
       }
 
-      if (msg.type === 'register_fcm_token') { if (userNick && msg.token) fcmTokens.set(userNick, msg.token); }
+      if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { fcmTokens.set(userNick, msg.token); if (msg.deviceId) nickDevices.set(userNick, msg.deviceId); } }
       if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
       if (msg.type === 'connect_request') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_request', from: userNick })); else ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'connect_response', from: userNick, accepted: msg.accepted })); }
@@ -1559,12 +1565,34 @@ wss.on('connection', (ws) => {
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
       if (msg.type === 'call_offer') {
+        // Захист від «дзвінка самому собі»: якщо адресат — інший акаунт на
+        // ТОМУ САМОМУ пристрої (спільний FCM-токен), не доставляємо ні WS, ні пуш.
+        const fromDev = nickDevices.get(userNick);
+        const toDev = nickDevices.get(msg.to);
+        if (fromDev && toDev && fromDev === toDev) {
+          console.log(`call_offer blocked: ${userNick}->${msg.to} same device ${fromDev}`);
+          ws.send(JSON.stringify({ type: 'call_error', error: 'Неможливо дзвонити на цей самий пристрій' }));
+          return;
+        }
         const target = onlineUsers.get(msg.to);
-        if (target) { target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false })); }
-        else {
-          await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
-          if (!fcmTokens.has(msg.to)) ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
-          await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
+        // ВАЖЛИВО: сокет міг «померти» (клієнт пішов у фон, code=1006), але ще
+        // не бути прибраним із onlineUsers (delete/heartbeat не встигли). Тоді
+        // наївний target.ws.send піде в нікуди, а FCM не спрацює — дзвінок
+        // зникає безслідно. Тому доставляємо через WS лише якщо сокет ЖИВИЙ.
+        const wsAlive = target && target.ws
+          && target.ws.readyState === 1 /* WebSocket.OPEN */
+          && target.ws.isAlive !== false;
+        if (wsAlive) {
+          target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
+        } else {
+          if (target) { onlineUsers.delete(msg.to); console.log(`call_offer: ${msg.to} stale socket → FCM`); }
+          const hasToken = fcmTokens.has(msg.to);
+          if (hasToken) {
+            await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
+          } else {
+            ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
+            await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
+          }
         }
       }
       if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
