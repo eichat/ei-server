@@ -129,6 +129,18 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
 
 async function sendFcmPush(toNick, data) {
   const token = fcmTokens.get(toNick); if (!token) return;
+  // Не шлемо пуш на ВЛАСНИЙ пристрій: якщо адресат — інший акаунт на тому
+  // самому телефоні (спільний FCM-токен), сповіщення набридали б власнику.
+  // Саме повідомлення вже збережене й буде видиме при відкритті того акаунта.
+  const fromNick = data && data.from_nick;
+  if (fromNick) {
+    const fromDev = nickDevices.get(fromNick);
+    const toDev = nickDevices.get(toNick);
+    if (fromDev && toDev && fromDev === toDev) {
+      console.log(`push skipped: ${fromNick}->${toNick} same device ${fromDev}`);
+      return;
+    }
+  }
   try { await admin.messaging().send({ token, data, android: { priority: 'high', ttl: 10000 } }); }
   catch (e) { console.error(`FCM push error до ${toNick}:`, e.message); if (e.code === 'messaging/registration-token-not-registered') fcmTokens.delete(toNick); }
 }
