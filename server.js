@@ -454,6 +454,29 @@ app.post('/update-email', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Видача ICE-серверів клієнту. Креди TURN живуть у env сервера, а не в APK —
+// інакше їх витягують із застосунку й крадуть relay-трафік. STUN — публічний,
+// віддаємо завжди; TURN — лише якщо налаштовані змінні оточення.
+app.get('/turn-credentials', (req, res) => {
+  const iceServers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
+  const user = process.env.TURN_USERNAME;
+  const cred = process.env.TURN_CREDENTIAL;
+  const host = process.env.TURN_HOST || 'global.relay.metered.ca';
+  if (user && cred) {
+    iceServers.push(
+      { urls: `stun:${host}:80` },
+      { urls: `turn:${host}:80`, username: user, credential: cred },
+      { urls: `turn:${host}:80?transport=tcp`, username: user, credential: cred },
+      { urls: `turn:${host}:443`, username: user, credential: cred },
+      { urls: `turns:${host}:443?transport=tcp`, username: user, credential: cred },
+    );
+  }
+  res.json({ ok: true, iceServers, ttl: 3600 });
+});
+
 app.post('/delete-account', async (req, res) => {
   const { nick, password } = req.body;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
