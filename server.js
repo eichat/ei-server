@@ -844,6 +844,7 @@ app.get('/group/messages', async (req, res) => {
   const hasMore = rows.length > limit;        // є ще старіші
   const page = hasMore ? rows.slice(0, limit) : rows;
   const visible = page.slice().reverse();     // назад в ascending
+  console.log(`[group/messages] groupId=${groupId} before=${before || '-'} limit=${limit} → returned=${visible.length} hasMore=${hasMore}`);
   const msgIds = visible.map(m => m.msg_id).filter(Boolean);
   const reactionsByMsg = {};
   if (msgIds.length) {
