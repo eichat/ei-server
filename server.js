@@ -826,7 +826,7 @@ app.get('/direct/reactions', async (req, res) => {
 
 app.get('/group/messages', async (req, res) => {
   const { groupId, nick, before } = req.query;
-  const limit = Math.min(parseInt(req.query.limit) || 10, 200); // ТИМЧАСОВО 10 для тесту пагінації (повернути 100!)
+  const limit = Math.min(parseInt(req.query.limit) || 100, 200);
   let clearedAt = 0;
   if (nick) {
     const { data: clRows } = await supabase.from('group_history_cleared').select('cleared_at').eq('nick', nick).eq('group_id', groupId).limit(1);
