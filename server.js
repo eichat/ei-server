@@ -1160,9 +1160,20 @@ app.delete('/channel/post', async (req, res) => {
 
 // Коментарі
 app.get('/channel/comments', async (req, res) => {
-  const { postId } = req.query; if (!postId) return res.json({ ok: false, error: 'postId обов\'язковий' });
-  const { data } = await supabase.from('channel_comments').select('*').eq('post_id', postId).order('timestamp', { ascending: true });
-  const comments = data || [];
+  const { postId, before } = req.query; if (!postId) return res.json({ ok: false, error: 'postId обов\'язковий' });
+  const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+  // Той самий двигун, що й /group/messages: беремо ОСТАННІ limit коментарів
+  // (descending + limit), потім розвертаємо в ascending. before (timestamp) —
+  // для довантаження старіших при скролі вгору.
+  let q = supabase.from('channel_comments').select('*').eq('post_id', postId);
+  if (before) q = q.lt('timestamp', Number(before));
+  q = q.order('timestamp', { ascending: false }).limit(limit + 1);
+  const { data: rawDesc } = await q;
+  const rows = rawDesc || [];
+  const hasMore = rows.length > limit;        // є ще старіші
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const comments = page.slice().reverse();    // назад в ascending
+  console.log(`[channel/comments] postId=${postId} before=${before || '-'} limit=${limit} → returned=${comments.length} hasMore=${hasMore}`);
   const ids = comments.map(c => c.id);
   const reactionsByComment = {};
   if (ids.length > 0) {
@@ -1173,7 +1184,7 @@ app.get('/channel/comments', async (req, res) => {
     }
   }
   const parseWf = (w) => { if (!w) return null; if (Array.isArray(w)) return w; try { return JSON.parse(w); } catch { return null; } };
-  res.json({ ok: true, comments: comments.map(c => ({ ...c, waveform: parseWf(c.waveform), reactions: reactionsByComment[c.id] || [] })) });
+  res.json({ ok: true, hasMore, oldest: comments[0]?.timestamp ?? null, comments: comments.map(c => ({ ...c, waveform: parseWf(c.waveform), reactions: reactionsByComment[c.id] || [] })) });
 });
 
 app.post('/channel/comment', async (req, res) => {
