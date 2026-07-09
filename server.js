@@ -235,7 +235,8 @@ app.get('/call-offer', (req, res) => {
 
 app.post('/decline-call', (req, res) => {
   const { fromNick, toNick } = req.body; if (!fromNick || !toNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  sendToUser(toNick, { type: 'call_reject', from: fromNick });
+  const delivered = sendToUser(toNick, { type: 'call_reject', from: fromNick });
+  console.log(`[calldiag] /decline-call ${fromNick}->${toNick} reject delivered=${delivered} (socket ${delivered ? 'OPEN' : 'NOT-OPEN/absent'})`);
   res.json({ ok: true });
 });
 
@@ -848,7 +849,7 @@ app.get('/contact/blocked-list', async (req, res) => {
 
 // Тимчасовий маркер версії — щоб однозначно підтвердити, яка збірка задеплоєна.
 app.get('/contact/version-check', (req, res) => {
-  res.json({ ok: true, marker: 'block-logging-v2-2026-07-09' });
+  res.json({ ok: true, marker: 'reject-diag-v3-2026-07-09' });
 });
 
 app.get('/direct/reactions', async (req, res) => {
@@ -1788,8 +1789,12 @@ wss.on('connection', (ws) => {
       if (msg.type === 'call_video_state') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_video_state', from: userNick, on: !!msg.on })); }
       if (msg.type === 'call_reject') {
         const target = onlineUsers.get(msg.to);
-        if (target) { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); }
-        else { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }); }
+        let delivered = false;
+        if (target && target.ws && target.ws.readyState === 1) {
+          try { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); delivered = true; } catch (_) {}
+        }
+        if (!delivered) { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }); }
+        console.log(`[calldiag] WS call_reject ${userNick}->${msg.to} delivered=${delivered}${delivered ? '' : ' (fallback FCM push)'}`);
       }
       if (msg.type === 'call_end') {
         const target = onlineUsers.get(msg.to);
