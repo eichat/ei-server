@@ -301,6 +301,15 @@ async function isModOrCreator(groupId, nick) {
   return data && (data.role === 'creator' || data.role === 'moderator');
 }
 
+// Чи blockerNick заблокував otherNick (тобто otherNick не повинен мати
+// можливості писати/дзвонити blockerNick).
+async function isBlockedBy(blockerNick, otherNick) {
+  if (!blockerNick || !otherNick) return false;
+  const { data } = await supabase.from('blocked_contacts').select('id')
+    .eq('blocker_nick', blockerNick).eq('blocked_nick', otherNick).maybeSingle();
+  return !!data;
+}
+
 async function notifyMembers(groupId, payload, excludeNick = null) {
   const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
   const msg = JSON.stringify(payload);
@@ -808,6 +817,31 @@ app.post('/group/delete', async (req, res) => {
   await supabase.from('groups').delete().eq('id', groupId);
   for (const m of members || []) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_deleted', groupId })); }
   res.json({ ok: true });
+});
+
+// ═══ Блокування контактів (direct: повідомлення + дзвінки) ═══
+app.post('/contact/block', async (req, res) => {
+  const { nick, targetNick } = req.body;
+  if (!nick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  if (nick === targetNick) return res.json({ ok: false, error: 'Не можна заблокувати самого себе' });
+  await supabase.from('blocked_contacts').upsert(
+    { blocker_nick: nick, blocked_nick: targetNick, blocked_at: Date.now() },
+    { onConflict: 'blocker_nick,blocked_nick' });
+  res.json({ ok: true });
+});
+
+app.post('/contact/unblock', async (req, res) => {
+  const { nick, targetNick } = req.body;
+  if (!nick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  await supabase.from('blocked_contacts').delete().eq('blocker_nick', nick).eq('blocked_nick', targetNick);
+  res.json({ ok: true });
+});
+
+app.get('/contact/blocked-list', async (req, res) => {
+  const { nick } = req.query;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data } = await supabase.from('blocked_contacts').select('blocked_nick, blocked_at').eq('blocker_nick', nick);
+  res.json({ ok: true, blocked: (data || []).map(r => r.blocked_nick) });
 });
 
 app.get('/direct/reactions', async (req, res) => {
@@ -1623,6 +1657,9 @@ wss.on('connection', (ws) => {
       if (msg.type === 'connect_response') { sendToUser(msg.to, { type: 'connect_response', from: userNick, accepted: msg.accepted }); }
 
       if (msg.type === 'chat_message') {
+        // Якщо адресат заблокував відправника — повідомлення не зберігається
+        // і не доставляється (мовчки, без сигналу відправнику).
+        if (await isBlockedBy(msg.to, userNick)) return;
         const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         const hasFile = msg.isFile && (msg.fileData || msg.fileUrl);
@@ -1700,6 +1737,12 @@ wss.on('connection', (ws) => {
       if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
       if (msg.type === 'call_offer') {
+        // Якщо адресат заблокував того, хто дзвонить — не з'єднуємо. Той самий
+        // сигнал call_error, що й для інших "недоступний" сценаріїв.
+        if (await isBlockedBy(msg.to, userNick)) {
+          ws.send(JSON.stringify({ type: 'call_error', error: 'Абонент недоступний' }));
+          return;
+        }
         // Захист від «дзвінка самому собі»: якщо адресат — інший акаунт на
         // ТОМУ САМОМУ пристрої (спільний FCM-токен), не доставляємо ні WS, ні пуш.
         const fromDev = nickDevices.get(userNick);
