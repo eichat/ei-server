@@ -824,9 +824,11 @@ app.post('/contact/block', async (req, res) => {
   const { nick, targetNick } = req.body;
   if (!nick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
   if (nick === targetNick) return res.json({ ok: false, error: 'Не можна заблокувати самого себе' });
-  await supabase.from('blocked_contacts').upsert(
+  const { data, error } = await supabase.from('blocked_contacts').upsert(
     { blocker_nick: nick, blocked_nick: targetNick, blocked_at: Date.now() },
-    { onConflict: 'blocker_nick,blocked_nick' });
+    { onConflict: 'blocker_nick,blocked_nick' }).select();
+  if (error) { console.log('[contact/block] SUPABASE ERROR:', JSON.stringify(error)); return res.json({ ok: false, error: error.message }); }
+  console.log('[contact/block] OK inserted:', JSON.stringify(data));
   res.json({ ok: true });
 });
 
@@ -842,6 +844,11 @@ app.get('/contact/blocked-list', async (req, res) => {
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data } = await supabase.from('blocked_contacts').select('blocked_nick, blocked_at').eq('blocker_nick', nick);
   res.json({ ok: true, blocked: (data || []).map(r => r.blocked_nick) });
+});
+
+// Тимчасовий маркер версії — щоб однозначно підтвердити, яка збірка задеплоєна.
+app.get('/contact/version-check', (req, res) => {
+  res.json({ ok: true, marker: 'block-logging-v2-2026-07-09' });
 });
 
 app.get('/direct/reactions', async (req, res) => {
