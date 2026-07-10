@@ -1679,6 +1679,29 @@ wss.on('connection', (ws) => {
         }
       }
 
+      if (msg.type === 'sticker') {
+        const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now();
+        const msgId = msg.msgId || null;
+        const content = `${msg.packId || 'tech01'}:${msg.stickerId || ''}`;
+        if (msg.groupId) {
+          // Стікер у групу
+          const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
+          if (!membership) return;
+          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
+          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
+          await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'sticker' });
+          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'sticker', groupId: msg.groupId, from: userNick, packId: msg.packId, stickerId: msg.stickerId, timestamp: ts, msgId }));
+        } else {
+          // Стікер у direct
+          if (await isBlockedBy(msg.to, userNick)) return;
+          const target = onlineUsers.get(msg.to);
+          const status = target ? 'delivered' : 'sent';
+          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'sticker', content, timestamp: ts, delivered: !!target, msg_id: msgId, status });
+          if (target) { target.ws.send(JSON.stringify({ type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+          else { sendFcmPush(msg.to, { type: 'message', from_nick: userNick }); }
+        }
+      }
+
       if (msg.type === 'file_message') {
         const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const msgId = msg.msgId || null;
         const fileData = msg.fileUrl || msg.data || null;
