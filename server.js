@@ -20,12 +20,12 @@ app.use(express.json({ limit: '60mb' }));
 // Один інстанс → лічильники в пам'яті достатньо. Коли буде кілька інстансів —
 // винести в Redis (як і sendToUser). Ключ — IP клієнта.
 // Декодує content-рядок стікера у поля JSON для клієнта. Формат узгоджений
-// з клієнтом (services.dart eDecodeStickerContent), роздільник \u0001:
+// з клієнтом (services.dart eDecodeStickerContent), роздільник ~|~:
 //   'packId:stickerId'                             — офіційний пак
-//   'user:id\u0001url\u0001scale\u0001dx\u0001dy'  — UGC-наліпка
+//   'user:id~|~url~|~scale~|~dx~|~dy'  — UGC-наліпка
 function decodeStickerContent(content) {
   content = content || '';
-  const SEP = '\u0001';
+  const SEP = '~|~';
   if (content.includes(SEP)) {
     const parts = content.split(SEP);
     const head = parts[0];
@@ -1713,10 +1713,10 @@ wss.on('connection', (ws) => {
         const msgId = msg.msgId || null;
         // UGC-наліпка (packId 'user') несе stickerUrl+crop. Щоб дані пережили
         // offline-доставку й перезавантаження історії без нових колонок у БД,
-        // кодуємо їх у content тим самим форматом, що й клієнт (роздільник \u0001):
+        // кодуємо їх у content тим самим форматом, що й клієнт (роздільник ~|~):
         //   'packId:stickerId'                             — офіційний пак
-        //   'user:id\u0001url\u0001scale\u0001dx\u0001dy'  — UGC
-        const SEP = '\u0001';
+        //   'user:id~|~url~|~scale~|~dx~|~dy'  — UGC
+        const SEP = '~|~';
         const hasUgc = typeof msg.stickerUrl === 'string' && msg.stickerUrl.length > 0;
         const content = hasUgc
           ? [`${msg.packId || 'user'}:${msg.stickerId || ''}`, msg.stickerUrl,
