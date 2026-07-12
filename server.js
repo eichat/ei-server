@@ -19,6 +19,35 @@ app.use(express.json({ limit: '60mb' }));
 // ── Простий in-memory rate-limit (без зовнішніх залежностей) ──────────────
 // Один інстанс → лічильники в пам'яті достатньо. Коли буде кілька інстансів —
 // винести в Redis (як і sendToUser). Ключ — IP клієнта.
+// Декодує content-рядок стікера у поля JSON для клієнта. Формат узгоджений
+// з клієнтом (services.dart eDecodeStickerContent), роздільник \u0001:
+//   'packId:stickerId'                             — офіційний пак
+//   'user:id\u0001url\u0001scale\u0001dx\u0001dy'  — UGC-наліпка
+function decodeStickerContent(content) {
+  content = content || '';
+  const SEP = '\u0001';
+  if (content.includes(SEP)) {
+    const parts = content.split(SEP);
+    const head = parts[0];
+    const sep = head.indexOf(':');
+    const num = (i) => (i < parts.length && parts[i] !== '' && !isNaN(parseFloat(parts[i]))) ? parseFloat(parts[i]) : undefined;
+    const out = {
+      packId: sep > 0 ? head.slice(0, sep) : 'user',
+      stickerId: sep > 0 ? head.slice(sep + 1) : head,
+    };
+    if (parts[1]) out.stickerUrl = parts[1];
+    if (num(2) !== undefined) out.cropScale = num(2);
+    if (num(3) !== undefined) out.cropDx = num(3);
+    if (num(4) !== undefined) out.cropDy = num(4);
+    return out;
+  }
+  const sep = content.indexOf(':');
+  return {
+    packId: sep > 0 ? content.slice(0, sep) : 'tech01',
+    stickerId: sep > 0 ? content.slice(sep + 1) : content,
+  };
+}
+
 function makeRateLimiter({ windowMs, max }) {
   const hits = new Map(); // ip -> { count, resetAt }
   // періодичне прибирання застарілих записів, щоб мапа не росла
@@ -1622,7 +1651,7 @@ wss.on('connection', (ws) => {
 
         const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
-          for (const m of pending) ws.send(JSON.stringify(m.type === 'sticker' ? { type: 'sticker', from: m.from_nick, packId: (m.content || '').split(':')[0] || 'tech01', stickerId: (m.content || '').split(':').slice(1).join(':'), timestamp: m.timestamp, msgId: m.msg_id } : m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, ...(m.file_data && m.file_data.startsWith('http') ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}), ...(m.reply_to_image ? { replyToImage: m.reply_to_image } : {}) }));
+          for (const m of pending) ws.send(JSON.stringify(m.type === 'sticker' ? { type: 'sticker', from: m.from_nick, ...decodeStickerContent(m.content), timestamp: m.timestamp, msgId: m.msg_id } : m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, ...(m.file_data && m.file_data.startsWith('http') ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}), ...(m.reply_to_image ? { replyToImage: m.reply_to_image } : {}) }));
           await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
         }
 
@@ -1682,7 +1711,27 @@ wss.on('connection', (ws) => {
       if (msg.type === 'sticker') {
         const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now();
         const msgId = msg.msgId || null;
-        const content = `${msg.packId || 'tech01'}:${msg.stickerId || ''}`;
+        // UGC-наліпка (packId 'user') несе stickerUrl+crop. Щоб дані пережили
+        // offline-доставку й перезавантаження історії без нових колонок у БД,
+        // кодуємо їх у content тим самим форматом, що й клієнт (роздільник \u0001):
+        //   'packId:stickerId'                             — офіційний пак
+        //   'user:id\u0001url\u0001scale\u0001dx\u0001dy'  — UGC
+        const SEP = '\u0001';
+        const hasUgc = typeof msg.stickerUrl === 'string' && msg.stickerUrl.length > 0;
+        const content = hasUgc
+          ? [`${msg.packId || 'user'}:${msg.stickerId || ''}`, msg.stickerUrl,
+             String(msg.cropScale != null ? msg.cropScale : 1),
+             String(msg.cropDx != null ? msg.cropDx : 0),
+             String(msg.cropDy != null ? msg.cropDy : 0)].join(SEP)
+          : `${msg.packId || 'tech01'}:${msg.stickerId || ''}`;
+        // Додаткові поля, які додаємо у ретрансльований JSON (щоб отримувач
+        // одразу мав URL/crop, а не тільки packId/stickerId).
+        const ugcOut = hasUgc ? {
+          stickerUrl: msg.stickerUrl,
+          cropScale: msg.cropScale != null ? msg.cropScale : 1,
+          cropDx: msg.cropDx != null ? msg.cropDx : 0,
+          cropDy: msg.cropDy != null ? msg.cropDy : 0,
+        } : {};
         if (msg.groupId) {
           // Стікер у групу
           const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
@@ -1690,14 +1739,14 @@ wss.on('connection', (ws) => {
           const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
           const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'sticker' });
-          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'sticker', groupId: msg.groupId, from: userNick, packId: msg.packId, stickerId: msg.stickerId, timestamp: ts, msgId }));
+          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'sticker', groupId: msg.groupId, from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId }));
         } else {
           // Стікер у direct
           if (await isBlockedBy(msg.to, userNick)) return;
           const target = onlineUsers.get(msg.to);
           const status = target ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'sticker', content, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-          if (target) { target.ws.send(JSON.stringify({ type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+          if (target) { target.ws.send(JSON.stringify({ type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
           else { sendFcmPush(msg.to, { type: 'message', from_nick: userNick }); }
         }
       }
