@@ -972,7 +972,92 @@ app.post('/shop/buy-premium', async (req, res) => {
   res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
 });
 
-// ── Оновлення групи (аватар, назва) ──────────
+// ═══════════════════════════════════════════════
+//  МАГАЗИН НАЛІПОК (Крок 2A — читання, без списання коінів)
+// ═══════════════════════════════════════════════
+
+// Видає користувачу всі БЕЗКОШТОВНІ паки (price=0), яких у нього ще немає.
+// Викликається при завантаженні магазину — щоб tech01 та інші безкоштовні
+// одразу були "у власності" без окремої купівлі. Ідемпотентно (on conflict).
+async function grantFreePacks(nick) {
+  try {
+    const { data: freePacks } = await supabase.from('sticker_packs').select('id').eq('price', 0).eq('is_active', true);
+    if (!freePacks || freePacks.length === 0) return;
+    const rows = freePacks.map(p => ({ nick, pack_id: p.id }));
+    await supabase.from('user_sticker_packs').upsert(rows, { onConflict: 'nick,pack_id', ignoreDuplicates: true });
+  } catch (e) {
+    console.error('[grantFreePacks]', e.message);
+  }
+}
+
+// Каталог магазину + позначка, які паки в користувача вже є.
+// Тільки читання — нічого не списує.
+app.get('/shop/sticker-packs', async (req, res) => {
+  const nick = req.query.nick;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  await grantFreePacks(nick); // безкоштовні одразу у власності
+  const { data: packs, error } = await supabase.from('sticker_packs')
+    .select('id, title, price, preview_sticker, sort_order')
+    .eq('is_active', true).order('sort_order', { ascending: true });
+  if (error) return res.json({ ok: false, error: 'Помилка каталогу' });
+  const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
+  const ownedSet = new Set((owned || []).map(o => o.pack_id));
+  const result = (packs || []).map(p => ({
+    id: p.id, title: p.title, price: p.price,
+    previewSticker: p.preview_sticker,
+    owned: ownedSet.has(p.id) || p.price === 0,
+  }));
+  res.json({ ok: true, packs: result });
+});
+
+// Список ID паків, якими користувач володіє (для панелі наліпок).
+app.get('/shop/my-packs', async (req, res) => {
+  const nick = req.query.nick;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  await grantFreePacks(nick);
+  const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
+  res.json({ ok: true, packIds: (owned || []).map(o => o.pack_id) });
+});
+
+// Купівля пака за коіни (Крок 2B). Порядок критичний для безпеки:
+// 1) перевірити, що пак існує й активний, взяти ціну З БД (не з клієнта);
+// 2) якщо вже володіє — повернути ok без списання (ідемпотентно);
+// 3) атомарно списати коіни (spend_coins);
+// 4) записати власність; якщо запис провалився — повернути коіни.
+app.post('/shop/buy-pack', async (req, res) => {
+  const { nick, packId } = req.body;
+  if (!nick || !packId) return res.json({ ok: false, error: 'Невірні параметри' });
+  // Ціна — виключно з БД (клієнт не може її підмінити).
+  const { data: pack } = await supabase.from('sticker_packs').select('id, price, is_active').eq('id', packId).single();
+  if (!pack || !pack.is_active) return res.json({ ok: false, error: 'Пак недоступний' });
+  // Вже володіє? — не списувати повторно.
+  const { data: existing } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick).eq('pack_id', packId).maybeSingle();
+  if (existing) return res.json({ ok: true, alreadyOwned: true });
+  const price = pack.price || 0;
+  // Безкоштовний — просто видаємо, без списання.
+  if (price === 0) {
+    await supabase.from('user_sticker_packs').upsert([{ nick, pack_id: packId }], { onConflict: 'nick,pack_id', ignoreDuplicates: true });
+    return res.json({ ok: true, granted: true });
+  }
+  // Платний — атомарне списання.
+  const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
+  if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
+  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  // Записуємо власність. Якщо провалилось — повертаємо коіни (щоб не списати даремно).
+  const { error: ownErr } = await supabase.from('user_sticker_packs').insert({ nick, pack_id: packId });
+  if (ownErr) {
+    // Можливо, паралельний запит уже записав власність (гонка) — перевіряємо.
+    const { data: recheck } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick).eq('pack_id', packId).maybeSingle();
+    if (!recheck) {
+      await supabase.rpc('add_coins', { p_nick: nick, p_amount: price }); // повертаємо кошти
+      return res.json({ ok: false, error: 'Помилка купівлі' });
+    }
+  }
+  const ws = onlineUsers.get(nick);
+  if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
+  res.json({ ok: true, newBalance, packId });
+});
+
 app.post('/group/update', async (req, res) => {
   const { groupId, requesterNick, name, avatarUrl } = req.body;
   if (!groupId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
