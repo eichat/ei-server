@@ -662,17 +662,21 @@ app.post('/transfer-coins', async (req, res) => {
   const { fromNick, toNick, amount } = req.body;
   if (!fromNick || !toNick || !amount || amount < 1) return res.json({ ok: false, error: 'Невірні параметри' });
   if (fromNick === toNick) return res.json({ ok: false, error: 'Не можна переказати собі' });
-  const { data: sender } = await supabase.from('users').select('coins').eq('nick', fromNick).single();
-  if (!sender) return res.json({ ok: false, error: 'Відправника не знайдено' });
-  if ((sender.coins || 0) < amount) return res.json({ ok: false, error: 'Недостатньо монет' });
-  const { data: receiver } = await supabase.from('users').select('coins').eq('nick', toNick).single();
+  const { data: receiver } = await supabase.from('users').select('nick').eq('nick', toNick).single();
   if (!receiver) return res.json({ ok: false, error: 'Отримувача не знайдено' });
-  await supabase.from('users').update({ coins: (sender.coins || 0) - amount }).eq('nick', fromNick);
-  const newReceiverCoins = (receiver.coins || 0) + amount;
-  await supabase.from('users').update({ coins: newReceiverCoins }).eq('nick', toNick);
-  const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -amount, total: (sender.coins || 0) - amount }));
+  // Атомарне списання у відправника.
+  const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: amount });
+  if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
+  if (senderBalance === -1) return res.json({ ok: false, error: 'Недостатньо монет' });
+  // Атомарне нарахування отримувачу. Якщо раптом провалиться — повертаємо кошти.
+  const { data: newReceiverCoins, error: addErr } = await supabase.rpc('add_coins', { p_nick: toNick, p_amount: amount });
+  if (addErr || newReceiverCoins === null) {
+    await supabase.rpc('add_coins', { p_nick: fromNick, p_amount: amount }); // повертаємо кошти
+    return res.json({ ok: false, error: 'Помилка переказу' });
+  }
+  const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -amount, total: senderBalance }));
   const receiverWs = onlineUsers.get(toNick); if (receiverWs) receiverWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount, total: newReceiverCoins }));
-  res.json({ ok: true, newBalance: (sender.coins || 0) - amount });
+  res.json({ ok: true, newBalance: senderBalance });
 });
 
 app.post('/call-log', async (req, res) => {
@@ -951,16 +955,18 @@ app.post('/shop/buy-premium', async (req, res) => {
   const PRICES = { monthly: 500, yearly: 4200 };
   const price = PRICES[plan];
   if (!price) return res.json({ ok: false, error: 'Невідомий план' });
-  const { data: user } = await supabase.from('users').select('coins, premium_expires_at').eq('nick', nick).single();
+  const { data: user } = await supabase.from('users').select('premium_expires_at').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if ((user.coins || 0) < price) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  // Атомарне списання: spend_coins повертає новий баланс або -1 (недостатньо).
+  const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
+  if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
+  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
   const now = new Date();
   let expiresAt = (user.premium_expires_at && new Date(user.premium_expires_at) > now)
     ? new Date(user.premium_expires_at) : new Date(now);
   if (plan === 'monthly') expiresAt.setMonth(expiresAt.getMonth() + 1);
   else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-  const newBalance = (user.coins || 0) - price;
-  await supabase.from('users').update({ coins: newBalance, premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
+  await supabase.from('users').update({ premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
   const ws = onlineUsers.get(nick);
   if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
   res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
@@ -1466,16 +1472,17 @@ app.post('/channel/contact-owner', async (req, res) => {
   const { data: channel } = await supabase.from('channels').select('owner_nick').eq('id', channelId).single();
   if (!channel) return res.json({ ok: false, error: 'Канал не знайдено' });
   if (channel.owner_nick === fromNick) return res.json({ ok: false, error: 'Ви є власником каналу' });
-  const { data: sender } = await supabase.from('users').select('coins').eq('nick', fromNick).single();
-  if (!sender || (sender.coins || 0) < CONTACT_PRICE) return res.json({ ok: false, error: 'Недостатньо EION монет (потрібно 100)' });
-  const { data: owner } = await supabase.from('users').select('coins').eq('nick', channel.owner_nick).single();
+  const { data: owner } = await supabase.from('users').select('nick').eq('nick', channel.owner_nick).single();
   if (!owner) return res.json({ ok: false, error: 'Власника каналу не знайдено' });
-  await supabase.from('users').update({ coins: (sender.coins || 0) - CONTACT_PRICE }).eq('nick', fromNick);
-  await supabase.from('users').update({ coins: (owner.coins || 0) + OWNER_SHARE }).eq('nick', channel.owner_nick);
-  const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
-  if (company) await supabase.from('users').update({ coins: (company.coins || 0) + COMPANY_SHARE }).eq('nick', COMPANY_NICK);
-  const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -CONTACT_PRICE, total: (sender.coins || 0) - CONTACT_PRICE }));
-  const ownerWs = onlineUsers.get(channel.owner_nick); if (ownerWs) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: OWNER_SHARE, total: (owner.coins || 0) + OWNER_SHARE }));
+  // Атомарне списання у покупця.
+  const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: CONTACT_PRICE });
+  if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
+  if (senderBalance === -1) return res.json({ ok: false, error: 'Недостатньо EION монет (потрібно 100)' });
+  // Розподіл: власнику + компанії (атомарні нарахування).
+  const { data: ownerBalance } = await supabase.rpc('add_coins', { p_nick: channel.owner_nick, p_amount: OWNER_SHARE });
+  await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: COMPANY_SHARE });
+  const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -CONTACT_PRICE, total: senderBalance }));
+  const ownerWs = onlineUsers.get(channel.owner_nick); if (ownerWs && ownerBalance != null) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: OWNER_SHARE, total: ownerBalance }));
   res.json({ ok: true, ownerNick: channel.owner_nick });
 });
 
@@ -1491,24 +1498,18 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   const { data: curArr } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).order('expires_at', { ascending: false }).limit(1);
   if (curArr && curArr[0] && Number(curArr[0].expires_at) > Date.now()) return res.json({ ok: true, alreadySubscribed: true, expiresAt: Number(curArr[0].expires_at) });
   const price = ch.price || 0;
-  const { data: user } = await supabase.from('users').select('coins').eq('nick', nick).single();
-  if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  if ((user.coins || 0) < price) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
   const companyShare = Math.floor(price * FEE_PCT / 100);
   const ownerShare = price - companyShare;
-  const newBalance = (user.coins || 0) - price;
-  await supabase.from('users').update({ coins: newBalance }).eq('nick', nick);
+  // Атомарне списання.
+  const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
+  if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
+  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
   if (ch.owner_nick && ch.owner_nick !== nick) {
-    const { data: owner } = await supabase.from('users').select('coins').eq('nick', ch.owner_nick).single();
-    if (owner) {
-      const ownerNew = (owner.coins || 0) + ownerShare;
-      await supabase.from('users').update({ coins: ownerNew }).eq('nick', ch.owner_nick);
-      const ownerWs = onlineUsers.get(ch.owner_nick);
-      if (ownerWs) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew }));
-    }
+    const { data: ownerNew } = await supabase.rpc('add_coins', { p_nick: ch.owner_nick, p_amount: ownerShare });
+    const ownerWs = onlineUsers.get(ch.owner_nick);
+    if (ownerWs && ownerNew != null) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew }));
   }
-  const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
-  if (company) await supabase.from('users').update({ coins: (company.coins || 0) + companyShare }).eq('nick', COMPANY_NICK);
+  await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: companyShare });
   const subDays = ch.sub_days || 30;
   const expiresAt = Date.now() + subDays * 86400000;
   // Запис підписки БЕЗ залежності від unique-констрейнта (upsert+onConflict міг тихо падати)
