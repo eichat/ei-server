@@ -999,7 +999,10 @@ app.get('/shop/sticker-packs', async (req, res) => {
   const { data: packs, error } = await supabase.from('sticker_packs')
     .select('id, title, price, preview_sticker, sort_order')
     .eq('is_active', true).order('sort_order', { ascending: true });
-  if (error) return res.json({ ok: false, error: 'Помилка каталогу' });
+  if (error) {
+    console.error('[shop/sticker-packs] select error:', error);
+    return res.json({ ok: false, error: 'Помилка каталогу', debug: error.message });
+  }
   const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
   const ownedSet = new Set((owned || []).map(o => o.pack_id));
   const result = (packs || []).map(p => ({
