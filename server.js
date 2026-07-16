@@ -1001,7 +1001,7 @@ app.get('/shop/sticker-packs', async (req, res) => {
     .eq('is_active', true).order('sort_order', { ascending: true });
   if (error) {
     console.error('[shop/sticker-packs] select error:', error);
-    return res.json({ ok: false, error: 'Помилка каталогу', debug: error.message });
+    return res.json({ ok: false, error: 'Помилка каталогу' });
   }
   const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
   const ownedSet = new Set((owned || []).map(o => o.pack_id));
