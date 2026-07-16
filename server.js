@@ -9,6 +9,15 @@ const https = require('https');
 const httpModule = require('http');
 
 const app = express();
+// Системний акаунт компанії — сюди надходить комісія з платних операцій
+// (контакти власників каналів, платні підписки). Єдина точка істини, щоб
+// різні endpoint не розходились. Має відповідати реальному ніку в таблиці users.
+const COMPANY_NICK = 'EION';
+// Комісія за переказ монет між користувачами (%). Відраховується ІЗ суми
+// (отримувач отримує менше), решта → COMPANY_NICK. Керований параметр:
+// 0 = без комісії. На малих сумах Math.floor може дати 0 (це нормально для 1%).
+// При запуску токена підняти за потреби (покриття газу мережі).
+const TRANSFER_FEE_PCT = 1;
 // Render стоїть за балансувальником: реальний IP клієнта — у X-Forwarded-For.
 // Без цього rate-limit бачив би один IP проксі для всіх і різав би всіх гуртом.
 app.set('trust proxy', 1);
@@ -664,19 +673,26 @@ app.post('/transfer-coins', async (req, res) => {
   if (fromNick === toNick) return res.json({ ok: false, error: 'Не можна переказати собі' });
   const { data: receiver } = await supabase.from('users').select('nick').eq('nick', toNick).single();
   if (!receiver) return res.json({ ok: false, error: 'Отримувача не знайдено' });
-  // Атомарне списання у відправника.
+  // Атомарне списання у відправника (повна сума).
   const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: amount });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
   if (senderBalance === -1) return res.json({ ok: false, error: 'Недостатньо монет' });
-  // Атомарне нарахування отримувачу. Якщо раптом провалиться — повертаємо кошти.
-  const { data: newReceiverCoins, error: addErr } = await supabase.rpc('add_coins', { p_nick: toNick, p_amount: amount });
+  // Комісія відраховується ІЗ суми: отримувач отримує net, решта → компанії.
+  const fee = Math.floor(amount * TRANSFER_FEE_PCT / 100);
+  const netAmount = amount - fee;
+  // Атомарне нарахування отримувачу (net). Якщо провалиться — повертаємо повну суму.
+  const { data: newReceiverCoins, error: addErr } = await supabase.rpc('add_coins', { p_nick: toNick, p_amount: netAmount });
   if (addErr || newReceiverCoins === null) {
     await supabase.rpc('add_coins', { p_nick: fromNick, p_amount: amount }); // повертаємо кошти
     return res.json({ ok: false, error: 'Помилка переказу' });
   }
+  // Комісія → компанії (EION). Не критично для успіху переказу, тож без rollback.
+  if (fee > 0 && toNick !== COMPANY_NICK && fromNick !== COMPANY_NICK) {
+    await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: fee });
+  }
   const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -amount, total: senderBalance }));
-  const receiverWs = onlineUsers.get(toNick); if (receiverWs) receiverWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount, total: newReceiverCoins }));
-  res.json({ ok: true, newBalance: senderBalance });
+  const receiverWs = onlineUsers.get(toNick); if (receiverWs) receiverWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: netAmount, total: newReceiverCoins }));
+  res.json({ ok: true, newBalance: senderBalance, fee, netAmount });
 });
 
 app.post('/call-log', async (req, res) => {
@@ -961,6 +977,8 @@ app.post('/shop/buy-premium', async (req, res) => {
   const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
   if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  // Дохід від преміуму → компанії (EION). (Раніше монети просто спалювались.)
+  if (nick !== COMPANY_NICK) await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: price });
   const now = new Date();
   let expiresAt = (user.premium_expires_at && new Date(user.premium_expires_at) > now)
     ? new Date(user.premium_expires_at) : new Date(now);
@@ -1056,6 +1074,9 @@ app.post('/shop/buy-pack', async (req, res) => {
       return res.json({ ok: false, error: 'Помилка купівлі' });
     }
   }
+  // Дохід від паку → компанії (EION). Після успішного запису власності, щоб
+  // при провалі-й-поверненні (вище) не нарахувати компанії за скасовану купівлю.
+  if (nick !== COMPANY_NICK) await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: price });
   const ws = onlineUsers.get(nick);
   if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
   res.json({ ok: true, newBalance, packId });
@@ -1556,7 +1577,7 @@ app.post('/channel/invite-response', async (req, res) => {
 app.post('/channel/contact-owner', async (req, res) => {
   const { channelId, fromNick } = req.body;
   if (!channelId || !fromNick) return res.json({ ok: false, error: 'Невірні параметри' });
-  const CONTACT_PRICE = 100; const OWNER_SHARE = 70; const COMPANY_SHARE = 30; const COMPANY_NICK = 'eion_company';
+  const CONTACT_PRICE = 100; const OWNER_SHARE = 70; const COMPANY_SHARE = 30;
   const { data: channel } = await supabase.from('channels').select('owner_nick').eq('id', channelId).single();
   if (!channel) return res.json({ ok: false, error: 'Канал не знайдено' });
   if (channel.owner_nick === fromNick) return res.json({ ok: false, error: 'Ви є власником каналу' });
@@ -1578,7 +1599,7 @@ app.post('/channel/contact-owner', async (req, res) => {
 app.post('/channel/subscribe-paid', async (req, res) => {
   const { channelId, nick } = req.body;
   if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
-  const COMPANY_NICK = 'eion_company'; const FEE_PCT = 30;
+  const FEE_PCT = 30;
   const { data: ch } = await supabase.from('channels').select('owner_nick, is_paid, price, sub_days').eq('id', channelId).single();
   if (!ch) return res.json({ ok: false, error: 'Канал не знайдено' });
   if (!ch.is_paid) return res.json({ ok: false, error: 'Канал безкоштовний' });
