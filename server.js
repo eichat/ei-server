@@ -762,6 +762,7 @@ app.post('/transfer-coins', async (req, res) => {
   const { data: newReceiverCoins, error: addErr } = await supabase.rpc('add_coins', { p_nick: toNick, p_amount: netAmount });
   if (addErr || newReceiverCoins === null) {
     await supabase.rpc('add_coins', { p_nick: fromNick, p_amount: amount }); // повертаємо кошти
+    await logTx({ fromNick: null, toNick: fromNick, amount, kind: 'transfer_refund', ref: toNick });
     return res.json({ ok: false, error: 'Помилка переказу' });
   }
   // Комісія → компанії (EION) з live-нотифікацією + журнал. Не критично для
@@ -770,8 +771,8 @@ app.post('/transfer-coins', async (req, res) => {
     await creditCompany(fee, 'transfer_fee', { fromNick, ref: toNick });
   }
   await logTx({ fromNick, toNick, amount: netAmount, kind: 'transfer' });
-  const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -amount, total: senderBalance }));
-  const receiverWs = onlineUsers.get(toNick); if (receiverWs) receiverWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: netAmount, total: newReceiverCoins }));
+  sendToUser(fromNick, { type: 'coins_update', amount: -amount, total: senderBalance });
+  sendToUser(toNick, { type: 'coins_received', fromNick, amount: netAmount, total: newReceiverCoins });
   res.json({ ok: true, newBalance: senderBalance, fee, netAmount });
 });
 
@@ -1091,8 +1092,7 @@ app.post('/shop/buy-premium', async (req, res) => {
   if (plan === 'monthly') expiresAt.setMonth(expiresAt.getMonth() + 1);
   else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
   await supabase.from('users').update({ premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
-  const ws = onlineUsers.get(nick);
-  if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
+  sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
   res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
 });
 
@@ -1177,14 +1177,14 @@ app.post('/shop/buy-pack', async (req, res) => {
     const { data: recheck } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick).eq('pack_id', packId).maybeSingle();
     if (!recheck) {
       await supabase.rpc('add_coins', { p_nick: nick, p_amount: price }); // повертаємо кошти
+      await logTx({ fromNick: null, toNick: nick, amount: price, kind: 'pack_refund', ref: packId });
       return res.json({ ok: false, error: 'Помилка купівлі' });
     }
   }
   // Дохід від паку → компанії (EION) з live-нотифікацією + журнал. Після
   // успішного запису власності, щоб при поверненні не нарахувати за скасовану купівлю.
   await creditCompany(price, 'pack', { fromNick: nick, ref: packId });
-  const ws = onlineUsers.get(nick);
-  if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
+  sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
   res.json({ ok: true, newBalance, packId });
 });
 
@@ -1697,8 +1697,8 @@ app.post('/channel/contact-owner', async (req, res) => {
   const { data: ownerBalance } = await supabase.rpc('add_coins', { p_nick: channel.owner_nick, p_amount: OWNER_SHARE });
   await logTx({ fromNick, toNick: channel.owner_nick, amount: OWNER_SHARE, kind: 'contact_owner', ref: String(channelId) });
   await creditCompany(COMPANY_SHARE, 'contact_fee', { fromNick, ref: String(channelId) });
-  const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -CONTACT_PRICE, total: senderBalance }));
-  const ownerWs = onlineUsers.get(channel.owner_nick); if (ownerWs && ownerBalance != null) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: OWNER_SHARE, total: ownerBalance }));
+  sendToUser(fromNick, { type: 'coins_update', amount: -CONTACT_PRICE, total: senderBalance });
+  if (ownerBalance != null) sendToUser(channel.owner_nick, { type: 'coins_received', fromNick, amount: OWNER_SHARE, total: ownerBalance });
   res.json({ ok: true, ownerNick: channel.owner_nick });
 });
 
@@ -1723,8 +1723,7 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   if (ch.owner_nick && ch.owner_nick !== nick) {
     const { data: ownerNew } = await supabase.rpc('add_coins', { p_nick: ch.owner_nick, p_amount: ownerShare });
     await logTx({ fromNick: nick, toNick: ch.owner_nick, amount: ownerShare, kind: 'paid_sub', ref: String(channelId) });
-    const ownerWs = onlineUsers.get(ch.owner_nick);
-    if (ownerWs && ownerNew != null) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew }));
+    if (ownerNew != null) sendToUser(ch.owner_nick, { type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew });
   }
   await creditCompany(companyShare, 'paid_sub_fee', { fromNick: nick, ref: String(channelId) });
   const subDays = ch.sub_days || 30;
@@ -1744,8 +1743,7 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   if (subWriteErr) console.error('[paid-sub] WRITE ERROR:', JSON.stringify(subWriteErr));
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
   if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
-  const subWs = onlineUsers.get(nick);
-  if (subWs) subWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
+  sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
   res.json({ ok: true, newBalance, expiresAt });
 });
 
