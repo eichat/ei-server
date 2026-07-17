@@ -13,6 +13,17 @@ const app = express();
 // (контакти власників каналів, платні підписки). Єдина точка істини, щоб
 // різні endpoint не розходились. Має відповідати реальному ніку в таблиці users.
 const COMPANY_NICK = 'EION';
+
+// Перевірка адмін-привілею: секрет із заголовка X-Admin-Secret проти
+// EION_ADMIN_SECRET (змінна оточення Render — НЕ в коді, НЕ в БД). Нік
+// підробити легко, секрет — ні. Якщо секрет не налаштовано → нікому не адмін
+// (безпечний дефолт). Це єдине джерело правди для всіх привілейованих дій.
+function isAdmin(req) {
+  const secret = process.env.EION_ADMIN_SECRET;
+  if (!secret) return false;
+  const provided = req.headers['x-admin-secret'];
+  return typeof provided === 'string' && provided.length > 0 && provided === secret;
+}
 // Комісія за переказ монет між користувачами (%). Відраховується ІЗ суми
 // (отримувач отримує менше), решта → COMPANY_NICK. Керований параметр:
 // 0 = без комісії. На малих сумах Math.floor може дати 0 (це нормально для 1%).
@@ -1790,31 +1801,36 @@ app.post('/report', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Тестовий endpoint для перевірки механізму адмін-авторизації (нешкідливий).
+app.get('/admin/ping', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
+  res.json({ ok: true, admin: true, message: 'Секрет вірний' });
+});
+
 app.get('/admin/reports', async (req, res) => {
-  const { adminNick } = req.query;
-  if (adminNick !== 'eion_company') return res.json({ ok: false, error: 'Доступ заборонено' });
+  if (!isAdmin(req)) return res.json({ ok: false, error: 'Доступ заборонено' });
   const { data } = await supabase.from('reports').select('*').eq('status', 'pending').order('created_at', { ascending: false });
   res.json({ ok: true, reports: data || [] });
 });
 
 app.post('/admin/ban', async (req, res) => {
-  const { adminNick, targetNick, reason } = req.body;
-  if (adminNick !== 'eion_company') return res.json({ ok: false, error: 'Доступ заборонено' });
-  await supabase.from('platform_bans').upsert({ nick: targetNick, reason: reason || null, banned_at: Date.now(), banned_by: adminNick });
+  if (!isAdmin(req)) return res.json({ ok: false, error: 'Доступ заборонено' });
+  const { targetNick, reason } = req.body;
+  await supabase.from('platform_bans').upsert({ nick: targetNick, reason: reason || null, banned_at: Date.now(), banned_by: COMPANY_NICK });
   const t = onlineUsers.get(targetNick); if (t) { t.ws.send(JSON.stringify({ type: 'kicked', reason: 'Акаунт заблоковано' })); t.ws.close(); }
   res.json({ ok: true });
 });
 
 app.post('/admin/unban', async (req, res) => {
-  const { adminNick, targetNick } = req.body;
-  if (adminNick !== 'eion_company') return res.json({ ok: false, error: 'Доступ заборонено' });
+  if (!isAdmin(req)) return res.json({ ok: false, error: 'Доступ заборонено' });
+  const { targetNick } = req.body;
   await supabase.from('platform_bans').delete().eq('nick', targetNick);
   res.json({ ok: true });
 });
 
 app.post('/admin/resolve-report', async (req, res) => {
-  const { adminNick, reportId } = req.body;
-  if (adminNick !== 'eion_company') return res.json({ ok: false, error: 'Доступ заборонено' });
+  if (!isAdmin(req)) return res.json({ ok: false, error: 'Доступ заборонено' });
+  const { reportId } = req.body;
   await supabase.from('reports').update({ status: 'resolved' }).eq('id', reportId);
   res.json({ ok: true });
 });
