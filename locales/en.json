@@ -489,5 +489,8 @@
   "action_block_contact": "Block contact",
   "action_block_contact_btn": "Block",
   "action_unblock_contact": "Unblock contact",
-  "msg_block_confirm_suffix": "will no longer be able to message you"
+  "msg_block_confirm_suffix": "will no longer be able to message you",
+  "stickers_create": "Create",
+  "pack_tech01": "EION · Tech Series 01",
+  "pack_bee": "EION · Bee Series 01"
 }

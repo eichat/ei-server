@@ -489,5 +489,8 @@
   "action_block_contact": "Заблокувати контакт",
   "action_block_contact_btn": "Заблокувати",
   "action_unblock_contact": "Розблокувати контакт",
-  "msg_block_confirm_suffix": "більше не зможе вам писати"
+  "msg_block_confirm_suffix": "більше не зможе вам писати",
+  "stickers_create": "Створити",
+  "pack_tech01": "EION · Tech-серія 01",
+  "pack_bee": "EION · Бджоли 01"
 }
