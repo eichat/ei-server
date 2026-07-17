@@ -253,6 +253,31 @@ function sendToUser(nick, payload) {
   }
 }
 
+// Журнал грошових операцій (append-only). Запис НЕ має ламати саму операцію:
+// якщо лог не записався — гроші вже перемістились, тож просто ковтаємо помилку.
+// Викликати ПІСЛЯ успішної зміни балансу, окремим рядком на кожну "половинку".
+async function logTx({ fromNick = null, toNick = null, amount, kind, ref = null }) {
+  try {
+    await supabase.from('coin_transactions').insert({
+      from_nick: fromNick, to_nick: toNick, amount, kind, ref,
+    });
+  } catch (e) {
+    console.error('[logTx]', kind, e.message);
+  }
+}
+
+// Нарахування доходу компанії (EION): атомарний add_coins + live-нотифікація,
+// якщо EION зараз онлайн (раніше баланс оновлювався лише після перезаходу),
+// + запис у журнал. amount<=0 або сам EION як платник — пропускаємо.
+async function creditCompany(amount, kind, { fromNick = null, ref = null } = {}) {
+  if (!amount || amount <= 0 || fromNick === COMPANY_NICK) return;
+  const { data: newTotal } = await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: amount });
+  if (newTotal != null) {
+    sendToUser(COMPANY_NICK, { type: 'coins_received', fromNick: fromNick || 'system', amount, total: newTotal });
+  }
+  await logTx({ fromNick, toNick: COMPANY_NICK, amount, kind, ref });
+}
+
 async function notifyChannelSubscribers(channelId, payload, excludeNick = null) {
   const { data: members } = await supabase.from('channel_members').select('nick').eq('channel_id', channelId);
   const msg = JSON.stringify(payload);
@@ -686,10 +711,12 @@ app.post('/transfer-coins', async (req, res) => {
     await supabase.rpc('add_coins', { p_nick: fromNick, p_amount: amount }); // повертаємо кошти
     return res.json({ ok: false, error: 'Помилка переказу' });
   }
-  // Комісія → компанії (EION). Не критично для успіху переказу, тож без rollback.
-  if (fee > 0 && toNick !== COMPANY_NICK && fromNick !== COMPANY_NICK) {
-    await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: fee });
+  // Комісія → компанії (EION) з live-нотифікацією + журнал. Не критично для
+  // успіху переказу, тож без rollback.
+  if (toNick !== COMPANY_NICK && fromNick !== COMPANY_NICK) {
+    await creditCompany(fee, 'transfer_fee', { fromNick, ref: toNick });
   }
+  await logTx({ fromNick, toNick, amount: netAmount, kind: 'transfer' });
   const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -amount, total: senderBalance }));
   const receiverWs = onlineUsers.get(toNick); if (receiverWs) receiverWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: netAmount, total: newReceiverCoins }));
   res.json({ ok: true, newBalance: senderBalance, fee, netAmount });
@@ -977,8 +1004,8 @@ app.post('/shop/buy-premium', async (req, res) => {
   const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
   if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
-  // Дохід від преміуму → компанії (EION). (Раніше монети просто спалювались.)
-  if (nick !== COMPANY_NICK) await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: price });
+  // Дохід від преміуму → компанії (EION) з live-нотифікацією + журнал.
+  await creditCompany(price, 'premium', { fromNick: nick, ref: plan });
   const now = new Date();
   let expiresAt = (user.premium_expires_at && new Date(user.premium_expires_at) > now)
     ? new Date(user.premium_expires_at) : new Date(now);
@@ -1074,9 +1101,9 @@ app.post('/shop/buy-pack', async (req, res) => {
       return res.json({ ok: false, error: 'Помилка купівлі' });
     }
   }
-  // Дохід від паку → компанії (EION). Після успішного запису власності, щоб
-  // при провалі-й-поверненні (вище) не нарахувати компанії за скасовану купівлю.
-  if (nick !== COMPANY_NICK) await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: price });
+  // Дохід від паку → компанії (EION) з live-нотифікацією + журнал. Після
+  // успішного запису власності, щоб при поверненні не нарахувати за скасовану купівлю.
+  await creditCompany(price, 'pack', { fromNick: nick, ref: packId });
   const ws = onlineUsers.get(nick);
   if (ws) ws.ws.send(JSON.stringify({ type: 'coins_update', amount: -price, total: newBalance }));
   res.json({ ok: true, newBalance, packId });
@@ -1587,9 +1614,10 @@ app.post('/channel/contact-owner', async (req, res) => {
   const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: CONTACT_PRICE });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання' });
   if (senderBalance === -1) return res.json({ ok: false, error: 'Недостатньо EION монет (потрібно 100)' });
-  // Розподіл: власнику + компанії (атомарні нарахування).
+  // Розподіл: власнику (атомарно) + компанії (creditCompany з live+журнал).
   const { data: ownerBalance } = await supabase.rpc('add_coins', { p_nick: channel.owner_nick, p_amount: OWNER_SHARE });
-  await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: COMPANY_SHARE });
+  await logTx({ fromNick, toNick: channel.owner_nick, amount: OWNER_SHARE, kind: 'contact_owner', ref: String(channelId) });
+  await creditCompany(COMPANY_SHARE, 'contact_fee', { fromNick, ref: String(channelId) });
   const senderWs = onlineUsers.get(fromNick); if (senderWs) senderWs.ws.send(JSON.stringify({ type: 'coins_update', amount: -CONTACT_PRICE, total: senderBalance }));
   const ownerWs = onlineUsers.get(channel.owner_nick); if (ownerWs && ownerBalance != null) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick, amount: OWNER_SHARE, total: ownerBalance }));
   res.json({ ok: true, ownerNick: channel.owner_nick });
@@ -1615,10 +1643,11 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
   if (ch.owner_nick && ch.owner_nick !== nick) {
     const { data: ownerNew } = await supabase.rpc('add_coins', { p_nick: ch.owner_nick, p_amount: ownerShare });
+    await logTx({ fromNick: nick, toNick: ch.owner_nick, amount: ownerShare, kind: 'paid_sub', ref: String(channelId) });
     const ownerWs = onlineUsers.get(ch.owner_nick);
     if (ownerWs && ownerNew != null) ownerWs.ws.send(JSON.stringify({ type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew }));
   }
-  await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: companyShare });
+  await creditCompany(companyShare, 'paid_sub_fee', { fromNick: nick, ref: String(channelId) });
   const subDays = ch.sub_days || 30;
   const expiresAt = Date.now() + subDays * 86400000;
   // Запис підписки БЕЗ залежності від unique-констрейнта (upsert+onConflict міг тихо падати)
