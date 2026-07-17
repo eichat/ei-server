@@ -374,6 +374,32 @@ async function isBlockedBy(blockerNick, otherNick) {
   return !!data;
 }
 
+// Чи може recipient отримати особисте повідомлення від sender.
+// Враховує глобальний блок вхідних (block_incoming) + allowlist (виняток для
+// тих, кому власник блоку написав ПІСЛЯ ввімкнення). Точкове блокування
+// (blocked_contacts) перевіряється окремо в наявному коді, тут не дублюємо.
+async function canReceiveFrom(senderNick, recipientNick) {
+  if (!senderNick || !recipientNick) return true;
+  const { data: rcpt } = await supabase.from('users').select('block_incoming').eq('nick', recipientNick).maybeSingle();
+  if (!rcpt || rcpt.block_incoming !== true) return true; // блок вимкнено — можна
+  // Блок увімкнено — дозволено лише якщо sender у allowlist recipient
+  // (тобто recipient сам написав sender за активного блоку).
+  const { data: allowed } = await supabase.from('block_allowlist').select('owner_nick')
+    .eq('owner_nick', recipientNick).eq('allowed_nick', senderNick).maybeSingle();
+  return !!allowed;
+}
+
+// Коли власник блоку САМ пише комусь за активного блоку — додаємо адресата
+// в його allowlist (той отримує право відповідати). Ідемпотентно.
+async function grantAllowlistIfBlocking(ownerNick, allowedNick) {
+  if (!ownerNick || !allowedNick || ownerNick === allowedNick) return;
+  const { data: owner } = await supabase.from('users').select('block_incoming').eq('nick', ownerNick).maybeSingle();
+  if (!owner || owner.block_incoming !== true) return; // блок вимкнено — allowlist не потрібен
+  await supabase.from('block_allowlist').upsert(
+    { owner_nick: ownerNick, allowed_nick: allowedNick },
+    { onConflict: 'owner_nick,allowed_nick', ignoreDuplicates: true });
+}
+
 async function notifyMembers(groupId, payload, excludeNick = null) {
   const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
   const msg = JSON.stringify(payload);
@@ -441,7 +467,7 @@ app.post('/login', async (req, res) => {
   if (ban) return res.json({ ok: false, error: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
-  res.json({ ok: true, nick: user.nick, color: user.color, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null });
+  res.json({ ok: true, nick: user.nick, color: user.color, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, block_incoming: user.block_incoming === true });
 });
 
 app.post('/forgot', async (req, res) => {
@@ -642,9 +668,9 @@ app.post('/online-users', (req, res) => {
 
 app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
-  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color').eq('nick', nick).single();
+  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null });
+  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true });
 });
 
 app.get('/search-user', async (req, res) => {
@@ -907,6 +933,19 @@ app.post('/contact/block', async (req, res) => {
   if (error) { console.log('[contact/block] SUPABASE ERROR:', JSON.stringify(error)); return res.json({ ok: false, error: error.message }); }
   console.log('[contact/block] OK inserted:', JSON.stringify(data));
   res.json({ ok: true });
+});
+
+// Перемикач глобального блоку вхідних. При ВВІМКНЕННІ очищаємо allowlist
+// (чистий аркуш: пишуть лише ті, кому власник напише вже за цього блоку).
+app.post('/settings/block-incoming', async (req, res) => {
+  const { nick, enabled } = req.body;
+  if (!nick || typeof enabled !== 'boolean') return res.json({ ok: false, error: 'Невірні параметри' });
+  const { error } = await supabase.from('users').update({ block_incoming: enabled }).eq('nick', nick);
+  if (error) return res.json({ ok: false, error: 'Помилка збереження' });
+  if (enabled) {
+    await supabase.from('block_allowlist').delete().eq('owner_nick', nick);
+  }
+  res.json({ ok: true, blockIncoming: enabled });
 });
 
 app.post('/contact/unblock', async (req, res) => {
@@ -1836,6 +1875,14 @@ wss.on('connection', (ws) => {
         // Якщо адресат заблокував відправника — повідомлення не зберігається
         // і не доставляється (мовчки, без сигналу відправнику).
         if (await isBlockedBy(msg.to, userNick)) return;
+        // Глобальний блок вхідних адресата (крім тих, кому він сам написав за блоку).
+        if (!(await canReceiveFrom(userNick, msg.to))) {
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'send_blocked', to: msg.to, reason: 'block_incoming', ...(msg.msgId ? { msgId: msg.msgId } : {}) }));
+          return;
+        }
+        // Відправник сам пише — якщо в НЬОГО ввімкнено блок, адресат потрапляє
+        // в його allowlist (зможе відповісти).
+        await grantAllowlistIfBlocking(userNick, msg.to);
         const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         const hasFile = msg.isFile && (msg.fileData || msg.fileUrl);
@@ -1882,6 +1929,11 @@ wss.on('connection', (ws) => {
         } else {
           // Стікер у direct
           if (await isBlockedBy(msg.to, userNick)) return;
+          if (!(await canReceiveFrom(userNick, msg.to))) {
+            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'send_blocked', to: msg.to, reason: 'block_incoming', ...(msgId ? { msgId } : {}) }));
+            return;
+          }
+          await grantAllowlistIfBlocking(userNick, msg.to);
           const target = onlineUsers.get(msg.to);
           const status = target ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'sticker', content, timestamp: ts, delivered: !!target, msg_id: msgId, status });
@@ -1902,6 +1954,12 @@ wss.on('connection', (ws) => {
           await trackFileObject(fileData, (members || []).map(m => m.nick).filter(n => n !== userNick)); // 2C
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
         } else {
+          if (await isBlockedBy(msg.to, userNick)) return;
+          if (!(await canReceiveFrom(userNick, msg.to))) {
+            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'send_blocked', to: msg.to, reason: 'block_incoming', ...(msgId ? { msgId } : {}) }));
+            return;
+          }
+          await grantAllowlistIfBlocking(userNick, msg.to);
           const target = onlineUsers.get(msg.to); const status = target ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, [msg.to]); // 2C
@@ -1960,6 +2018,11 @@ wss.on('connection', (ws) => {
         // сигнал call_error, що й для інших "недоступний" сценаріїв.
         if (await isBlockedBy(msg.to, userNick)) {
           ws.send(JSON.stringify({ type: 'call_error', error: 'Абонент недоступний' }));
+          return;
+        }
+        // Глобальний блок вхідних адресата (крім тих, кому він сам написав за блоку).
+        if (!(await canReceiveFrom(userNick, msg.to))) {
+          ws.send(JSON.stringify({ type: 'call_error', error: 'Абонент не приймає дзвінки' }));
           return;
         }
         // Захист від «дзвінка самому собі»: якщо адресат — інший акаунт на
