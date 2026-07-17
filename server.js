@@ -657,25 +657,39 @@ app.post('/delete-account', async (req, res) => {
   res.json({ ok: true });
 });
 
+// In-memory набір невидимих ніків (invisible=true). Заповнюється при старті
+// й оновлюється endpoint'ом перемикача. Дає синхронну перевірку без запиту в
+// БД у гарячих шляхах (presence, доставка статусів).
+const invisibleNicks = new Set();
+async function loadInvisibleNicks() {
+  try {
+    const { data } = await supabase.from('users').select('nick').eq('invisible', true);
+    invisibleNicks.clear();
+    for (const u of (data || [])) invisibleNicks.add(u.nick);
+  } catch (e) { console.error('[loadInvisibleNicks]', e.message); }
+}
+loadInvisibleNicks();
+
 // Приватний presence: повертаємо лише тих із КОНТАКТІВ запитувача, хто онлайн.
 // (Раніше GET віддавав список УСІХ онлайн будь-кому — витік ніків + не масштабно.)
+// Невидимі (invisible) виключаються — для інших вони завжди офлайн.
 app.post('/online-users', (req, res) => {
   const { contacts } = req.body || {};
   if (!Array.isArray(contacts)) return res.json({ ok: true, users: [] });
-  const online = contacts.filter(n => typeof n === 'string' && onlineUsers.has(n)).slice(0, 5000);
+  const online = contacts.filter(n => typeof n === 'string' && onlineUsers.has(n) && !invisibleNicks.has(n)).slice(0, 5000);
   res.json({ ok: true, users: online });
 });
 
 app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
-  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming').eq('nick', nick).single();
+  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming, invisible').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
-  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true });
+  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true });
 });
 
 app.get('/search-user', async (req, res) => {
   const { nick } = req.query; if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Введіть мін. 2 символи' });
-  const { data } = await supabase.from('users').select('nick').ilike('nick_lower', `%${nick.toLowerCase()}%`).limit(10);
+  const { data } = await supabase.from('users').select('nick').ilike('nick_lower', `%${nick.toLowerCase()}%`).neq('invisible', true).limit(10);
   res.json({ ok: true, users: (data || []).map(u => u.nick) });
 });
 
@@ -714,7 +728,9 @@ app.post('/update-status', async (req, res) => {
   const { nick, status } = req.body; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
   const newStatus = status && status.trim().length > 0 ? status.trim().substring(0, 60) : null;
   await supabase.from('users').update({ status: newStatus }).eq('nick', nick);
-  for (const [n, user] of onlineUsers) if (n !== nick) user.ws.send(JSON.stringify({ type: 'user_status', nick, status: newStatus }));
+  if (!invisibleNicks.has(nick)) {
+    for (const [n, user] of onlineUsers) if (n !== nick) user.ws.send(JSON.stringify({ type: 'user_status', nick, status: newStatus }));
+  }
   res.json({ ok: true, status: newStatus });
 });
 
@@ -937,6 +953,19 @@ app.post('/contact/block', async (req, res) => {
 
 // Перемикач глобального блоку вхідних. При ВВІМКНЕННІ очищаємо allowlist
 // (чистий аркуш: пишуть лише ті, кому власник напише вже за цього блоку).
+// Перемикач режиму невидимості (лише для системного акаунта EION). Оновлює
+// прапорець у БД + in-memory набір invisibleNicks (для presence без запиту в БД).
+app.post('/settings/invisible', async (req, res) => {
+  const { nick, enabled } = req.body;
+  if (!nick || typeof enabled !== 'boolean') return res.json({ ok: false, error: 'Невірні параметри' });
+  // Захист: невидимість доступна лише EION (системний акаунт).
+  if (nick !== COMPANY_NICK) return res.json({ ok: false, error: 'Недоступно' });
+  const { error } = await supabase.from('users').update({ invisible: enabled }).eq('nick', nick);
+  if (error) return res.json({ ok: false, error: 'Помилка збереження' });
+  if (enabled) invisibleNicks.add(nick); else invisibleNicks.delete(nick);
+  res.json({ ok: true, invisible: enabled });
+});
+
 app.post('/settings/block-incoming', async (req, res) => {
   const { nick, enabled } = req.body;
   if (!nick || typeof enabled !== 'boolean') return res.json({ ok: false, error: 'Невірні параметри' });
@@ -1807,7 +1836,10 @@ wss.on('connection', (ws) => {
         if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився' })); old.ws.close(); }
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
         ws.send(JSON.stringify({ type: 'login_ok' }));
-        for (const [nick, user] of onlineUsers) { if (nick !== userNick) user.ws.send(JSON.stringify({ type: 'user_online', nick: userNick })); }
+        // Невидимі (invisible) не сповіщають інших про свій онлайн.
+        if (!invisibleNicks.has(userNick)) {
+          for (const [nick, user] of onlineUsers) { if (nick !== userNick) user.ws.send(JSON.stringify({ type: 'user_online', nick: userNick })); }
+        }
 
         const { data: pendingDeletes } = await supabase.from('deleted_messages').select('msg_id, from_nick').eq('to_nick', userNick);
         if (pendingDeletes && pendingDeletes.length > 0) {
