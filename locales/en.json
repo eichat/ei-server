@@ -492,5 +492,13 @@
   "msg_block_confirm_suffix": "will no longer be able to message you",
   "stickers_create": "Create",
   "pack_tech01": "EION · Tech Series 01",
-  "pack_bee": "EION · Bee Series 01"
+  "pack_bee": "EION · Bee Series 01",
+  "admin_key_title": "Admin key",
+  "admin_key_active": "Key active",
+  "admin_key_inactive": "Key not set",
+  "admin_key_hint": "Enter secret key",
+  "admin_key_verify": "Verify",
+  "admin_key_ok": "Key valid and saved",
+  "admin_key_bad": "Invalid key",
+  "admin_key_removed": "Key removed"
 }

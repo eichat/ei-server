@@ -492,5 +492,13 @@
   "msg_block_confirm_suffix": "больше не сможет вам писать",
   "stickers_create": "Создать",
   "pack_tech01": "EION · Tech-серия 01",
-  "pack_bee": "EION · Пчёлы 01"
+  "pack_bee": "EION · Пчёлы 01",
+  "admin_key_title": "Админ-ключ",
+  "admin_key_active": "Ключ активен",
+  "admin_key_inactive": "Ключ не установлен",
+  "admin_key_hint": "Введите секретный ключ",
+  "admin_key_verify": "Проверить",
+  "admin_key_ok": "Ключ верный и сохранён",
+  "admin_key_bad": "Неверный ключ",
+  "admin_key_removed": "Ключ удалён"
 }
