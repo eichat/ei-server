@@ -1773,6 +1773,51 @@ app.post('/channel/update', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Стрім у каналі (вбудований YouTube) ──────────────
+// Валідатор YouTube-посилання: приймає watch?v=, youtu.be/, live/, embed/.
+function extractYouTubeId(url) {
+  if (typeof url !== 'string') return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=)([\w-]{11})/,
+    /(?:youtu\.be\/)([\w-]{11})/,
+    /(?:youtube\.com\/live\/)([\w-]{11})/,
+    /(?:youtube\.com\/embed\/)([\w-]{11})/,
+  ];
+  for (const p of patterns) { const m = url.match(p); if (m) return m[1]; }
+  return null;
+}
+
+// Почати трансляцію: власник вставляє YouTube-посилання.
+app.post('/channel/stream/start', async (req, res) => {
+  const { channelId, ownerNick, url } = req.body;
+  if (!channelId || !ownerNick || !url) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  const videoId = extractYouTubeId(url);
+  if (!videoId) return res.json({ ok: false, error: 'Це не схоже на посилання YouTube' });
+  const startedAt = Date.now();
+  // Зберігаємо нормалізований embed-URL за videoId (щоб клієнту було легко вбудувати).
+  await supabase.from('channels').update({
+    live_url: `https://www.youtube.com/watch?v=${videoId}`,
+    live_active: true,
+    live_started_at: startedAt,
+  }).eq('id', channelId);
+  // Сповіщаємо онлайн-підписників, що канал наlive (щоб оновили екран без перезаходу).
+  notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, videoId, active: true }).catch(() => {});
+  res.json({ ok: true, videoId, startedAt });
+});
+
+// Завершити трансляцію: live_active=false, але live_url лишається як запис.
+app.post('/channel/stream/stop', async (req, res) => {
+  const { channelId, ownerNick } = req.body;
+  if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
+  if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
+  await supabase.from('channels').update({ live_active: false }).eq('id', channelId);
+  notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, active: false }).catch(() => {});
+  res.json({ ok: true });
+});
+
 app.post('/channel/delete', async (req, res) => {
   const { channelId, ownerNick } = req.body;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
