@@ -509,5 +509,6 @@
   "stream_stop_btn": "Завершить",
   "stream_new_btn": "Новая трансляция",
   "stream_live_badge": "В ЭФИРЕ",
-  "stream_recording_badge": "Запись трансляции"
+  "stream_recording_badge": "Запись трансляции",
+  "stream_open_youtube": "Смотреть на YouTube"
 }
