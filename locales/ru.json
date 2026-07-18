@@ -501,5 +501,13 @@
   "admin_key_ok": "Ключ верный и сохранён",
   "admin_key_bad": "Неверный ключ",
   "admin_key_removed": "Ключ удалён",
-  "admin_key_paste": "Вставить"
+  "admin_key_paste": "Вставить",
+  "stream_start_title": "Начать трансляцию",
+  "stream_url_hint": "Ссылка на YouTube-стрим",
+  "stream_go_live": "В эфир",
+  "stream_start_btn": "Начать трансляцию",
+  "stream_stop_btn": "Завершить",
+  "stream_new_btn": "Новая трансляция",
+  "stream_live_badge": "В ЭФИРЕ",
+  "stream_recording_badge": "Запись трансляции"
 }

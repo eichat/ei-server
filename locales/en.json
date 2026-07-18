@@ -501,5 +501,13 @@
   "admin_key_ok": "Key valid and saved",
   "admin_key_bad": "Invalid key",
   "admin_key_removed": "Key removed",
-  "admin_key_paste": "Paste"
+  "admin_key_paste": "Paste",
+  "stream_start_title": "Start stream",
+  "stream_url_hint": "YouTube stream link",
+  "stream_go_live": "Go live",
+  "stream_start_btn": "Start stream",
+  "stream_stop_btn": "End stream",
+  "stream_new_btn": "New stream",
+  "stream_live_badge": "LIVE",
+  "stream_recording_badge": "Stream recording"
 }
