@@ -500,5 +500,6 @@
   "admin_key_verify": "Проверить",
   "admin_key_ok": "Ключ верный и сохранён",
   "admin_key_bad": "Неверный ключ",
-  "admin_key_removed": "Ключ удалён"
+  "admin_key_removed": "Ключ удалён",
+  "admin_key_paste": "Вставить"
 }

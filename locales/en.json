@@ -500,5 +500,6 @@
   "admin_key_verify": "Verify",
   "admin_key_ok": "Key valid and saved",
   "admin_key_bad": "Invalid key",
-  "admin_key_removed": "Key removed"
+  "admin_key_removed": "Key removed",
+  "admin_key_paste": "Paste"
 }
