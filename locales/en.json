@@ -510,5 +510,6 @@
   "stream_new_btn": "New stream",
   "stream_live_badge": "LIVE",
   "stream_recording_badge": "Stream recording",
-  "stream_open_youtube": "Watch on YouTube"
+  "stream_open_youtube": "Watch on YouTube",
+  "stream_post_label": "Live stream"
 }
