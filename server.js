@@ -1796,18 +1796,31 @@ app.post('/channel/stream/start', async (req, res) => {
   const videoId = extractYouTubeId(url);
   if (!videoId) return res.json({ ok: false, error: 'Це не схоже на посилання YouTube' });
   const startedAt = Date.now();
-  // Зберігаємо нормалізований embed-URL за videoId (щоб клієнту було легко вбудувати).
+  const liveUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  // Створюємо ПОСТ зі стрімом — коментарі йтимуть до нього, і після завершення
+  // він природно лишається у стрічці як запис. Маркер [stream] у content, щоб
+  // клієнт розпізнав пост-стрім і показав плеєр замість звичайного тексту.
+  const ts = startedAt; const msgId = `ch_${channelId}_${ts}`;
+  const { data: post } = await supabase.from('channel_messages').insert({
+    channel_id: channelId, from_nick: ownerNick,
+    content: `[stream]${videoId}`,
+    timestamp: ts, msg_id: msgId,
+  }).select().single();
   await supabase.from('channels').update({
-    live_url: `https://www.youtube.com/watch?v=${videoId}`,
+    live_url: liveUrl,
     live_active: true,
     live_started_at: startedAt,
+    live_post_id: post.id,
+    last_post_at: ts,
+    last_post_text: '🔴 Трансляція',
   }).eq('id', channelId);
-  // Сповіщаємо онлайн-підписників, що канал наlive (щоб оновили екран без перезаходу).
-  notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, videoId, active: true }).catch(() => {});
-  res.json({ ok: true, videoId, startedAt });
+  // Сповіщаємо онлайн-підписників: і про новий пост, і про live-стан.
+  notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: post.id, from: ownerNick, text: `[stream]${videoId}`, timestamp: ts, msgId, message: { ...post, commentCount: 0, reactions: [], topCommenters: [] } }, ownerNick).catch(() => {});
+  notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, videoId, active: true, postId: post.id }).catch(() => {});
+  res.json({ ok: true, videoId, startedAt, postId: post.id });
 });
 
-// Завершити трансляцію: live_active=false, але live_url лишається як запис.
+// Завершити трансляцію: live_active=false, live_url лишається як запис.
 app.post('/channel/stream/stop', async (req, res) => {
   const { channelId, ownerNick } = req.body;
   if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
