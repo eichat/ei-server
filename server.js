@@ -1282,7 +1282,15 @@ app.get('/channel/list', async (req, res) => {
     const { data: lastPosts } = await supabase.from('channel_messages').select('content, image_url, file_name, timestamp').eq('channel_id', c.id).order('timestamp', { ascending: false }).limit(1);
     const lastPost = lastPosts && lastPosts.length > 0 ? lastPosts[0] : null;
     const lastPostAt = lastPost ? lastPost.timestamp : (c.last_post_at || c.created_at || null);
-    const lastPostText = lastPost ? (lastPost.content ? lastPost.content.substring(0, 50) : (lastPost.image_url ? '🖼 Зображення' : (lastPost.file_name ? '📎 ' + lastPost.file_name.substring(0, 30) : ''))) : null;
+    // Пости-стріми й пости-наліпки зберігаються з маркером у content
+    // ("[stream]videoId", "[sticker]packId:stickerId") — у прев'ю списку
+    // каналів замість сирого маркера показуємо зрозумілий підпис.
+    const previewText = (raw) => {
+      if (raw.startsWith('[stream]')) return '📺 Трансляція';
+      if (raw.startsWith('[sticker]')) return '🏷️ Наліпка';
+      return raw.substring(0, 50);
+    };
+    const lastPostText = lastPost ? (lastPost.content ? previewText(lastPost.content) : (lastPost.image_url ? '🖼 Зображення' : (lastPost.file_name ? '📎 ' + lastPost.file_name.substring(0, 30) : ''))) : null;
     result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0, lastPostAt, lastPostText });
   }
   result.sort((a, b) => (b.lastPostAt || 0) - (a.lastPostAt || 0));
