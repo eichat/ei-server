@@ -2124,6 +2124,35 @@ wss.on('connection', (ws) => {
 
       if (msg.type === 'ei_message') { /* нарахування прибрано */ }
       if (msg.type === 'group_typing') { const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId); for (const m of members || []) { if (m.nick !== userNick) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_typing', groupId: msg.groupId, from: userNick })); } } }
+      // Групова read-квитанція: користувач відкрив групу → позначаємо всі
+      // повідомлення інших як прочитані ним. Статус «переглянуто» (fully_read)
+      // виставляється лише коли ВСІ учасники, крім автора, прочитали.
+      // Тоді автору (якщо онлайн) шлемо group_status_update.
+      if (msg.type === 'group_read_receipt') {
+        const groupId = msg.groupId;
+        const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', groupId).eq('nick', userNick).single();
+        if (membership) {
+          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
+          const memberNicks = (members || []).map(m => m.nick);
+          const { data: msgs } = await supabase.from('group_messages')
+            .select('id, from_nick, msg_id, read_by, fully_read')
+            .eq('group_id', groupId).neq('from_nick', userNick).eq('fully_read', false);
+          const nowReadBySender = {}; // автор → [msgId, що стали fully_read]
+          for (const m of msgs || []) {
+            const readBy = m.read_by || [];
+            if (readBy.includes(userNick)) continue;
+            const newReadBy = [...readBy, userNick];
+            const others = memberNicks.filter(n => n !== m.from_nick);
+            const allRead = others.length > 0 && others.every(n => newReadBy.includes(n));
+            await supabase.from('group_messages').update({ read_by: newReadBy, ...(allRead ? { fully_read: true } : {}) }).eq('id', m.id);
+            if (allRead && m.msg_id) (nowReadBySender[m.from_nick] ??= []).push(m.msg_id);
+          }
+          for (const [sender, msgIds] of Object.entries(nowReadBySender)) {
+            const t = onlineUsers.get(sender);
+            if (t && t.ws.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'group_status_update', groupId, status: 'read', msgIds }));
+          }
+        }
+      }
       if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: ex } = await supabase.from('group_message_reactions').select('id').eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick).eq('emoji', emoji).maybeSingle(); if (ex) { await supabase.from('group_message_reactions').delete().eq('id', ex.id); } else { await supabase.from('group_message_reactions').delete().eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick); await supabase.from('group_message_reactions').insert({ msg_id: msgId, group_id: groupId, nick: userNick, emoji }); } const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const pairKey = [userNick, chatNick].sort().join('|'); const { data: dex } = await supabase.from('direct_message_reactions').select('id').eq('msg_id', msgId).eq('from_nick', userNick).eq('emoji', emoji).maybeSingle(); if (dex) { await supabase.from('direct_message_reactions').delete().eq('id', dex.id); } else { await supabase.from('direct_message_reactions').delete().eq('msg_id', msgId).eq('from_nick', userNick).eq('pair_key', pairKey); await supabase.from('direct_message_reactions').insert({ msg_id: msgId, from_nick: userNick, emoji, pair_key: pairKey }); } const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
       if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); sendToUser(msg.to, { type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }); }
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
