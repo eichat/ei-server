@@ -578,5 +578,8 @@
   "stream_stop_error": "स्ट्रीम रोकी नहीं जा सकी: {e}",
   "channel_write_cost_confirm": "{nick} को लिखने पर {price} EION लगेंगे।\n\nआपका बैलेंस: {balance} EION.",
   "msg_group_will_be_deleted": "समूह \"{name}\" सभी सदस्यों के लिए स्थायी रूप से हटा दिया जाएगा।",
-  "call_connect_failed": "कनेक्ट नहीं हो सका"
+  "call_connect_failed": "कनेक्ट नहीं हो सका",
+  "missed_calls_title": "छूटी हुई कॉल",
+  "missed_call_from": "{nick} से छूटी हुई कॉल",
+  "missed_calls_count": "{count} छूटी हुई कॉल"
 }

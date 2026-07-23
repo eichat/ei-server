@@ -578,5 +578,8 @@
   "stream_stop_error": "Не вдалося зупинити трансляцію: {e}",
   "channel_write_cost_confirm": "Написати {nick} коштуватиме {price} EION.\n\nВаш баланс: {balance} EION.",
   "msg_group_will_be_deleted": "Група \"{name}\" буде видалена назавжди для всіх учасників.",
-  "call_connect_failed": "Не вдалося з'єднатися"
+  "call_connect_failed": "Не вдалося з'єднатися",
+  "missed_calls_title": "Пропущені дзвінки",
+  "missed_call_from": "Пропущений дзвінок від {nick}",
+  "missed_calls_count": "{count} пропущених дзвінків"
 }

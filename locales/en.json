@@ -578,5 +578,8 @@
   "stream_stop_error": "Could not stop the stream: {e}",
   "channel_write_cost_confirm": "Writing to {nick} will cost {price} EION.\n\nYour balance: {balance} EION.",
   "msg_group_will_be_deleted": "The group \"{name}\" will be permanently deleted for all members.",
-  "call_connect_failed": "Failed to connect"
+  "call_connect_failed": "Failed to connect",
+  "missed_calls_title": "Missed calls",
+  "missed_call_from": "Missed call from {nick}",
+  "missed_calls_count": "{count} missed calls"
 }

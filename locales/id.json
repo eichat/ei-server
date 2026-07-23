@@ -578,5 +578,8 @@
   "stream_stop_error": "Tidak dapat menghentikan siaran: {e}",
   "channel_write_cost_confirm": "Mengirim pesan ke {nick} akan dikenakan {price} EION.\n\nSaldo kamu: {balance} EION.",
   "msg_group_will_be_deleted": "Grup \"{name}\" akan dihapus permanen untuk semua anggota.",
-  "call_connect_failed": "Gagal terhubung"
+  "call_connect_failed": "Gagal terhubung",
+  "missed_calls_title": "Panggilan tidak terjawab",
+  "missed_call_from": "Panggilan tidak terjawab dari {nick}",
+  "missed_calls_count": "{count} panggilan tidak terjawab"
 }

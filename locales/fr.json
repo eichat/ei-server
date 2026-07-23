@@ -578,5 +578,8 @@
   "stream_stop_error": "Impossible d'arrêter le direct : {e}",
   "channel_write_cost_confirm": "Écrire à {nick} coûtera {price} EION.\n\nVotre solde : {balance} EION.",
   "msg_group_will_be_deleted": "Le groupe \"{name}\" sera supprimé définitivement pour tous les membres.",
-  "call_connect_failed": "Échec de la connexion"
+  "call_connect_failed": "Échec de la connexion",
+  "missed_calls_title": "Appels manqués",
+  "missed_call_from": "Appel manqué de {nick}",
+  "missed_calls_count": "{count} appels manqués"
 }

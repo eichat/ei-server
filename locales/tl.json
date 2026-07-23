@@ -578,5 +578,8 @@
   "stream_stop_error": "Hindi mahinto ang stream: {e}",
   "channel_write_cost_confirm": "Ang pagmensahe kay {nick} ay magkakahalaga ng {price} EION.\n\nBalanse mo: {balance} EION.",
   "msg_group_will_be_deleted": "Permanenteng buburahin ang grupong \"{name}\" para sa lahat ng miyembro.",
-  "call_connect_failed": "Nabigong kumonekta"
+  "call_connect_failed": "Nabigong kumonekta",
+  "missed_calls_title": "Mga hindi nasagot na tawag",
+  "missed_call_from": "Hindi nasagot na tawag mula kay {nick}",
+  "missed_calls_count": "{count} hindi nasagot na tawag"
 }

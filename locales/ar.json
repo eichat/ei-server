@@ -578,5 +578,8 @@
   "stream_stop_error": "تعذّر إيقاف البث: {e}",
   "channel_write_cost_confirm": "ستكلفك مراسلة {nick} مبلغ {price} EION.\n\nرصيدك: {balance} EION.",
   "msg_group_will_be_deleted": "سيتم حذف المجموعة \"{name}\" نهائيًا لجميع الأعضاء.",
-  "call_connect_failed": "تعذّر الاتصال"
+  "call_connect_failed": "تعذّر الاتصال",
+  "missed_calls_title": "مكالمات فائتة",
+  "missed_call_from": "مكالمة فائتة من {nick}",
+  "missed_calls_count": "{count} مكالمات فائتة"
 }

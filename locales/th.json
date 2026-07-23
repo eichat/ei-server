@@ -578,5 +578,8 @@
   "stream_stop_error": "ไม่สามารถหยุดการถ่ายทอดสดได้: {e}",
   "channel_write_cost_confirm": "การส่งข้อความถึง {nick} มีค่าใช้จ่าย {price} EION\n\nยอดคงเหลือของคุณ: {balance} EION",
   "msg_group_will_be_deleted": "กลุ่ม \"{name}\" จะถูกลบถาวรสำหรับสมาชิกทุกคน",
-  "call_connect_failed": "เชื่อมต่อไม่สำเร็จ"
+  "call_connect_failed": "เชื่อมต่อไม่สำเร็จ",
+  "missed_calls_title": "สายที่ไม่ได้รับ",
+  "missed_call_from": "สายที่ไม่ได้รับจาก {nick}",
+  "missed_calls_count": "สายที่ไม่ได้รับ {count} สาย"
 }

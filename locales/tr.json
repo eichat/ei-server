@@ -578,5 +578,8 @@
   "stream_stop_error": "Yayın durdurulamadı: {e}",
   "channel_write_cost_confirm": "{nick} kişisine yazmak {price} EION tutacak.\n\nBakiyeniz: {balance} EION.",
   "msg_group_will_be_deleted": "\"{name}\" grubu tüm üyeler için kalıcı olarak silinecek.",
-  "call_connect_failed": "Bağlanılamadı"
+  "call_connect_failed": "Bağlanılamadı",
+  "missed_calls_title": "Cevapsız aramalar",
+  "missed_call_from": "{nick} kişisinden cevapsız arama",
+  "missed_calls_count": "{count} cevapsız arama"
 }

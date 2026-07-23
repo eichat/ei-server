@@ -578,5 +578,8 @@
   "stream_stop_error": "স্ট্রিম বন্ধ করা যায়নি: {e}",
   "channel_write_cost_confirm": "{nick}-কে লিখতে {price} EION খরচ হবে।\n\nআপনার ব্যালেন্স: {balance} EION.",
   "msg_group_will_be_deleted": "\"{name}\" গ্রুপটি সব সদস্যের জন্য স্থায়ীভাবে মুছে ফেলা হবে।",
-  "call_connect_failed": "সংযোগ ব্যর্থ হয়েছে"
+  "call_connect_failed": "সংযোগ ব্যর্থ হয়েছে",
+  "missed_calls_title": "মিসড কল",
+  "missed_call_from": "{nick} থেকে মিসড কল",
+  "missed_calls_count": "{count}টি মিসড কল"
 }

@@ -578,5 +578,8 @@
   "stream_stop_error": "Kon de stream niet stoppen: {e}",
   "channel_write_cost_confirm": "Een bericht aan {nick} kost {price} EION.\n\nJe saldo: {balance} EION.",
   "msg_group_will_be_deleted": "De groep \"{name}\" wordt permanent verwijderd voor alle leden.",
-  "call_connect_failed": "Verbinden mislukt"
+  "call_connect_failed": "Verbinden mislukt",
+  "missed_calls_title": "Gemiste oproepen",
+  "missed_call_from": "Gemiste oproep van {nick}",
+  "missed_calls_count": "{count} gemiste oproepen"
 }

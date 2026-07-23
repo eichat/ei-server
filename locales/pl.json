@@ -578,5 +578,8 @@
   "stream_stop_error": "Nie udało się zatrzymać transmisji: {e}",
   "channel_write_cost_confirm": "Napisanie do {nick} będzie kosztować {price} EION.\n\nTwoje saldo: {balance} EION.",
   "msg_group_will_be_deleted": "Grupa \"{name}\" zostanie trwale usunięta dla wszystkich uczestników.",
-  "call_connect_failed": "Nie udało się połączyć"
+  "call_connect_failed": "Nie udało się połączyć",
+  "missed_calls_title": "Nieodebrane połączenia",
+  "missed_call_from": "Nieodebrane połączenie od {nick}",
+  "missed_calls_count": "{count} nieodebranych połączeń"
 }

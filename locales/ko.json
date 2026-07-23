@@ -578,5 +578,8 @@
   "stream_stop_error": "스트림을 중지하지 못했습니다: {e}",
   "channel_write_cost_confirm": "{nick}님에게 메시지를 보내려면 {price} EION이 필요합니다.\n\n잔액: {balance} EION.",
   "msg_group_will_be_deleted": "\"{name}\" 그룹이 모든 멤버에게서 영구적으로 삭제됩니다.",
-  "call_connect_failed": "연결하지 못했습니다"
+  "call_connect_failed": "연결하지 못했습니다",
+  "missed_calls_title": "부재중 전화",
+  "missed_call_from": "{nick}님의 부재중 전화",
+  "missed_calls_count": "부재중 전화 {count}건"
 }

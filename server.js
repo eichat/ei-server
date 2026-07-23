@@ -802,6 +802,25 @@ app.delete('/call-logs', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Пропущені дзвінки для nick ПІСЛЯ since (мс). Клієнт викликає на login_ok, щоб
+// сповістити про дзвінки, що надійшли, поки він був офлайн (сокет мертвий → лог
+// missed створюється тут-таки при call_offer, але клієнт про це не дізнавався,
+// бо логи підвантажуються лише при відкритті конкретного чату).
+// status: 'missed' (не додзвонились / офлайн) і 'no_answer' (скасовано до відповіді) —
+// обидва з погляду to_nick це пропущений. 'rejected'/'completed' не рахуємо.
+app.get('/missed-calls', async (req, res) => {
+  const { nick, since } = req.query;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const sinceTs = parseInt(since, 10) || 0;
+  const { data } = await supabase.from('call_logs')
+    .select('from_nick, has_video, started_at, status')
+    .eq('to_nick', nick)
+    .in('status', ['missed', 'no_answer'])
+    .gt('started_at', sinceTs)
+    .order('started_at', { ascending: false });
+  res.json({ ok: true, missed: data || [] });
+});
+
 // ── Групи ──────────────────────────────────────
 app.post('/group/create', async (req, res) => {
   const { name, creatorNick, members, type } = req.body;

@@ -578,5 +578,8 @@
   "stream_stop_error": "Não foi possível parar a transmissão: {e}",
   "channel_write_cost_confirm": "Escrever para {nick} vai custar {price} EION.\n\nSeu saldo: {balance} EION.",
   "msg_group_will_be_deleted": "O grupo \"{name}\" será excluído permanentemente para todos os membros.",
-  "call_connect_failed": "Falha ao conectar"
+  "call_connect_failed": "Falha ao conectar",
+  "missed_calls_title": "Chamadas perdidas",
+  "missed_call_from": "Chamada perdida de {nick}",
+  "missed_calls_count": "{count} chamadas perdidas"
 }

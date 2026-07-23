@@ -578,5 +578,8 @@
   "stream_stop_error": "Không thể dừng buổi phát trực tiếp: {e}",
   "channel_write_cost_confirm": "Nhắn tin cho {nick} sẽ tốn {price} EION.\n\nSố dư của bạn: {balance} EION.",
   "msg_group_will_be_deleted": "Nhóm \"{name}\" sẽ bị xóa vĩnh viễn đối với tất cả thành viên.",
-  "call_connect_failed": "Không thể kết nối"
+  "call_connect_failed": "Không thể kết nối",
+  "missed_calls_title": "Cuộc gọi nhỡ",
+  "missed_call_from": "Cuộc gọi nhỡ từ {nick}",
+  "missed_calls_count": "{count} cuộc gọi nhỡ"
 }

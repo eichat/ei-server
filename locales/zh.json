@@ -578,5 +578,8 @@
   "stream_stop_error": "无法停止直播：{e}",
   "channel_write_cost_confirm": "给 {nick} 发消息需要 {price} EION。\n\n你的余额：{balance} EION。",
   "msg_group_will_be_deleted": "群组“{name}”将对所有成员永久删除。",
-  "call_connect_failed": "连接失败"
+  "call_connect_failed": "连接失败",
+  "missed_calls_title": "未接来电",
+  "missed_call_from": "来自 {nick} 的未接来电",
+  "missed_calls_count": "{count} 个未接来电"
 }

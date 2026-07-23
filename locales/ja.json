@@ -578,5 +578,8 @@
   "stream_stop_error": "配信を停止できませんでした: {e}",
   "channel_write_cost_confirm": "{nick} へのメッセージには {price} EION かかります。\n\n残高: {balance} EION。",
   "msg_group_will_be_deleted": "グループ「{name}」はすべてのメンバーから完全に削除されます。",
-  "call_connect_failed": "接続できませんでした"
+  "call_connect_failed": "接続できませんでした",
+  "missed_calls_title": "不在着信",
+  "missed_call_from": "{nick} からの不在着信",
+  "missed_calls_count": "不在着信 {count} 件"
 }
