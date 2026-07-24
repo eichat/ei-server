@@ -1541,6 +1541,30 @@ app.post('/channel/post/comments-toggle', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Читач відкрив коментарі під постом → чужі коментарі позначаємо як побачені.
+// Модель спрощена (на відміну від груп): другу галочку дає ПЕРШИЙ читач,
+// синьої «прочитали всі» в каналах немає — множина підписників невизначена.
+app.post('/channel/comments/read', async (req, res) => {
+  const { postId, nick } = req.body;
+  if (!postId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { data: rows } = await supabase.from('channel_comments')
+    .select('id, from_nick, read_by')
+    .eq('post_id', postId).neq('from_nick', nick)
+    .not('read_by', 'cs', `{"${nick}"}`)
+    .limit(500);
+  const firstSeenByAuthor = {}; // автор → commentIds, що аж тепер стали побаченими
+  for (const c of rows || []) {
+    const readBy = c.read_by || [];
+    if (readBy.includes(nick)) continue;
+    await supabase.from('channel_comments').update({ read_by: [...readBy, nick] }).eq('id', c.id);
+    if (readBy.length === 0) (firstSeenByAuthor[c.from_nick] ??= []).push(c.id);
+  }
+  for (const [author, commentIds] of Object.entries(firstSeenByAuthor)) {
+    sendToUser(author, { type: 'channel_comment_status', postId: Number(postId), status: 'delivered', commentIds });
+  }
+  res.json({ ok: true });
+});
+
 app.delete('/channel/comment', async (req, res) => {
   const { commentId, channelId, requesterNick } = req.body;
   if (!commentId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
