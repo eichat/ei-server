@@ -417,6 +417,15 @@ async function notifyMembers(groupId, payload, excludeNick = null) {
   for (const m of members || []) { if (m.nick === excludeNick) continue; const t = onlineUsers.get(m.nick); if (t) { try { t.ws.send(msg); } catch (_) {} } }
 }
 
+// Друга (сіра) галочка авторові групового повідомлення: хтось із учасників
+// онлайн — отже, повідомлення вже доставлене. Синя ✓✓ ставиться окремо
+// (group_read_receipt), коли прочитають ВСІ учасники.
+function notifyGroupDelivered(ws, groupId, msgId, onlineMembers) {
+  if (!msgId || !onlineMembers || onlineMembers.length === 0) return;
+  if (ws.readyState !== WebSocket.OPEN) return;
+  try { ws.send(JSON.stringify({ type: 'group_status_update', groupId, status: 'delivered', msgIds: [msgId] })); } catch (_) {}
+}
+
 async function sendGroupInvite(groupId, groupName, inviterNick, targetNick) {
   const target = onlineUsers.get(targetNick);
   const payload = { type: 'group_invite', groupId, groupName, inviterNick };
@@ -1968,11 +1977,18 @@ wss.on('connection', (ws) => {
         if (myGroups && myGroups.length > 0) {
           for (const gm of myGroups) {
             const { data: pendingGroup } = await supabase.from('group_messages').select('*').eq('group_id', gm.group_id).not('delivered_to', 'cs', `{"${userNick}"}`).order('timestamp', { ascending: true });
+            const deliveredBySender = {}; // автор → msgIds, що аж тепер дійшли цьому юзеру
             if (pendingGroup && pendingGroup.length > 0) { for (const m of pendingGroup) {
               if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.file_data && m.file_data.startsWith('http') ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
               else ws.send(JSON.stringify({ type: 'group_message', groupId: m.group_id, from: m.from_nick, text: m.content, timestamp: m.timestamp, msgId: m.msg_id }));
               await supabase.from('group_messages').update({ delivered_to: [...(m.delivered_to || []), userNick] }).eq('id', m.id);
+              if (m.msg_id && m.from_nick !== userNick) (deliveredBySender[m.from_nick] ??= []).push(m.msg_id);
             } }
+            // Авторам — друга (сіра) галочка: їхні повідомлення щойно дійшли.
+            for (const [sender, msgIds] of Object.entries(deliveredBySender)) {
+              const target = onlineUsers.get(sender);
+              if (target && target.ws.readyState === WebSocket.OPEN) target.ws.send(JSON.stringify({ type: 'group_status_update', groupId: gm.group_id, status: 'delivered', msgIds }));
+            }
           }
         }
 
@@ -2057,6 +2073,7 @@ wss.on('connection', (ws) => {
           const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'sticker' });
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'sticker', groupId: msg.groupId, from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId }));
+          notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
         } else {
           // Стікер у direct
           if (await isBlockedBy(msg.to, userNick)) return;
@@ -2084,6 +2101,7 @@ wss.on('connection', (ws) => {
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: fileData, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, (members || []).map(m => m.nick).filter(n => n !== userNick)); // 2C
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
+          notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
         } else {
           if (await isBlockedBy(msg.to, userNick)) return;
           if (!(await canReceiveFrom(userNick, msg.to))) {
@@ -2120,6 +2138,7 @@ wss.on('connection', (ws) => {
         const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
         await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], ...(msg.isFile ? { type: 'file', file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
+        notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
       }
 
       if (msg.type === 'ei_message') { /* нарахування прибрано */ }
@@ -2137,7 +2156,8 @@ wss.on('connection', (ws) => {
           const { data: msgs } = await supabase.from('group_messages')
             .select('id, from_nick, msg_id, read_by, fully_read')
             .eq('group_id', groupId).neq('from_nick', userNick).eq('fully_read', false);
-          const nowReadBySender = {}; // автор → [msgId, що стали fully_read]
+          const nowReadBySender = {};  // автор → [msgId, що стали fully_read] → сині ✓✓
+          const nowSeenBySender = {};  // автор → [msgId, що прочитав хтось один] → сірі ✓✓
           for (const m of msgs || []) {
             const readBy = m.read_by || [];
             if (readBy.includes(userNick)) continue;
@@ -2145,11 +2165,13 @@ wss.on('connection', (ws) => {
             const others = memberNicks.filter(n => n !== m.from_nick);
             const allRead = others.length > 0 && others.every(n => newReadBy.includes(n));
             await supabase.from('group_messages').update({ read_by: newReadBy, ...(allRead ? { fully_read: true } : {}) }).eq('id', m.id);
-            if (allRead && m.msg_id) (nowReadBySender[m.from_nick] ??= []).push(m.msg_id);
+            if (m.msg_id) (allRead ? (nowReadBySender[m.from_nick] ??= []) : (nowSeenBySender[m.from_nick] ??= [])).push(m.msg_id);
           }
-          for (const [sender, msgIds] of Object.entries(nowReadBySender)) {
-            const t = onlineUsers.get(sender);
-            if (t && t.ws.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'group_status_update', groupId, status: 'read', msgIds }));
+          for (const [status, bySender] of [['read', nowReadBySender], ['delivered', nowSeenBySender]]) {
+            for (const [sender, msgIds] of Object.entries(bySender)) {
+              const t = onlineUsers.get(sender);
+              if (t && t.ws.readyState === WebSocket.OPEN) t.ws.send(JSON.stringify({ type: 'group_status_update', groupId, status, msgIds }));
+            }
           }
         }
       }
