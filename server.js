@@ -598,7 +598,7 @@ app.post('/reset', async (req, res) => {
 });
 
 app.post('/update-nick', async (req, res) => {
-  const { nick, password, newNick } = req.body;
+  const { password, newNick } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
@@ -633,11 +633,14 @@ app.post('/update-nick', async (req, res) => {
   const userWs = onlineUsers.get(oldNick);
   if (userWs) { onlineUsers.delete(oldNick); onlineUsers.set(newNick, userWs); }
   for (const [n, u] of onlineUsers) if (n !== newNick) u.ws.send(JSON.stringify({ type: 'nick_changed', oldNick, newNick }));
-  res.json({ ok: true, newNick });
+  // Токен ніс старий нік — старі сесії гасимо, видаємо новий токен (клієнт зберігає).
+  await destroySessionsForNick(oldNick);
+  const newToken = await createSession(newNick, req.body.deviceId || null);
+  res.json({ ok: true, newNick, token: newToken });
 });
 
 app.post('/update-password', async (req, res) => {
-  const { nick, password, newPassword } = req.body;
+  const { password, newPassword } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
@@ -648,7 +651,7 @@ app.post('/update-password', async (req, res) => {
 });
 
 app.post('/update-phone', async (req, res) => {
-  const { nick, password, phone, phoneNormalized } = req.body;
+  const { password, phone, phoneNormalized } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
@@ -718,7 +721,7 @@ app.post('/phone/verify-code', async (req, res) => {
 });
 
 app.post('/update-email', async (req, res) => {
-  const { nick, password, newEmail } = req.body;
+  const { password, newEmail } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
@@ -753,13 +756,14 @@ app.get('/turn-credentials', (req, res) => {
 });
 
 app.post('/delete-account', async (req, res) => {
-  const { nick, password } = req.body;
+  const { password } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
   await supabase.from('messages').delete().or(`from_nick.eq.${nick},to_nick.eq.${nick}`);
   await supabase.from('users').delete().eq('nick_lower', nick.toLowerCase());
   onlineUsers.delete(nick); fcmTokens.delete(nick);
+  await destroySessionsForNick(nick);
   res.json({ ok: true });
 });
 
@@ -809,7 +813,7 @@ app.post('/users/by-phones', async (req, res) => {
   res.json({ ok: true, users: result });
 });
 
-app.post('/unregister', (req, res) => { const { nick } = req.body; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
+app.post('/unregister', (req, res) => { const nick = req.nick; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
 app.post('/register-fcm-token', (req, res) => {
   const { token, deviceId } = req.body; // token тут = FCM-токен (не сесійний)
   const nick = req.nick; // Фаза 1/#14: FCM-токен реєструється ЛИШЕ на свій нік.
@@ -820,21 +824,21 @@ app.post('/register-fcm-token', (req, res) => {
 });
 
 app.post('/update-nick-color', async (req, res) => {
-  const { nick, nickColor } = req.body; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
+  const { nickColor } = req.body; const nick = req.nick; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
   await supabase.from('users').update({ nick_color: nickColor || null }).eq('nick', nick);
   for (const [n, user] of onlineUsers) if (n !== nick) user.ws.send(JSON.stringify({ type: 'nick_color_changed', nick, nickColor: nickColor || null }));
   res.json({ ok: true });
 });
 
 app.post('/update-avatar', async (req, res) => {
-  const { nick, avatarUrl } = req.body; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
+  const { avatarUrl } = req.body; const nick = req.nick; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
   await supabase.from('users').update({ avatar_url: avatarUrl || null }).eq('nick', nick);
   for (const [n, user] of onlineUsers) if (n !== nick) user.ws.send(JSON.stringify({ type: 'avatar_changed', nick, avatarUrl: avatarUrl || null }));
   res.json({ ok: true });
 });
 
 app.post('/update-status', async (req, res) => {
-  const { nick, status } = req.body; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
+  const { status } = req.body; const nick = req.nick; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий' });
   const newStatus = status && status.trim().length > 0 ? status.trim().substring(0, 60) : null;
   await supabase.from('users').update({ status: newStatus }).eq('nick', nick);
   if (!invisibleNicks.has(nick)) {
@@ -932,7 +936,7 @@ app.get('/missed-calls', async (req, res) => {
 
 // ── Групи ──────────────────────────────────────
 app.post('/group/create', async (req, res) => {
-  const { name, creatorNick, members, type } = req.body;
+  const { name, members, type } = req.body; const creatorNick = req.nick;
   if (!name || name.trim().length < 1) return res.json({ ok: false, error: 'Назва групи порожня' });
   const groupType = type || 'closed';
   const { data: group, error } = await supabase.from('groups').insert({ name: name.trim(), creator_nick: creatorNick, type: groupType }).select().single();
@@ -943,7 +947,7 @@ app.post('/group/create', async (req, res) => {
 });
 
 app.post('/group/invite-response', async (req, res) => {
-  const { groupId, nick, accepted } = req.body;
+  const { groupId, accepted } = req.body; const nick = req.nick;
   if (accepted) {
     const { data: existing } = await supabase.from('group_members').select('nick').eq('group_id', groupId).eq('nick', nick).single();
     if (!existing) await supabase.from('group_members').insert({ group_id: groupId, nick, role: 'member' });
@@ -983,7 +987,7 @@ app.get('/group/search', async (req, res) => {
 });
 
 app.post('/group/join', async (req, res) => {
-  const { groupId, nick } = req.body;
+  const { groupId } = req.body; const nick = req.nick;
   const { data: group } = await supabase.from('groups').select('*').eq('id', groupId).single();
   if (!group) return res.json({ ok: false, error: 'Групу не знайдено' });
   if (group.type === 'closed') return res.json({ ok: false, error: 'Група закрита' });
@@ -1005,7 +1009,7 @@ app.post('/group/join', async (req, res) => {
 });
 
 app.post('/group/approve', async (req, res) => {
-  const { groupId, requesterNick, targetNick, approve } = req.body;
+  const { groupId, targetNick, approve } = req.body; const requesterNick = req.nick;
   if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('group_join_requests').update({ status: approve ? 'approved' : 'rejected' }).eq('group_id', groupId).eq('nick', targetNick);
   const t = onlineUsers.get(targetNick);
@@ -1020,7 +1024,7 @@ app.post('/group/approve', async (req, res) => {
 });
 
 app.post('/group/set-type', async (req, res) => {
-  const { groupId, requesterNick, groupType } = req.body;
+  const { groupId, groupType } = req.body; const requesterNick = req.nick;
   const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
   if (!member || member.role !== 'creator') return res.json({ ok: false, error: 'Тільки творець може змінювати тип групи' });
   await supabase.from('groups').update({ type: groupType }).eq('id', groupId);
@@ -1029,7 +1033,7 @@ app.post('/group/set-type', async (req, res) => {
 });
 
 app.post('/group/set-moderator', async (req, res) => {
-  const { groupId, requesterNick, targetNick, isModerator } = req.body;
+  const { groupId, targetNick, isModerator } = req.body; const requesterNick = req.nick;
   const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
   if (!member || member.role !== 'creator') return res.json({ ok: false, error: 'Тільки творець може призначати модераторів' });
   const newRole = isModerator ? 'moderator' : 'member';
@@ -1039,7 +1043,7 @@ app.post('/group/set-moderator', async (req, res) => {
 });
 
 app.post('/group/add-member', async (req, res) => {
-  const { groupId, requesterNick, newNick } = req.body;
+  const { groupId, newNick } = req.body; const requesterNick = req.nick;
   if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Тільки модератор або творець може запрошувати учасників' });
   const { data: existing } = await supabase.from('group_members').select('nick').eq('group_id', groupId).eq('nick', newNick).single();
   if (existing) return res.json({ ok: false, error: 'Користувач вже в групі' });
@@ -1049,7 +1053,7 @@ app.post('/group/add-member', async (req, res) => {
 });
 
 app.post('/group/remove-member', async (req, res) => {
-  const { groupId, requesterNick, targetNick } = req.body;
+  const { groupId, targetNick } = req.body; const requesterNick = req.nick;
   if (requesterNick !== targetNick && !(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Тільки модератор або творець може видаляти учасників' });
   await supabase.from('group_members').delete().eq('group_id', groupId).eq('nick', targetNick);
   sendToUser(targetNick, { type: 'group_removed', groupId });
@@ -1065,7 +1069,7 @@ app.get('/group/join-requests', async (req, res) => {
 });
 
 app.post('/group/delete', async (req, res) => {
-  const { groupId, requesterNick } = req.body;
+  const { groupId } = req.body; const requesterNick = req.nick;
   const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
   if (!member || member.role !== 'creator') return res.json({ ok: false, error: 'Тільки творець може видалити групу' });
   const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
@@ -1080,7 +1084,7 @@ app.post('/group/delete', async (req, res) => {
 
 // ═══ Блокування контактів (direct: повідомлення + дзвінки) ═══
 app.post('/contact/block', async (req, res) => {
-  const { nick, targetNick } = req.body;
+  const { targetNick } = req.body; const nick = req.nick;
   if (!nick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
   if (nick === targetNick) return res.json({ ok: false, error: 'Не можна заблокувати самого себе' });
   const { data, error } = await supabase.from('blocked_contacts').upsert(
@@ -1096,7 +1100,7 @@ app.post('/contact/block', async (req, res) => {
 // Перемикач режиму невидимості (лише для системного акаунта EION). Оновлює
 // прапорець у БД + in-memory набір invisibleNicks (для presence без запиту в БД).
 app.post('/settings/invisible', async (req, res) => {
-  const { nick, enabled } = req.body;
+  const { enabled } = req.body; const nick = req.nick;
   if (!nick || typeof enabled !== 'boolean') return res.json({ ok: false, error: 'Невірні параметри' });
   // Захист: невидимість доступна лише EION (системний акаунт).
   if (nick !== COMPANY_NICK) return res.json({ ok: false, error: 'Недоступно' });
@@ -1107,7 +1111,7 @@ app.post('/settings/invisible', async (req, res) => {
 });
 
 app.post('/settings/block-incoming', async (req, res) => {
-  const { nick, enabled } = req.body;
+  const { enabled } = req.body; const nick = req.nick;
   if (!nick || typeof enabled !== 'boolean') return res.json({ ok: false, error: 'Невірні параметри' });
   const { error } = await supabase.from('users').update({ block_incoming: enabled }).eq('nick', nick);
   if (error) return res.json({ ok: false, error: 'Помилка збереження' });
@@ -1118,7 +1122,7 @@ app.post('/settings/block-incoming', async (req, res) => {
 });
 
 app.post('/contact/unblock', async (req, res) => {
-  const { nick, targetNick } = req.body;
+  const { targetNick } = req.body; const nick = req.nick;
   if (!nick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
   await supabase.from('blocked_contacts').delete().eq('blocker_nick', nick).eq('blocked_nick', targetNick);
   res.json({ ok: true });
@@ -1186,7 +1190,7 @@ app.get('/group/messages', async (req, res) => {
 
 // Очистити історію групи лише для себе (персистентний маркер часу)
 app.post('/group/clear-history', async (req, res) => {
-  const { groupId, nick } = req.body;
+  const { groupId } = req.body; const nick = req.nick;
   if (!groupId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   await supabase.from('group_history_cleared').upsert({ nick, group_id: groupId, cleared_at: Date.now() }, { onConflict: 'nick,group_id' });
   res.json({ ok: true });
@@ -1319,7 +1323,7 @@ app.post('/shop/buy-pack', async (req, res) => {
 });
 
 app.post('/group/update', async (req, res) => {
-  const { groupId, requesterNick, name, avatarUrl } = req.body;
+  const { groupId, name, avatarUrl } = req.body; const requesterNick = req.nick;
   if (!groupId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
   if (!member || !['creator', 'moderator'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1337,7 +1341,7 @@ app.get('/ping', (req, res) => res.json({ ok: true }));
 // ── Закріплені повідомлення груп ──────────────────────────────
 // Закріпити (creator/moderator). Клієнт шле прев'ю (text) + автора (from) + msgId.
 app.post('/group/pin', async (req, res) => {
-  const { groupId, requesterNick, msgId, text, from } = req.body;
+  const { groupId, msgId, text, from } = req.body; const requesterNick = req.nick;
   if (!groupId || !requesterNick || !msgId) return res.json({ ok: false, error: 'Невірні параметри' });
   if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Недостатньо прав' });
   const pinnedAt = Date.now();
@@ -1348,7 +1352,7 @@ app.post('/group/pin', async (req, res) => {
 
 // Відкріпити (creator/moderator)
 app.post('/group/unpin', async (req, res) => {
-  const { groupId, requesterNick } = req.body;
+  const { groupId } = req.body; const requesterNick = req.nick;
   if (!groupId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   if (!(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('groups').update({ pinned_msg_id: null, pinned_text: null, pinned_from: null, pinned_at: null }).eq('id', groupId);
@@ -1359,7 +1363,7 @@ app.post('/group/unpin', async (req, res) => {
 
 // ── Закріплені пости каналів (owner/admin) ──────────────────────────────
 app.post('/channel/pin', async (req, res) => {
-  const { channelId, requesterNick, postId, text, from } = req.body;
+  const { channelId, postId, text, from } = req.body; const requesterNick = req.nick;
   if (!channelId || !requesterNick || !postId) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1370,7 +1374,7 @@ app.post('/channel/pin', async (req, res) => {
 });
 
 app.post('/channel/unpin', async (req, res) => {
-  const { channelId, requesterNick } = req.body;
+  const { channelId } = req.body; const requesterNick = req.nick;
   if (!channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1382,7 +1386,7 @@ app.post('/channel/unpin', async (req, res) => {
 
 // ── Канали ──────────────────────────────────────
 app.post('/channel/create', async (req, res) => {
-  const { ownerNick, name, description, type, subscribers } = req.body;
+  const { name, description, type, subscribers } = req.body; const ownerNick = req.nick;
   if (!ownerNick || !name || name.trim().length < 1) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: channel, error } = await supabase.from('channels').insert({
     name: name.trim(), description: description || null,
@@ -1442,7 +1446,7 @@ app.get('/channel/search', async (req, res) => {
 });
 
 app.post('/channel/subscribe', async (req, res) => {
-  const { channelId, nick } = req.body; if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { channelId } = req.body; const nick = req.nick; if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: channel } = await supabase.from('channels').select('type').eq('id', channelId).single();
   if (!channel) return res.json({ ok: false, error: 'Канал не знайдено' });
   if (channel.type === 'private') return res.json({ ok: false, error: 'Приватний канал — тільки за запрошенням' });
@@ -1455,7 +1459,7 @@ app.post('/channel/subscribe', async (req, res) => {
 });
 
 app.post('/channel/unsubscribe', async (req, res) => {
-  const { channelId, nick } = req.body; if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { channelId } = req.body; const nick = req.nick; if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
   if (!member) return res.json({ ok: false, error: 'Ви не підписані' });
   if (member.role === 'owner') return res.json({ ok: false, error: 'Власник не може відписатись — видаліть канал' });
@@ -1500,7 +1504,7 @@ app.get('/channel/messages', async (req, res) => {
 
 // POST /channel/message — підтримує text, imageUrl, fileData, fileName
 app.post('/channel/message', async (req, res) => {
-  const { channelId, fromNick, text, imageUrl, fileData, fileName, waveform, durationSec, forwardedFrom } = req.body;
+  const { channelId, text, imageUrl, fileData, fileName, waveform, durationSec, forwardedFrom } = req.body; const fromNick = req.nick;
   if (!channelId || !fromNick || (!text && !imageUrl && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Тільки власник або адмін може писати' });
@@ -1526,7 +1530,7 @@ app.post('/channel/message', async (req, res) => {
 
 // Редагування поста (обидва шляхи для сумісності)
 app.post('/channel/message/edit', async (req, res) => {
-  const { channelId, postId, nick, content } = req.body;
+  const { channelId, postId, content } = req.body; const nick = req.nick;
   if (!channelId || !postId || !nick || !content) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
   const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
@@ -1539,7 +1543,7 @@ app.post('/channel/message/edit', async (req, res) => {
 });
 
 app.post('/channel/edit-message', async (req, res) => {
-  const { channelId, postId, fromNick, text } = req.body;
+  const { channelId, postId, text } = req.body; const fromNick = req.nick;
   if (!channelId || !postId || !fromNick || !text) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   const { data: post } = await supabase.from('channel_messages').select('from_nick').eq('id', postId).single();
@@ -1553,7 +1557,7 @@ app.post('/channel/edit-message', async (req, res) => {
 
 // Видалення поста (обидва шляхи)
 app.post('/channel/message/delete', async (req, res) => {
-  const { channelId, postId, nick } = req.body;
+  const { channelId, postId } = req.body; const nick = req.nick;
   if (!postId || !channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
   const { data: post } = await supabase.from('channel_messages').select('from_nick, image_url, file_data').eq('id', postId).single();
@@ -1571,7 +1575,7 @@ app.post('/channel/message/delete', async (req, res) => {
 });
 
 app.delete('/channel/post', async (req, res) => {
-  const { postId, channelId, requesterNick } = req.body;
+  const { postId, channelId } = req.body; const requesterNick = req.nick;
   if (!postId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   const { data: post } = await supabase.from('channel_messages').select('from_nick, image_url, file_data').eq('id', postId).single();
@@ -1618,7 +1622,7 @@ app.get('/channel/comments', async (req, res) => {
 });
 
 app.post('/channel/comment', async (req, res) => {
-  const { channelId, postId, fromNick, text, fileData, fileName, waveform, durationSec, replyToNick, replyToText, replyToImage, replyToId } = req.body;
+  const { channelId, postId, text, fileData, fileName, waveform, durationSec, replyToNick, replyToText, replyToImage, replyToId } = req.body; const fromNick = req.nick;
   if (!channelId || !postId || !fromNick || (!text && !fileData)) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі' });
@@ -1635,7 +1639,7 @@ app.post('/channel/comment', async (req, res) => {
 });
 
 app.post('/channel/post/comments-toggle', async (req, res) => {
-  const { channelId, postId, requesterNick, enabled } = req.body;
+  const { channelId, postId, enabled } = req.body; const requesterNick = req.nick;
   if (!channelId || !postId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1647,7 +1651,7 @@ app.post('/channel/post/comments-toggle', async (req, res) => {
 // Модель спрощена (на відміну від груп): другу галочку дає ПЕРШИЙ читач,
 // синьої «прочитали всі» в каналах немає — множина підписників невизначена.
 app.post('/channel/comments/read', async (req, res) => {
-  const { postId, nick } = req.body;
+  const { postId } = req.body; const nick = req.nick;
   if (!postId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: rows } = await supabase.from('channel_comments')
     .select('id, from_nick, read_by')
@@ -1668,7 +1672,7 @@ app.post('/channel/comments/read', async (req, res) => {
 });
 
 app.delete('/channel/comment', async (req, res) => {
-  const { commentId, channelId, requesterNick } = req.body;
+  const { commentId, channelId } = req.body; const requesterNick = req.nick;
   if (!commentId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: comment } = await supabase.from('channel_comments').select('from_nick, file_data').eq('id', commentId).single();
   if (!comment) return res.json({ ok: false, error: 'Коментар не знайдено' });
@@ -1683,7 +1687,7 @@ app.delete('/channel/comment', async (req, res) => {
 
 // Реакція на коментар (toggle) — дзеркало /channel/reaction
 app.post('/channel/comment/reaction', async (req, res) => {
-  const { commentId, channelId, nick, emoji } = req.body;
+  const { commentId, channelId, emoji } = req.body; const nick = req.nick;
   if (!commentId || !channelId || !nick || !emoji) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані' });
@@ -1701,7 +1705,7 @@ app.post('/channel/comment/reaction', async (req, res) => {
 
 // Редагування коментаря (свій або owner/admin) — дзеркало /channel/message/edit
 app.post('/channel/comment/edit', async (req, res) => {
-  const { channelId, commentId, nick, content } = req.body;
+  const { channelId, commentId, content } = req.body; const nick = req.nick;
   if (!channelId || !commentId || !nick || !content) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: comment } = await supabase.from('channel_comments').select('from_nick, post_id').eq('id', commentId).single();
   if (!comment) return res.json({ ok: false, error: 'Коментар не знайдено' });
@@ -1716,7 +1720,7 @@ app.post('/channel/comment/edit', async (req, res) => {
 
 // Інкремент переглядів поста
 app.post('/channel/view', async (req, res) => {
-  const { postId, nick } = req.body;
+  const { postId } = req.body; const nick = req.nick;
   if (!postId) return res.json({ ok: false });
   const { data: post } = await supabase.from('channel_messages').select('view_count, channel_id').eq('id', postId).single();
   if (!post) return res.json({ ok: false });
@@ -1735,7 +1739,7 @@ app.post('/channel/view', async (req, res) => {
 
 // Реакції
 app.post('/channel/reaction', async (req, res) => {
-  const { postId, channelId, nick, emoji } = req.body;
+  const { postId, channelId, emoji } = req.body; const nick = req.nick;
   if (!postId || !channelId || !nick || !emoji) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані' });
@@ -1752,7 +1756,7 @@ app.post('/channel/reaction', async (req, res) => {
 
 // Модерація каналу
 app.post('/channel/block-subscriber', async (req, res) => {
-  const { channelId, ownerNick, targetNick } = req.body;
+  const { channelId, targetNick } = req.body; const ownerNick = req.nick;
   if (!channelId || !ownerNick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1770,7 +1774,7 @@ app.get('/channel/blocked-list', async (req, res) => {
 });
 
 app.post('/channel/unblock-subscriber', async (req, res) => {
-  const { channelId, ownerNick, targetNick } = req.body;
+  const { channelId, targetNick } = req.body; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('channel_blocked').delete().eq('channel_id', channelId).eq('nick', targetNick);
@@ -1778,7 +1782,7 @@ app.post('/channel/unblock-subscriber', async (req, res) => {
 });
 
 app.post('/channel/remove-subscriber', async (req, res) => {
-  const { channelId, ownerNick, targetNick } = req.body;
+  const { channelId, targetNick } = req.body; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('nick', targetNick);
@@ -1787,7 +1791,7 @@ app.post('/channel/remove-subscriber', async (req, res) => {
 });
 
 app.post('/channel/set-admin', async (req, res) => {
-  const { channelId, ownerNick, targetNick, isAdmin } = req.body;
+  const { channelId, targetNick, isAdmin } = req.body; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Тільки власник може призначати адмінів' });
   await supabase.from('channel_members').update({ role: isAdmin ? 'admin' : 'subscriber' }).eq('channel_id', channelId).eq('nick', targetNick);
@@ -1805,7 +1809,7 @@ app.get('/channel/subscribers', async (req, res) => {
 });
 
 app.post('/channel/invite', async (req, res) => {
-  const { channelId, ownerNick, targetNick } = req.body;
+  const { channelId, targetNick } = req.body; const ownerNick = req.nick;
   if (!channelId || !ownerNick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1827,7 +1831,7 @@ app.post('/channel/invite', async (req, res) => {
 });
 
 app.post('/channel/invite-response', async (req, res) => {
-  const { channelId, nick, accepted } = req.body;
+  const { channelId, accepted } = req.body; const nick = req.nick;
   if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   await supabase.from('pending_channel_invites').delete().eq('channel_id', channelId).eq('target_nick', nick);
   if (!accepted) return res.json({ ok: true });
@@ -1913,7 +1917,7 @@ app.post('/channel/subscribe-paid', async (req, res) => {
 
 // Власник вмикає/вимикає платність і ставить ціну/період
 app.post('/channel/set-paid', async (req, res) => {
-  const { channelId, requesterNick, isPaid, price, subDays } = req.body;
+  const { channelId, isPaid, price, subDays } = req.body; const requesterNick = req.nick;
   if (!channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Лише власник' });
@@ -1922,7 +1926,7 @@ app.post('/channel/set-paid', async (req, res) => {
 });
 
 app.post('/channel/update', async (req, res) => {
-  const { channelId, ownerNick, name, description, type, avatar_url, comments_allow_media } = req.body;
+  const { channelId, name, description, type, avatar_url, comments_allow_media } = req.body; const ownerNick = req.nick;
   if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1953,7 +1957,7 @@ function extractYouTubeId(url) {
 
 // Почати трансляцію: власник вставляє YouTube-посилання.
 app.post('/channel/stream/start', async (req, res) => {
-  const { channelId, ownerNick, url } = req.body;
+  const { channelId, url } = req.body; const ownerNick = req.nick;
   if (!channelId || !ownerNick || !url) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1986,7 +1990,7 @@ app.post('/channel/stream/start', async (req, res) => {
 
 // Завершити трансляцію: live_active=false, live_url лишається як запис.
 app.post('/channel/stream/stop', async (req, res) => {
-  const { channelId, ownerNick } = req.body;
+  const { channelId } = req.body; const ownerNick = req.nick;
   if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав' });
@@ -1996,7 +2000,7 @@ app.post('/channel/stream/stop', async (req, res) => {
 });
 
 app.post('/channel/delete', async (req, res) => {
-  const { channelId, ownerNick } = req.body;
+  const { channelId } = req.body; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Тільки власник може видалити канал' });
   // Збираємо файли постів і коментарів перед видаленням — щоб прибрати зі Storage.
@@ -2015,7 +2019,7 @@ app.post('/channel/delete', async (req, res) => {
 
 // ── Модерація платформи ────────────────────────
 app.post('/report', async (req, res) => {
-  const { reporterNick, targetNick, reason, context } = req.body;
+  const { targetNick, reason, context } = req.body; const reporterNick = req.nick;
   if (!reporterNick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри' });
   await supabase.from('reports').insert({ reporter_nick: reporterNick, target_nick: targetNick, reason: reason || null, context: context || null, created_at: Date.now() });
   res.json({ ok: true });
@@ -2038,6 +2042,7 @@ app.post('/admin/ban', async (req, res) => {
   const { targetNick, reason } = req.body;
   await supabase.from('platform_bans').upsert({ nick: targetNick, reason: reason || null, banned_at: Date.now(), banned_by: COMPANY_NICK });
   const t = onlineUsers.get(targetNick); if (t) { t.ws.send(JSON.stringify({ type: 'kicked', reason: 'Акаунт заблоковано' })); t.ws.close(); }
+  await destroySessionsForNick(targetNick); // забанений не має лишатись автентифікованим
   res.json({ ok: true });
 });
 
