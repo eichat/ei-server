@@ -264,6 +264,20 @@ function sendToUser(nick, payload) {
   }
 }
 
+// Онлайн-запис адресата ЛИШЕ якщо сокет справді живий (readyState OPEN +
+// heartbeat). Мертвий сокет (code=1006 на Render, ще не прибраний delete/
+// heartbeat) прибираємо й вважаємо офлайн. Критично для доставки: інакше
+// target «є», повідомлення позначається delivered=true і йде в нікуди —
+// при повторному вході (delivered=false) його вже не виберуть → втрата.
+function liveTarget(nick) {
+  const t = onlineUsers.get(nick);
+  if (!t) return null;
+  if (t.ws && t.ws.readyState === 1 /* OPEN */ && t.ws.isAlive !== false) return t;
+  onlineUsers.delete(nick);
+  return null;
+}
+function isLive(nick) { return liveTarget(nick) !== null; }
+
 // Журнал грошових операцій (append-only). Запис НЕ має ламати саму операцію:
 // якщо лог не записався — гроші вже перемістились, тож просто ковтаємо помилку.
 // Викликати ПІСЛЯ успішної зміни балансу, окремим рядком на кожну "половинку".
@@ -827,7 +841,15 @@ app.get('/missed-calls', async (req, res) => {
     .in('status', ['missed', 'no_answer'])
     .gt('started_at', sinceTs)
     .order('started_at', { ascending: false });
-  res.json({ ok: true, missed: data || [] });
+  // Дедуп: один дзвінок може лишити і 'missed' (сервер, offer-time), і
+  // 'no_answer' (той-хто-дзвонив, скасування) — близькі за часом від того ж
+  // відправника. Згортаємо в один запис, щоб не рахувати двічі.
+  const missed = [];
+  for (const c of data || []) {
+    if (missed.some(k => k.from_nick === c.from_nick && Math.abs(k.started_at - c.started_at) < 10000)) continue;
+    missed.push(c);
+  }
+  res.json({ ok: true, missed });
 });
 
 // ── Групи ──────────────────────────────────────
@@ -2054,7 +2076,7 @@ wss.on('connection', (ws) => {
         // Відправник сам пише — якщо в НЬОГО ввімкнено блок, адресат потрапляє
         // в його allowlist (зможе відповісти).
         await grantAllowlistIfBlocking(userNick, msg.to);
-        const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const target = onlineUsers.get(msg.to); const msgId = msg.msgId || null;
+        const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const target = liveTarget(msg.to); const msgId = msg.msgId || null;
         const status = target ? 'delivered' : 'sent';
         const hasFile = msg.isFile && (msg.fileData || msg.fileUrl);
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: hasFile ? 'file' : 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(hasFile ? { file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
@@ -2094,7 +2116,7 @@ wss.on('connection', (ws) => {
           const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
           if (!membership) return;
           const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
-          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
+          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && isLive(n));
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'sticker' });
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'sticker', groupId: msg.groupId, from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId }));
           notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
@@ -2106,7 +2128,7 @@ wss.on('connection', (ws) => {
             return;
           }
           await grantAllowlistIfBlocking(userNick, msg.to);
-          const target = onlineUsers.get(msg.to);
+          const target = liveTarget(msg.to);
           const status = target ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'sticker', content, timestamp: ts, delivered: !!target, msg_id: msgId, status });
           if (target) { target.ws.send(JSON.stringify({ type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
@@ -2121,7 +2143,7 @@ wss.on('connection', (ws) => {
           const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
           if (!membership) return;
           const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
-          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
+          const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && isLive(n));
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: fileData, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, (members || []).map(m => m.nick).filter(n => n !== userNick)); // 2C
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
@@ -2133,7 +2155,7 @@ wss.on('connection', (ws) => {
             return;
           }
           await grantAllowlistIfBlocking(userNick, msg.to);
-          const target = onlineUsers.get(msg.to); const status = target ? 'delivered' : 'sent';
+          const target = liveTarget(msg.to); const status = target ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, [msg.to]); // 2C
           if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
@@ -2159,7 +2181,7 @@ wss.on('connection', (ws) => {
         const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single();
         if (!membership) return;
         const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
-        const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && onlineUsers.has(n));
+        const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && isLive(n));
         await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], ...(msg.isFile ? { type: 'file', file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
         notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
@@ -2253,15 +2275,30 @@ wss.on('connection', (ws) => {
         } else {
           if (target) { onlineUsers.delete(msg.to); console.log(`call_offer: ${msg.to} stale socket → FCM`); }
           const hasToken = fcmTokens.has(msg.to);
+          // Missed-лог створюємо ЗАВЖДИ, коли доставити наживо не вдалось —
+          // і для FCM (адресат у фоні/офлайн, пуш міг не розбудити), і без токена.
+          // Це єдиний запис, який БАЧИТЬ адресат: no_answer від того-хто-дзвонив
+          // для нього фільтрується. Якщо пуш розбудить і дзвінок приймуть —
+          // цей запис приберемо в call_answer (див. нижче).
+          await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
           if (hasToken) {
             await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
           } else {
             ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
-            await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
           }
         }
       }
-      if (msg.type === 'call_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer })); }
+      if (msg.type === 'call_answer') {
+        const target = onlineUsers.get(msg.to);
+        if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer }));
+        // Дзвінок таки прийняли (FCM розбудив) → прибираємо передчасний missed-лог
+        // цієї пари (from=той-хто-дзвонив=msg.to, to=я=userNick) за останні 2 хв.
+        try {
+          await supabase.from('call_logs').delete()
+            .eq('from_nick', msg.to).eq('to_nick', userNick).eq('status', 'missed')
+            .gt('started_at', Date.now() - 120000);
+        } catch (_) {}
+      }
       if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
       // Перемикання аудіо↔відео посеред дзвінка (renegotiation)
       if (msg.type === 'call_renegotiate') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_renegotiate', from: userNick, offer: msg.offer })); }
