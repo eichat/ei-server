@@ -8,6 +8,8 @@ const admin = require('firebase-admin');
 const https = require('https');
 const httpModule = require('http');
 const crypto = require('crypto');
+const net = require('net');
+const dnsp = require('dns').promises;
 
 const app = express();
 // Системний акаунт компанії — сюди надходить комісія з платних операцій
@@ -140,7 +142,7 @@ app.get('/stats', (req, res) => {
 });
 
 
-const BCRYPT_ROUNDS = 8;
+const BCRYPT_ROUNDS = 10; // аудит #9: підняли з 8 (лише нові/змінені паролі)
 const REQUIRE_EMAIL_VERIFICATION = false;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -212,6 +214,31 @@ setInterval(() => {
   for (const [p, exp] of verifiedPhones) if (now > exp) verifiedPhones.delete(p);
 }, 120000);
 
+// ── Захист від SSRF (аудит #6) ────────────────
+// Дозволяємо лише http(s) і публічні IP: блокуємо loopback/приватні/link-local
+// (напр. 127.0.0.1, 169.254.169.254 метадані хмари, 10/8, 192.168/16).
+function isPrivateIp(ip) {
+  if (net.isIPv4(ip)) {
+    const p = ip.split('.').map(Number);
+    return p[0] === 0 || p[0] === 10 || p[0] === 127
+      || (p[0] === 169 && p[1] === 254) || (p[0] === 172 && p[1] >= 16 && p[1] <= 31)
+      || (p[0] === 192 && p[1] === 168) || (p[0] === 100 && p[1] >= 64 && p[1] <= 127);
+  }
+  const lo = ip.toLowerCase().replace(/^\[|\]$/g, '');
+  return lo === '::1' || lo === '::' || lo.startsWith('fc') || lo.startsWith('fd')
+    || lo.startsWith('fe8') || lo.startsWith('fe9') || lo.startsWith('fea') || lo.startsWith('feb')
+    || lo.startsWith('::ffff:');
+}
+async function assertPublicUrl(u) {
+  let parsed;
+  try { parsed = new URL(u); } catch { throw new Error('Невірний URL'); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Схема заборонена');
+  const host = parsed.hostname;
+  const addrs = net.isIP(host) ? [host] : (await dnsp.lookup(host, { all: true })).map(a => a.address);
+  if (addrs.length === 0) throw new Error('DNS');
+  for (const ip of addrs) if (isPrivateIp(ip)) throw new Error('Приватна адреса заборонена');
+}
+
 // ── Link Preview ──────────────────────────────
 app.get('/link-preview', async (req, res) => {
   const { url } = req.query;
@@ -219,6 +246,7 @@ app.get('/link-preview', async (req, res) => {
   const cached = linkPreviewCache.get(url);
   if (cached) return res.json({ ok: true, ...cached.data });
   try {
+    await assertPublicUrl(url); // SSRF-захист
     const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
     if (ytMatch) {
       const videoId = ytMatch[1];
@@ -248,11 +276,17 @@ function fetchJson(url) {
   });
 }
 
-function fetchUrl(url) {
+function fetchUrl(url, depth = 0) {
   return new Promise((resolve, reject) => {
+    if (depth > 4) return reject(new Error('Забагато редіректів'));
     const client = url.startsWith('https') ? https : httpModule;
     const req = client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EIONBot/1.0)', 'Accept': 'text/html' }, timeout: 8000 }, (resp) => {
-      if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) return fetchUrl(resp.headers.location).then(resolve).catch(reject);
+      if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
+        // SSRF: редірект теж валідуємо (міг вести на приватну адресу).
+        const loc = new URL(resp.headers.location, url).toString();
+        resp.destroy();
+        return assertPublicUrl(loc).then(() => fetchUrl(loc, depth + 1)).then(resolve).catch(reject);
+      }
       let data = ''; resp.setEncoding('utf8');
       resp.on('data', chunk => { data += chunk; if (data.length > 100000) { resp.destroy(); resolve(data); } });
       resp.on('end', () => resolve(data));
@@ -551,9 +585,14 @@ app.post('/verify-email', async (req, res) => {
   const pending = pendingRegistrations.get(email); if (!pending) return res.json({ ok: false, error: 'Реєстрацію не знайдено' });
   if (Date.now() > pending.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (pending.code !== code) return res.json({ ok: false, error: 'Невірний код' });
-  const { error } = await supabase.from('users').insert({ nick: pending.nick, nick_lower: pending.nick.toLowerCase(), password_hash: pending.passwordHash, email, color: pending.color, coins: 50 });
+  // Аудит #10: було pending.passwordHash (undefined) → акаунт без пароля.
+  // Правильне поле — password_hash (з userData). Вставляємо повний набір полів.
+  const { code: _c, expires: _e, ...userData } = pending;
+  const { error } = await supabase.from('users').insert(userData);
   if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
-  pendingRegistrations.delete(email); res.json({ ok: true });
+  pendingRegistrations.delete(email);
+  const token = await createSession(pending.nick);
+  res.json({ ok: true, token, nick: pending.nick });
 });
 
 app.post('/login', async (req, res) => {
@@ -805,11 +844,17 @@ app.get('/search-user', async (req, res) => {
 });
 
 app.post('/users/by-phones', async (req, res) => {
-  const { phones } = req.body;
+  let { phones } = req.body;
   if (!phones || !Array.isArray(phones) || phones.length === 0) return res.json({ ok: false, error: 'Невірні параметри' });
-  const { data } = await supabase.from('users').select('nick, phone_normalized').not('phone_normalized', 'is', null).eq('phone_verified', true);
+  // Аудит #7: фільтруємо В ЗАПИТІ (не вивантажуємо всі номери в пам'ять) +
+  // обмежуємо розмір списку, щоб не можна було перебирати всю базу за раз.
+  phones = phones.filter(p => typeof p === 'string').slice(0, 2000);
+  const { data } = await supabase.from('users')
+    .select('nick, phone_normalized')
+    .eq('phone_verified', true)
+    .in('phone_normalized', phones);
   const result = {};
-  for (const user of data || []) { if (phones.includes(user.phone_normalized)) result[user.phone_normalized] = user.nick; }
+  for (const user of data || []) result[user.phone_normalized] = user.nick;
   res.json({ ok: true, users: result });
 });
 
