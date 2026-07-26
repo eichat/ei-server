@@ -160,41 +160,42 @@ const nickDevices = new Map();
 const pendingCallOffers = new Map();
 const linkPreviewCache = new Map();
 
-// ── Сесійні токени (Фаза 1 аудиту) ──────────────────────────────────────────
-// token -> { nick, deviceId }. In-memory (сервер одноінстансний), персиститься
-// в таблиці sessions (loadSessions при старті). resolveSession — гарячий шлях
-// (кожен HTTP-запит + WS-login), тому лише пам'ять, без запиту до БД.
-const sessions = new Map();
-async function loadSessions() {
-  try {
-    const { data } = await supabase.from('sessions').select('token, nick, device_id');
-    for (const s of data || []) sessions.set(s.token, { nick: s.nick, deviceId: s.device_id || null });
-    console.log(`[sessions] loaded ${sessions.size}`);
-  } catch (e) { console.error('[sessions] load error:', e.message); }
-}
-async function createSession(nick, deviceId = null) {
-  const token = crypto.randomBytes(32).toString('hex');
-  const now = Date.now();
-  sessions.set(token, { nick, deviceId });
-  try { await supabase.from('sessions').insert({ token, nick, device_id: deviceId, created_at: now, last_seen: now }); }
-  catch (e) { console.error('[sessions] insert error:', e.message); }
-  return token;
+// ── Сесійні токени (Фаза 1 аудиту): STATELESS HMAC ──────────────────────────
+// Перша версія тримала токени в таблиці sessions, але сервер НЕ service_role —
+// INSERT мовчки падав (таблиця лишалась порожньою), тож токени жили лише в
+// пам'яті й гинули на кожному рестарті/спін-дауні Render → кік-цикл. Плюс anon
+// (ключ у APK) міг ЧИТАТИ ту таблицю. Тому перейшли на підписані токени:
+//   token = base64url(payload).base64url(HMAC-SHA256(payload, SECRET))
+//   payload = {n: nick, t: issuedAt}
+// Переваги: без БД (переживає рестарти), без anon-експозиції, миттєва перевірка.
+// Секрет — з env (окремий SESSION_SECRET; як запасний — уже наявний
+// EION_ADMIN_SECRET, щоб не вимагати нового env). Відкликання (logout/delete)
+// не миттєве — прийнятно для пре-релізу; бан лишається дійсним, бо WS-login
+// окремо перевіряє platform_bans.
+const SESSION_SECRET = process.env.SESSION_SECRET || process.env.EION_ADMIN_SECRET || null;
+function createSessionToken(nick) {
+  const payload = Buffer.from(JSON.stringify({ n: nick, t: Date.now() })).toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET || 'insecure-dev').update(payload).digest('base64url');
+  return `${payload}.${sig}`;
 }
 function resolveSession(token) {
-  if (!token) return null;
-  const s = sessions.get(token);
-  return s ? s.nick : null;
+  if (!token || typeof token !== 'string' || !SESSION_SECRET) return null;
+  const i = token.lastIndexOf('.');
+  if (i <= 0) return null;
+  const payload = token.slice(0, i);
+  const sig = token.slice(i + 1);
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  const a = Buffer.from(sig), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  try { return JSON.parse(Buffer.from(payload, 'base64url').toString()).n || null; }
+  catch (_) { return null; }
 }
-async function destroySession(token) {
-  if (!token) return;
-  sessions.delete(token);
-  try { await supabase.from('sessions').delete().eq('token', token); } catch (_) {}
-}
-// Усі сесії ніка (при зміні ніка / видаленні акаунта / бані).
-async function destroySessionsForNick(nick) {
-  for (const [tok, s] of sessions) if (s.nick === nick) sessions.delete(tok);
-  try { await supabase.from('sessions').delete().eq('nick', nick); } catch (_) {}
-}
+// Сумісність зі старими викликами (async). БД більше не потрібна.
+async function createSession(nick, _deviceId = null) { return createSessionToken(nick); }
+// Stateless → миттєвого відкликання немає (no-op). Бан діє через platform_bans
+// у WS-login; зміна ніка видає новий токен; клієнт при виході стирає свій.
+async function destroySession(_token) {}
+async function destroySessionsForNick(_nick) {}
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
@@ -779,7 +780,6 @@ async function loadInvisibleNicks() {
   } catch (e) { console.error('[loadInvisibleNicks]', e.message); }
 }
 loadInvisibleNicks();
-loadSessions();
 
 // Приватний presence: повертаємо лише тих із КОНТАКТІВ запитувача, хто онлайн.
 // (Раніше GET віддавав список УСІХ онлайн будь-кому — витік ніків + не масштабно.)
