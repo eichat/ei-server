@@ -7,6 +7,7 @@ const { createClient } = require('@supabase/supabase-js');
 const admin = require('firebase-admin');
 const https = require('https');
 const httpModule = require('http');
+const crypto = require('crypto');
 
 const app = express();
 // Системний акаунт компанії — сюди надходить комісія з платних операцій
@@ -92,9 +93,32 @@ function makeRateLimiter({ windowMs, max }) {
 
 // Загальний помірний ліміт на всі HTTP-запити
 app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120 }));
-// Суворіший ліміт на чутливе (вхід/реєстрація/скидання) — проти brute-force
+// Суворіший ліміт на чутливе (вхід/реєстрація/скидання) — проти brute-force.
+// ВИПРАВЛЕНО (аудит #4): раніше тут були неіснуючі /request-reset,/reset-password —
+// реальні шляхи це /forgot,/reset. Плюс телефонні коди (SMS — дорого, брутфорс коду).
 const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
-app.use(['/login', '/register', '/request-reset', '/reset-password', '/verify-email'], authLimiter);
+app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/request-code', '/phone/verify-code'], authLimiter);
+
+// ── Автентифікація (Фаза 1 аудиту): ЖОРСТКИЙ режим ──────────────────────────
+// Кожен непублічний HTTP-запит вимагає валідний сесійний токен (Bearer),
+// інакше 401. req.nick береться ЛИШЕ з токена — тілу запиту більше не довіряємо
+// (це основа виправлення #1). Публічні: auth-флоу до отримання токена + health/
+// моніторинг + /admin/* (свій захист секретом X-Admin-Secret). WS автентифікується
+// окремо в login-хендлері.
+const PUBLIC_PATHS = new Set([
+  '/health', '/stats', '/ping',
+  '/login', '/register', '/forgot', '/reset', '/verify-email',
+  '/phone/request-code', '/phone/verify-code',
+]);
+app.use((req, res, next) => {
+  if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/')) return next();
+  const auth = req.headers['authorization'] || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  const nick = resolveSession(token);
+  if (!nick) return res.status(401).json({ ok: false, error: 'Не авторизовано' });
+  req.nick = nick;
+  next();
+});
 
 // ── Моніторинг ────────────────────────────────────────────────────────────
 // Публічний liveness — БЕЗ чутливих даних (його бачить будь-хто): лише «живий».
@@ -135,6 +159,42 @@ const fcmTokens = new Map();
 const nickDevices = new Map();
 const pendingCallOffers = new Map();
 const linkPreviewCache = new Map();
+
+// ── Сесійні токени (Фаза 1 аудиту) ──────────────────────────────────────────
+// token -> { nick, deviceId }. In-memory (сервер одноінстансний), персиститься
+// в таблиці sessions (loadSessions при старті). resolveSession — гарячий шлях
+// (кожен HTTP-запит + WS-login), тому лише пам'ять, без запиту до БД.
+const sessions = new Map();
+async function loadSessions() {
+  try {
+    const { data } = await supabase.from('sessions').select('token, nick, device_id');
+    for (const s of data || []) sessions.set(s.token, { nick: s.nick, deviceId: s.device_id || null });
+    console.log(`[sessions] loaded ${sessions.size}`);
+  } catch (e) { console.error('[sessions] load error:', e.message); }
+}
+async function createSession(nick, deviceId = null) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const now = Date.now();
+  sessions.set(token, { nick, deviceId });
+  try { await supabase.from('sessions').insert({ token, nick, device_id: deviceId, created_at: now, last_seen: now }); }
+  catch (e) { console.error('[sessions] insert error:', e.message); }
+  return token;
+}
+function resolveSession(token) {
+  if (!token) return null;
+  const s = sessions.get(token);
+  return s ? s.nick : null;
+}
+async function destroySession(token) {
+  if (!token) return;
+  sessions.delete(token);
+  try { await supabase.from('sessions').delete().eq('token', token); } catch (_) {}
+}
+// Усі сесії ніка (при зміні ніка / видаленні акаунта / бані).
+async function destroySessionsForNick(nick) {
+  for (const [tok, s] of sessions) if (s.nick === nick) sessions.delete(tok);
+  try { await supabase.from('sessions').delete().eq('nick', nick); } catch (_) {}
+}
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
@@ -322,7 +382,7 @@ app.get('/call-offer', (req, res) => {
 });
 
 app.post('/decline-call', (req, res) => {
-  const { fromNick, toNick } = req.body; if (!fromNick || !toNick) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { toNick } = req.body; const fromNick = req.nick; if (!fromNick || !toNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const delivered = sendToUser(toNick, { type: 'call_reject', from: fromNick });
   console.log(`[calldiag] /decline-call ${fromNick}->${toNick} reject delivered=${delivered} (socket ${delivered ? 'OPEN' : 'NOT-OPEN/absent'})`);
   res.json({ ok: true });
@@ -479,7 +539,9 @@ app.post('/register', async (req, res) => {
   } else {
     const { error } = await supabase.from('users').insert(userData);
     if (error) return res.json({ ok: false, error: 'Помилка створення акаунта' });
-    res.json({ ok: true, needVerification: false });
+    // Одразу видаємо токен — після реєстрації користувач залогінений.
+    const token = await createSession(nick, req.body.deviceId || null);
+    res.json({ ok: true, needVerification: false, token, nick });
   }
 });
 
@@ -501,7 +563,17 @@ app.post('/login', async (req, res) => {
   if (ban) return res.json({ ok: false, error: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
-  res.json({ ok: true, nick: user.nick, color: user.color, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, block_incoming: user.block_incoming === true });
+  // Сесійний токен (Фаза 1): клієнт зберігає його й шле в Authorization/WS замість ніка.
+  const token = await createSession(user.nick, req.body.deviceId || null);
+  res.json({ ok: true, token, nick: user.nick, color: user.color, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, block_incoming: user.block_incoming === true });
+});
+
+// Вихід: інвалідує токен (клієнт зве при виході з профілю).
+app.post('/logout', async (req, res) => {
+  const auth = req.headers['authorization'] || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  await destroySession(token);
+  res.json({ ok: true });
 });
 
 app.post('/forgot', async (req, res) => {
@@ -703,6 +775,7 @@ async function loadInvisibleNicks() {
   } catch (e) { console.error('[loadInvisibleNicks]', e.message); }
 }
 loadInvisibleNicks();
+loadSessions();
 
 // Приватний presence: повертаємо лише тих із КОНТАКТІВ запитувача, хто онлайн.
 // (Раніше GET віддавав список УСІХ онлайн будь-кому — витік ніків + не масштабно.)
@@ -738,7 +811,9 @@ app.post('/users/by-phones', async (req, res) => {
 
 app.post('/unregister', (req, res) => { const { nick } = req.body; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
 app.post('/register-fcm-token', (req, res) => {
-  const { nick, token, deviceId } = req.body; if (!nick || !token) return res.json({ ok: false, error: 'Невірні параметри' });
+  const { token, deviceId } = req.body; // token тут = FCM-токен (не сесійний)
+  const nick = req.nick; // Фаза 1/#14: FCM-токен реєструється ЛИШЕ на свій нік.
+  if (!nick || !token) return res.json({ ok: false, error: 'Невірні параметри' });
   fcmTokens.set(nick, token);
   if (deviceId) nickDevices.set(nick, deviceId);
   res.json({ ok: true });
@@ -769,7 +844,8 @@ app.post('/update-status', async (req, res) => {
 });
 
 app.post('/transfer-coins', async (req, res) => {
-  const { fromNick, toNick, amount } = req.body;
+  const { toNick, amount } = req.body;
+  const fromNick = req.nick; // Фаза 1: платник — ЛИШЕ автентифікований юзер, не з тіла.
   if (!fromNick || !toNick || !amount || amount < 1) return res.json({ ok: false, error: 'Невірні параметри' });
   if (fromNick === toNick) return res.json({ ok: false, error: 'Не можна переказати собі' });
   const { data: receiver } = await supabase.from('users').select('nick').eq('nick', toNick).single();
@@ -802,6 +878,8 @@ app.post('/transfer-coins', async (req, res) => {
 app.post('/call-log', async (req, res) => {
   const { fromNick, toNick, hasVideo, startedAt, durationSeconds, status } = req.body;
   if (!fromNick || !toNick || !startedAt || !status) return res.json({ ok: false, error: 'Невірні параметри' });
+  // Актор має бути учасником дзвінка (вхідний/вихідний — обидві сторони логують).
+  if (req.nick !== fromNick && req.nick !== toNick) return res.status(403).json({ ok: false, error: 'Недостатньо прав' });
   await supabase.from('call_logs').insert({ from_nick: fromNick, to_nick: toNick, has_video: hasVideo || false, started_at: startedAt, duration_seconds: durationSeconds || null, status });
   // Realtime: повідомляємо обидві онлайн-сторони перезавантажити логи (each reloads counterpart).
   // Кожен send у try/catch: мертвий сокет першого не має зривати пуш другому.
@@ -1123,7 +1201,8 @@ app.get('/check-phone', async (req, res) => {
 
 // ── Магазин Premium ──────────────────────────
 app.post('/shop/buy-premium', async (req, res) => {
-  const { nick, plan } = req.body;
+  const { plan } = req.body;
+  const nick = req.nick; // Фаза 1: покупець — автентифікований юзер.
   if (!nick || !plan) return res.json({ ok: false, error: 'Невірні параметри' });
   const PRICES = { monthly: 500, yearly: 4200 };
   const price = PRICES[plan];
@@ -1202,7 +1281,8 @@ app.get('/shop/my-packs', async (req, res) => {
 // 3) атомарно списати коіни (spend_coins);
 // 4) записати власність; якщо запис провалився — повернути коіни.
 app.post('/shop/buy-pack', async (req, res) => {
-  const { nick, packId } = req.body;
+  const { packId } = req.body;
+  const nick = req.nick; // Фаза 1: покупець — автентифікований юзер.
   if (!nick || !packId) return res.json({ ok: false, error: 'Невірні параметри' });
   // Ціна — виключно з БД (клієнт не може її підмінити).
   const { data: pack } = await supabase.from('sticker_packs').select('id, price, is_active').eq('id', packId).single();
@@ -1763,7 +1843,8 @@ app.post('/channel/invite-response', async (req, res) => {
 
 
 app.post('/channel/contact-owner', async (req, res) => {
-  const { channelId, fromNick } = req.body;
+  const { channelId } = req.body;
+  const fromNick = req.nick; // Фаза 1: платник — автентифікований юзер.
   if (!channelId || !fromNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const CONTACT_PRICE = 100; const OWNER_SHARE = 70; const COMPANY_SHARE = 30;
   const { data: channel } = await supabase.from('channels').select('owner_nick').eq('id', channelId).single();
@@ -1786,7 +1867,8 @@ app.post('/channel/contact-owner', async (req, res) => {
 
 // ── Платна підписка на канал (монети, комісія 30% платформі) ──────────────
 app.post('/channel/subscribe-paid', async (req, res) => {
-  const { channelId, nick } = req.body;
+  const { channelId } = req.body;
+  const nick = req.nick; // Фаза 1: платник — автентифікований юзер.
   if (!channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри' });
   const FEE_PCT = 30;
   const { data: ch } = await supabase.from('channels').select('owner_nick, is_paid, price, sub_days').eq('id', channelId).single();
@@ -1984,7 +2066,10 @@ wss.on('connection', (ws) => {
       const msg = JSON.parse(raw);
 
       if (msg.type === 'login') {
-        userNick = msg.nick;
+        // Автентифікація WS (Фаза 1): нік беремо з ТОКЕНА, не з msg.nick.
+        // Невалідний токен → close (жорсткий режим).
+        userNick = resolveSession(msg.token);
+        if (!userNick) { ws.send(JSON.stringify({ type: 'kicked', reason: 'Сесія недійсна, увійдіть знову' })); ws.close(); return; }
         const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', userNick).single();
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` })); ws.close(); return; }
         if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився' })); old.ws.close(); }
