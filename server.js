@@ -1053,15 +1053,27 @@ app.get('/group/list', async (req, res) => {
   const { data: groups } = await supabase.from('groups').select('*').in('id', ids);
   const readMap = await getChatReadMap(nick, 'group', ids);
   const result = [];
+  const toSeed = []; const nowTs = Date.now();
   for (const g of groups || []) {
     const { data: members } = await supabase.from('group_members').select('nick, role').eq('group_id', g.id);
     // Непрочитане = чужі повідомлення новіші за вказівник "останнє прочитане".
-    const { count: unread } = await supabase.from('group_messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('group_id', g.id).neq('from_nick', nick)
-      .gt('timestamp', readMap[g.id] || 0);
-    result.push({ ...g, members: (members || []).map(m => m.nick), memberRoles: Object.fromEntries((members || []).map(m => [m.nick, m.role])), myRole: roleMap[g.id], unread: unread || 0 });
+    // Немає вказівника (перший показ після фічі) → історія вважається прочитаною:
+    // засіваємо вказівник = зараз і повертаємо 0, інакше в бейджі світилась би ВСЯ
+    // історія. Далі рахуються лише повідомлення, новіші за цей момент.
+    const ptr = readMap[g.id];
+    let unread = 0;
+    if (ptr === undefined) {
+      toSeed.push({ nick, chat_type: 'group', chat_id: g.id, last_read_ts: nowTs });
+    } else {
+      const { count } = await supabase.from('group_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', g.id).neq('from_nick', nick)
+        .gt('timestamp', ptr);
+      unread = count || 0;
+    }
+    result.push({ ...g, members: (members || []).map(m => m.nick), memberRoles: Object.fromEntries((members || []).map(m => [m.nick, m.role])), myRole: roleMap[g.id], unread });
   }
+  if (toSeed.length) { try { await supabase.from('chat_reads').upsert(toSeed, { onConflict: 'nick,chat_type,chat_id' }); } catch (_) {} }
   res.json({ ok: true, groups: result });
 });
 
@@ -1518,13 +1530,22 @@ app.get('/channel/list', async (req, res) => {
   const { data: channels } = await supabase.from('channels').select('*').in('id', ids);
   const readMap = await getChatReadMap(nick, 'channel', ids);
   const result = [];
+  const toSeed = []; const nowTs = Date.now();
   for (const c of channels || []) {
     const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', c.id);
-    // Непрочитане = чужі пости новіші за вказівник "останнє прочитане".
-    const { count: unread } = await supabase.from('channel_messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('channel_id', c.id).neq('from_nick', nick)
-      .gt('timestamp', readMap[c.id] || 0);
+    // Непрочитане = чужі пости новіші за вказівник. Немає вказівника (перший показ)
+    // → історія прочитана: засіваємо = зараз, повертаємо 0 (інакше світилась би вся історія).
+    const ptr = readMap[c.id];
+    let unread = 0;
+    if (ptr === undefined) {
+      toSeed.push({ nick, chat_type: 'channel', chat_id: c.id, last_read_ts: nowTs });
+    } else {
+      const { count: u } = await supabase.from('channel_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('channel_id', c.id).neq('from_nick', nick)
+        .gt('timestamp', ptr);
+      unread = u || 0;
+    }
     const { data: lastPosts } = await supabase.from('channel_messages').select('content, image_url, file_name, timestamp').eq('channel_id', c.id).order('timestamp', { ascending: false }).limit(1);
     const lastPost = lastPosts && lastPosts.length > 0 ? lastPosts[0] : null;
     const lastPostAt = lastPost ? lastPost.timestamp : (c.last_post_at || c.created_at || null);
@@ -1537,8 +1558,9 @@ app.get('/channel/list', async (req, res) => {
       return raw.substring(0, 50);
     };
     const lastPostText = lastPost ? (lastPost.content ? previewText(lastPost.content) : (lastPost.image_url ? '🖼 Зображення' : (lastPost.file_name ? '📎 ' + lastPost.file_name.substring(0, 30) : ''))) : null;
-    result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0, lastPostAt, lastPostText, unread: unread || 0 });
+    result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0, lastPostAt, lastPostText, unread });
   }
+  if (toSeed.length) { try { await supabase.from('chat_reads').upsert(toSeed, { onConflict: 'nick,chat_type,chat_id' }); } catch (_) {} }
   result.sort((a, b) => (b.lastPostAt || 0) - (a.lastPostAt || 0));
   res.json({ ok: true, channels: result });
 });
