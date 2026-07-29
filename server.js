@@ -967,6 +967,31 @@ app.delete('/call-logs', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Storage 2.2 (аудит #2): підписаний upload-URL. Раніше клієнт заливав файли
+// напряму anon-ключем (він у APK → будь-хто міг заливати/перезаписувати довільні
+// файли). Тепер заливка можлива лише в автентифікованій сесії: сервер service-
+// ключем видає одноразовий підписаний URL, клієнт заливає по ньому. Після переходу
+// всіх клієнтів прибираємо anon INSERT-політики (migrations/storage_lockdown_2_2.sql).
+const STORAGE_BUCKETS = new Set(['files', 'avatars']);
+app.post('/storage/signed-upload', async (req, res) => {
+  const { bucket, path, upsert } = req.body;
+  if (!bucket || !path || !STORAGE_BUCKETS.has(bucket)) {
+    return res.json({ ok: false, error: 'Невірні параметри' });
+  }
+  // Санітизація шляху: без обходу вгору й провідного слеша, розумна довжина.
+  if (typeof path !== 'string' || path.includes('..') || path.startsWith('/') || path.length > 300) {
+    return res.json({ ok: false, error: 'Невірний шлях' });
+  }
+  try {
+    const { data, error } = await supabase.storage.from(bucket)
+      .createSignedUploadUrl(path, { upsert: upsert !== false });
+    if (error || !data) return res.json({ ok: false, error: error?.message || 'Не вдалось створити URL' });
+    res.json({ ok: true, token: data.token, path: data.path, signedUrl: data.signedUrl });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 // Пропущені дзвінки для nick ПІСЛЯ since (мс). Клієнт викликає на login_ok, щоб
 // сповістити про дзвінки, що надійшли, поки він був офлайн (сокет мертвий → лог
 // missed створюється тут-таки при call_offer, але клієнт про це не дізнавався,
