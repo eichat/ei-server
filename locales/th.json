@@ -204,7 +204,7 @@
   "msg_code_sent_to": "ส่งรหัสไปที่ {email}",
   "msg_confirm_code_sent": "ส่งรหัสยืนยันไปที่ {email}",
   "msg_password_changed": "เปลี่ยนรหัสผ่านแล้ว! โปรดเข้าสู่ระบบ",
-  "msg_password_min4": "รหัสผ่านอย่างน้อย 4 ตัวอักษร",
+  "msg_password_min8": "รหัสผ่านอย่างน้อย 8 ตัวอักษร",
   "msg_fill_all_fields": "กรุณากรอกทุกช่อง",
   "msg_fill_field": "กรุณากรอกช่องนี้",
   "msg_min_1_coin": "อย่างน้อย 1 เหรียญ",

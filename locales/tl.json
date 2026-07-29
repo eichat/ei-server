@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Ipinadala ang code sa {email}",
   "msg_confirm_code_sent": "Ipinadala ang confirmation code sa {email}",
   "msg_password_changed": "Nabago ang password! Mag-login na.",
-  "msg_password_min4": "Password min. 4 character",
+  "msg_password_min8": "Password min. 8 character",
   "msg_fill_all_fields": "Punan ang lahat ng field",
   "msg_fill_field": "Punan ang field",
   "msg_min_1_coin": "Min. 1 coin",

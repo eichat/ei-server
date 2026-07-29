@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Kod {email} adresine gönderildi",
   "msg_confirm_code_sent": "Onay kodu {email} adresine gönderildi",
   "msg_password_changed": "Şifre değiştirildi! Şimdi giriş yapın.",
-  "msg_password_min4": "Şifre en az 4 karakter",
+  "msg_password_min8": "Şifre en az 8 karakter",
   "msg_fill_all_fields": "Tüm alanları doldurun",
   "msg_fill_field": "Alanı doldurun",
   "msg_min_1_coin": "En az 1 jeton",

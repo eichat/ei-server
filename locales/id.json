@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Kode dikirim ke {email}",
   "msg_confirm_code_sent": "Kode konfirmasi dikirim ke {email}",
   "msg_password_changed": "Kata sandi diubah! Sekarang masuk.",
-  "msg_password_min4": "Kata sandi min. 4 karakter",
+  "msg_password_min8": "Kata sandi min. 8 karakter",
   "msg_fill_all_fields": "Isi semua kolom",
   "msg_fill_field": "Isi kolom",
   "msg_min_1_coin": "Min. 1 koin",

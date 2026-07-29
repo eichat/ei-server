@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Code sent to {email}",
   "msg_confirm_code_sent": "Confirmation code sent to {email}",
   "msg_password_changed": "Password changed! Please sign in.",
-  "msg_password_min4": "Password min. 4 characters",
+  "msg_password_min8": "Password min. 8 characters",
   "msg_fill_all_fields": "Please fill all fields",
   "msg_fill_field": "Please fill the field",
   "msg_min_1_coin": "Min. 1 coin",

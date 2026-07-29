@@ -561,7 +561,7 @@ async function sendGroupInvite(groupId, groupName, inviterNick, targetNick) {
 app.post('/register', async (req, res) => {
   const { nick, password, email, color, phone, phoneNormalized } = req.body;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)' });
-  if (!password || password.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 4 символи)' });
+  if (!password || password.length < 8) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 8 символів)' });
   if (email && !email.includes('@')) return res.json({ ok: false, error: 'Невірний email' });
   const { data: existing } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
   if (existing) return res.json({ ok: false, error: 'Нік вже зайнятий' });
@@ -646,7 +646,7 @@ app.post('/reset', async (req, res) => {
   const reset = resetCodes.get(email); if (!reset) return res.json({ ok: false, error: 'Код не знайдено' });
   if (Date.now() > reset.expires) return res.json({ ok: false, error: 'Код застарів' });
   if (reset.code !== code) return res.json({ ok: false, error: 'Невірний код' });
-  if (!newPassword || newPassword.length < 4) return res.json({ ok: false, error: 'Пароль занадто короткий' });
+  if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 8 символів)' });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', reset.nick.toLowerCase());
   resetCodes.delete(email); res.json({ ok: true });
@@ -699,7 +699,7 @@ app.post('/update-password', async (req, res) => {
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
-  if (!newPassword || newPassword.length < 4) return res.json({ ok: false, error: 'Новий пароль занадто короткий' });
+  if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'Новий пароль занадто короткий (мін. 8 символів)' });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', nick.toLowerCase());
   res.json({ ok: true });

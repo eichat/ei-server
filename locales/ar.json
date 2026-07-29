@@ -204,7 +204,7 @@
   "msg_code_sent_to": "تم إرسال الرمز إلى {email}",
   "msg_confirm_code_sent": "تم إرسال رمز التأكيد إلى {email}",
   "msg_password_changed": "تم تغيير كلمة المرور! يرجى تسجيل الدخول.",
-  "msg_password_min4": "كلمة المرور 4 أحرف على الأقل",
+  "msg_password_min8": "كلمة المرور 8 أحرف على الأقل",
   "msg_fill_all_fields": "يرجى ملء جميع الحقول",
   "msg_fill_field": "يرجى ملء الحقل",
   "msg_min_1_coin": "عملة واحدة على الأقل",

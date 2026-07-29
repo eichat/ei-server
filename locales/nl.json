@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Code verzonden naar {email}",
   "msg_confirm_code_sent": "Bevestigingscode verzonden naar {email}",
   "msg_password_changed": "Wachtwoord gewijzigd! Log nu in.",
-  "msg_password_min4": "Wachtwoord min. 4 tekens",
+  "msg_password_min8": "Wachtwoord min. 8 tekens",
   "msg_fill_all_fields": "Vul alle velden in",
   "msg_fill_field": "Vul het veld in",
   "msg_min_1_coin": "Min. 1 munt",

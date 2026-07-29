@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Código enviado a {email}",
   "msg_confirm_code_sent": "Código de confirmación enviado a {email}",
   "msg_password_changed": "¡Contraseña cambiada! Ahora inicia sesión.",
-  "msg_password_min4": "Contraseña mín. 4 caracteres",
+  "msg_password_min8": "Contraseña mín. 8 caracteres",
   "msg_fill_all_fields": "Rellena todos los campos",
   "msg_fill_field": "Rellena el campo",
   "msg_min_1_coin": "Mín. 1 moneda",

@@ -204,7 +204,7 @@
   "msg_code_sent_to": "{email} पर कोड भेजा गया",
   "msg_confirm_code_sent": "{email} पर पुष्टि कोड भेजा गया",
   "msg_password_changed": "पासवर्ड बदल गया! अब लॉग इन करें।",
-  "msg_password_min4": "पासवर्ड न्यूनतम 4 अक्षर",
+  "msg_password_min8": "पासवर्ड न्यूनतम 8 अक्षर",
   "msg_fill_all_fields": "सभी फ़ील्ड भरें",
   "msg_fill_field": "फ़ील्ड भरें",
   "msg_min_1_coin": "न्यूनतम 1 सिक्का",

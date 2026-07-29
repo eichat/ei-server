@@ -204,7 +204,7 @@
   "msg_code_sent_to": "{email} にコードを送信しました",
   "msg_confirm_code_sent": "{email} に確認コードを送信しました",
   "msg_password_changed": "パスワードを変更しました！ログインしてください。",
-  "msg_password_min4": "パスワードは4文字以上",
+  "msg_password_min8": "パスワードは8文字以上",
   "msg_fill_all_fields": "すべての項目を入力してください",
   "msg_fill_field": "項目を入力してください",
   "msg_min_1_coin": "最低1コイン",

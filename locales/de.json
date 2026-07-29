@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Code gesendet an {email}",
   "msg_confirm_code_sent": "Bestätigungscode gesendet an {email}",
   "msg_password_changed": "Passwort geändert! Bitte anmelden.",
-  "msg_password_min4": "Passwort mind. 4 Zeichen",
+  "msg_password_min8": "Passwort mind. 8 Zeichen",
   "msg_fill_all_fields": "Bitte alle Felder ausfüllen",
   "msg_fill_field": "Bitte Feld ausfüllen",
   "msg_min_1_coin": "Mind. 1 Coin",

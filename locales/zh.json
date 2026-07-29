@@ -204,7 +204,7 @@
   "msg_code_sent_to": "验证码已发送至 {email}",
   "msg_confirm_code_sent": "确认验证码已发送至 {email}",
   "msg_password_changed": "密码已更改！请登录。",
-  "msg_password_min4": "密码至少 4 个字符",
+  "msg_password_min8": "密码至少 8 个字符",
   "msg_fill_all_fields": "请填写所有字段",
   "msg_fill_field": "请填写该字段",
   "msg_min_1_coin": "至少 1 个金币",

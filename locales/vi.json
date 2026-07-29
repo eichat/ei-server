@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Đã gửi mã đến {email}",
   "msg_confirm_code_sent": "Đã gửi mã xác nhận đến {email}",
   "msg_password_changed": "Đã đổi mật khẩu! Hãy đăng nhập.",
-  "msg_password_min4": "Mật khẩu tối thiểu 4 ký tự",
+  "msg_password_min8": "Mật khẩu tối thiểu 8 ký tự",
   "msg_fill_all_fields": "Hãy điền tất cả các trường",
   "msg_fill_field": "Hãy điền vào trường",
   "msg_min_1_coin": "Tối thiểu 1 xu",

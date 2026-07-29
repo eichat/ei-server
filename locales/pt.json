@@ -204,7 +204,7 @@
   "msg_code_sent_to": "Código enviado para {email}",
   "msg_confirm_code_sent": "Código de confirmação enviado para {email}",
   "msg_password_changed": "Senha alterada! Agora entre.",
-  "msg_password_min4": "Senha mín. 4 caracteres",
+  "msg_password_min8": "Senha mín. 8 caracteres",
   "msg_fill_all_fields": "Preencha todos os campos",
   "msg_fill_field": "Preencha o campo",
   "msg_min_1_coin": "Mín. 1 moeda",

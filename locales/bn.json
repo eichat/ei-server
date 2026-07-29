@@ -204,7 +204,7 @@
   "msg_code_sent_to": "{email} এ কোড পাঠানো হয়েছে",
   "msg_confirm_code_sent": "{email} এ নিশ্চিতকরণ কোড পাঠানো হয়েছে",
   "msg_password_changed": "পাসওয়ার্ড পরিবর্তিত! এখন লগ ইন করুন।",
-  "msg_password_min4": "পাসওয়ার্ড সর্বনিম্ন ৪ অক্ষর",
+  "msg_password_min8": "পাসওয়ার্ড সর্বনিম্ন ৮ অক্ষর",
   "msg_fill_all_fields": "সব ক্ষেত্র পূরণ করুন",
   "msg_fill_field": "ক্ষেত্রটি পূরণ করুন",
   "msg_min_1_coin": "সর্বনিম্ন ১ কয়েন",
