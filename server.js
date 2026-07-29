@@ -373,6 +373,21 @@ function liveTarget(nick) {
 }
 function isLive(nick) { return liveTarget(nick) !== null; }
 
+// Лічильники непрочитаного (chat_reads). Повертає мапу {chat_id: last_read_ts}
+// для одного юзера й типу ('group'|'channel'). Відсутній вказівник → трактуємо як
+// 0 (усе прочитане до першого відкриття), щоб на першому запуску після цієї фічі
+// не показувати гігантський бейдж зі всієї історії. Пойнтер зсувається на
+// mark-read при відкритті/закритті чату.
+async function getChatReadMap(nick, type, ids) {
+  if (!ids || ids.length === 0) return {};
+  const { data } = await supabase.from('chat_reads')
+    .select('chat_id, last_read_ts')
+    .eq('nick', nick).eq('chat_type', type).in('chat_id', ids);
+  const map = {};
+  for (const r of data || []) map[r.chat_id] = Number(r.last_read_ts) || 0;
+  return map;
+}
+
 // Журнал грошових операцій (append-only). Запис НЕ має ламати саму операцію:
 // якщо лог не записався — гроші вже перемістились, тож просто ковтаємо помилку.
 // Викликати ПІСЛЯ успішної зміни балансу, окремим рядком на кожну "половинку".
@@ -1011,12 +1026,33 @@ app.get('/group/list', async (req, res) => {
   const ids = memberships.map(m => m.group_id);
   const roleMap = Object.fromEntries(memberships.map(m => [m.group_id, m.role]));
   const { data: groups } = await supabase.from('groups').select('*').in('id', ids);
+  const readMap = await getChatReadMap(nick, 'group', ids);
   const result = [];
   for (const g of groups || []) {
     const { data: members } = await supabase.from('group_members').select('nick, role').eq('group_id', g.id);
-    result.push({ ...g, members: (members || []).map(m => m.nick), memberRoles: Object.fromEntries((members || []).map(m => [m.nick, m.role])), myRole: roleMap[g.id] });
+    // Непрочитане = чужі повідомлення новіші за вказівник "останнє прочитане".
+    const { count: unread } = await supabase.from('group_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('group_id', g.id).neq('from_nick', nick)
+      .gt('timestamp', readMap[g.id] || 0);
+    result.push({ ...g, members: (members || []).map(m => m.nick), memberRoles: Object.fromEntries((members || []).map(m => [m.nick, m.role])), myRole: roleMap[g.id], unread: unread || 0 });
   }
   res.json({ ok: true, groups: result });
+});
+
+// Позначити групу/канал прочитаним — зсуває вказівник last_read_ts у Date.now(),
+// щоб наступний /group/list чи /channel/list дав unread=0. Клієнт кличе при
+// відкритті й закритті чату. actor-нік — із сесії (req.nick), не з тіла (аудит #1).
+app.post('/chat/mark-read', async (req, res) => {
+  const nick = req.nick;
+  const { type, id } = req.body;
+  if (!nick || (type !== 'group' && type !== 'channel') || id == null) {
+    return res.json({ ok: false, error: 'Невірні параметри' });
+  }
+  await supabase.from('chat_reads').upsert(
+    { nick, chat_type: type, chat_id: id, last_read_ts: Date.now() },
+    { onConflict: 'nick,chat_type,chat_id' });
+  res.json({ ok: true });
 });
 
 app.get('/group/search', async (req, res) => {
@@ -1455,9 +1491,15 @@ app.get('/channel/list', async (req, res) => {
   const ids = memberships.map(m => m.channel_id);
   const roleMap = Object.fromEntries(memberships.map(m => [m.channel_id, m.role]));
   const { data: channels } = await supabase.from('channels').select('*').in('id', ids);
+  const readMap = await getChatReadMap(nick, 'channel', ids);
   const result = [];
   for (const c of channels || []) {
     const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', c.id);
+    // Непрочитане = чужі пости новіші за вказівник "останнє прочитане".
+    const { count: unread } = await supabase.from('channel_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('channel_id', c.id).neq('from_nick', nick)
+      .gt('timestamp', readMap[c.id] || 0);
     const { data: lastPosts } = await supabase.from('channel_messages').select('content, image_url, file_name, timestamp').eq('channel_id', c.id).order('timestamp', { ascending: false }).limit(1);
     const lastPost = lastPosts && lastPosts.length > 0 ? lastPosts[0] : null;
     const lastPostAt = lastPost ? lastPost.timestamp : (c.last_post_at || c.created_at || null);
@@ -1470,7 +1512,7 @@ app.get('/channel/list', async (req, res) => {
       return raw.substring(0, 50);
     };
     const lastPostText = lastPost ? (lastPost.content ? previewText(lastPost.content) : (lastPost.image_url ? '🖼 Зображення' : (lastPost.file_name ? '📎 ' + lastPost.file_name.substring(0, 30) : ''))) : null;
-    result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0, lastPostAt, lastPostText });
+    result.push({ ...c, myRole: roleMap[c.id], subscriberCount: count || 0, lastPostAt, lastPostText, unread: unread || 0 });
   }
   result.sort((a, b) => (b.lastPostAt || 0) - (a.lastPostAt || 0));
   res.json({ ok: true, channels: result });
@@ -2160,8 +2202,8 @@ wss.on('connection', (ws) => {
             const { data: pendingGroup } = await supabase.from('group_messages').select('*').eq('group_id', gm.group_id).not('delivered_to', 'cs', `{"${userNick}"}`).order('timestamp', { ascending: true });
             const deliveredBySender = {}; // автор → msgIds, що аж тепер дійшли цьому юзеру
             if (pendingGroup && pendingGroup.length > 0) { for (const m of pendingGroup) {
-              if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.file_data && m.file_data.startsWith('http') ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
-              else ws.send(JSON.stringify({ type: 'group_message', groupId: m.group_id, from: m.from_nick, text: m.content, timestamp: m.timestamp, msgId: m.msg_id }));
+              if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.file_data && m.file_data.startsWith('http') ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, catchup: true, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
+              else ws.send(JSON.stringify({ type: 'group_message', groupId: m.group_id, from: m.from_nick, text: m.content, timestamp: m.timestamp, msgId: m.msg_id, catchup: true }));
               await supabase.from('group_messages').update({ delivered_to: [...(m.delivered_to || []), userNick] }).eq('id', m.id);
               if (m.msg_id && m.from_nick !== userNick) (deliveredBySender[m.from_nick] ??= []).push(m.msg_id);
             } }
