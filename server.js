@@ -2463,7 +2463,10 @@ wss.on('connection', (ws) => {
       if (msg.type === 'read_receipt') { await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to); const target = onlineUsers.get(msg.to); if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); } }
       if (msg.type === 'delete_message') { if (!sendToUser(msg.to, { type: 'delete_message', from: userNick, msgId: msg.msgId })) await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
-      if (msg.type === 'ping') { if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
+      // Застосунковий ping тримає сокет живим для heartbeat (isAlive), а не лише
+      // оновлює lastSeen: якщо Render не пропускає ПРОТОКОЛЬНІ ping/pong, сервер
+      // інакше вбивав би живий сокет кожні 30с (флапінг presence/дзвінків).
+      if (msg.type === 'ping') { ws.isAlive = true; if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
 
       if (msg.type === 'call_offer') {
         // Якщо адресат заблокував того, хто дзвонить — не з'єднуємо. Той самий
@@ -2546,7 +2549,10 @@ wss.on('connection', (ws) => {
   });
   ws.on('close', (code, reason) => {
     console.log(`[ws] close nick=${userNick || '?'} code=${code} reason=${reason ? reason.toString() : ''}`);
-    if (userNick) onlineUsers.delete(userNick);
+    // ВАЖЛИВО: видаляємо presence ЛИШЕ якщо цей сокет — досі поточний. Інакше
+    // гонка реконекту: закриття СТАРОГО сокета (після того, як login уже
+    // зареєстрував НОВИЙ) стирало б запис нового → юзер «постійно офлайн».
+    if (userNick && onlineUsers.get(userNick)?.ws === ws) onlineUsers.delete(userNick);
   });
   ws.on('error', (e) => { console.log(`[ws] error nick=${userNick || '?'}: ${e && e.message}`); });
 });
