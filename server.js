@@ -2542,8 +2542,13 @@ wss.on('connection', (ws) => {
       }
       if (msg.type === 'call_end') {
         const target = onlineUsers.get(msg.to);
-        if (target) { target.ws.send(JSON.stringify({ type: 'call_end', from: userNick })); }
-        else { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }); }
+        if (target) { try { target.ws.send(JSON.stringify({ type: 'call_end', from: userNick })); } catch (_) {} }
+        // ЗАВЖДИ шлемо й FCM (не лише коли офлайн): якщо вхідний показує НАТИВНИЙ
+        // CallActivity (offer прийшов через FCM, поки Android був у фоні), а тепер
+        // Android онлайн — сам WS-call_end нативний дзвінок не спинить. FCM-пуш
+        // прибирає CallActivity нативно; для foreground-Flutter це безпечний no-op
+        // (activeConnection == null, рингтон не грає, нотифікації 1 нема).
+        await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
       }
     } catch (e) { console.error('Помилка:', e); }
   });
