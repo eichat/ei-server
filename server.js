@@ -39,6 +39,23 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 app.use(express.json({ limit: '60mb' }));
 
+// ── Storage 2.3: підпис медіа-рефів у ВСІХ JSON-відповідях (чокпойнт HTTP) ───
+// Обгортає res.json так, що будь-який `eion://<bucket>/<path>` у тілі відповіді
+// (історія, аватари, списки) замінюється на підписаний URL. signDeep — no-op для
+// повних http-URL і не-рефів, тож поки в БД лише публічні URL, це нічого не змінює.
+// Швидкий відсів через includes('eion://'), щоб не перебудовувати відповіді дарма.
+app.use((req, res, next) => {
+  const orig = res.json.bind(res);
+  res.json = (body) => {
+    let hasRef = false;
+    try { hasRef = JSON.stringify(body).includes('eion://'); } catch (_) {}
+    if (!hasRef) return orig(body);
+    signDeep(body).then(orig).catch(() => orig(body));
+    return res;
+  };
+  next();
+});
+
 // ── Простий in-memory rate-limit (без зовнішніх залежностей) ──────────────
 // Один інстанс → лічильники в пам'яті достатньо. Коли буде кілька інстансів —
 // винести в Redis (як і sendToUser). Ключ — IP клієнта.
@@ -2320,6 +2337,20 @@ app.post('/admin/resolve-report', async (req, res) => {
 // ── WebSocket ────────────────────────────────
 wss.on('connection', (ws) => {
   let userNick = null;
+  // Storage 2.3: WS-чокпойнт. Усі релеї file/group/channel шлють напряму
+  // target.ws.send (повз sendToUser), тож підписуємо медіа-рефи тут — у будь-якому
+  // ws.send цього з'єднання. No-op, поки в тілі немає eion:// (швидкий відсів).
+  const _rawSend = ws.send.bind(ws);
+  ws.send = (data, ...rest) => {
+    if (typeof data === 'string' && data.includes('eion://')) {
+      try {
+        const obj = JSON.parse(data);
+        signDeep(obj).then((s) => _rawSend(JSON.stringify(s))).catch(() => _rawSend(data));
+        return;
+      } catch (_) { return _rawSend(data, ...rest); }
+    }
+    return _rawSend(data, ...rest);
+  };
   // Серверний heartbeat (проти code=1006: мертвий транспорт виявляємо швидко).
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); });
@@ -2362,7 +2393,12 @@ wss.on('connection', (ws) => {
 
         const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
-          for (const m of pending) ws.send(JSON.stringify(m.type === 'sticker' ? { type: 'sticker', from: m.from_nick, ...decodeStickerContent(m.content), timestamp: m.timestamp, msgId: m.msg_id } : m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, ...(m.file_data && m.file_data.startsWith('http') ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}), ...(m.reply_to_image ? { replyToImage: m.reply_to_image } : {}) }));
+          for (const m of pending) {
+            // Storage 2.3: реф (eion://) теж іде як fileUrl (не base64 data), а весь
+            // payload підписується — цей шлях повз sendToUser і res.json чокпойнти.
+            const payload = m.type === 'sticker' ? { type: 'sticker', from: m.from_nick, ...decodeStickerContent(m.content), timestamp: m.timestamp, msgId: m.msg_id } : m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, ...(m.file_data && /^(https?:\/\/|eion:\/\/)/.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}), ...(m.reply_to_image ? { replyToImage: m.reply_to_image } : {}) };
+            ws.send(JSON.stringify(await signDeep(payload)));
+          }
           await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
         }
 
