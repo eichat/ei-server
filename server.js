@@ -311,6 +311,55 @@ function parseOpenGraph(html, url) {
   return { title, description, image, siteName, domain, url };
 }
 
+// ── AI-проксі (аудит #3) ────────────────────────────────────────────────────
+// GROQ_API_KEY був у .env → пакувався в APK, будь-хто з розпакованого APK палив
+// платну квоту. Тепер клієнт шле лише messages сюди (автентифіковано — endpoint
+// не в PUBLIC_PATHS, тож req.nick є), ключ лишається на сервері. Модель і ліміти
+// ФОРСУЮТЬСЯ тут (клієнт не обере дорожчу модель / більший max_tokens), а відповідь
+// GROQ (SSE-стрім або JSON) пайпиться клієнту байт-у-байт — його парсер незмінний.
+app.post('/ai/chat', (req, res) => {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return res.status(503).json({ error: { message: 'AI недоступний' } });
+  const raw = Array.isArray(req.body && req.body.messages) ? req.body.messages : null;
+  if (!raw || raw.length === 0) return res.status(400).json({ error: { message: 'messages обовʼязкові' } });
+  // Санітизація + ліміти проти абʼюзу: лише валідні role/content-рядки, останні 40, обрізка довжини.
+  const messages = raw
+    .filter(m => m && typeof m.role === 'string' && typeof m.content === 'string')
+    .slice(-40)
+    .map(m => ({ role: m.role, content: m.content.slice(0, 8000) }));
+  if (messages.length === 0) return res.status(400).json({ error: { message: 'messages невалідні' } });
+  const stream = req.body.stream === true;
+  const payload = JSON.stringify({
+    model: 'llama-3.3-70b-versatile',   // форсуємо модель — клієнт не обирає
+    messages,
+    max_tokens: 1024,
+    temperature: 0.7,
+    stream,
+  });
+  const upstream = https.request({
+    method: 'POST',
+    hostname: 'api.groq.com',
+    path: '/openai/v1/chat/completions',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`,
+      'Content-Length': Buffer.byteLength(payload),
+    },
+    timeout: 30000,
+  }, (up) => {
+    res.status(up.statusCode || 200);
+    res.setHeader('Content-Type', up.headers['content-type'] || (stream ? 'text/event-stream' : 'application/json'));
+    if (stream) { res.setHeader('Cache-Control', 'no-cache'); res.setHeader('X-Accel-Buffering', 'no'); }
+    up.pipe(res);
+  });
+  upstream.on('timeout', () => { upstream.destroy(); if (!res.headersSent) res.status(504).json({ error: { message: 'AI таймаут' } }); else res.end(); });
+  upstream.on('error', () => { if (!res.headersSent) res.status(502).json({ error: { message: 'AI помилка' } }); else res.end(); });
+  // Клієнт закрив зʼєднання (скасував) — не тримаємо висячий запит до GROQ.
+  res.on('close', () => upstream.destroy());
+  upstream.write(payload);
+  upstream.end();
+});
+
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   const token = fcmTokens.get(toNick); if (!token) return;
   const callId = `${fromNick}_${toNick}_${Date.now()}`;
