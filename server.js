@@ -397,15 +397,75 @@ async function sendFcmPush(toNick, data) {
 // інстансів — саме тут (і лише тут) вмикається Redis pub/sub: якщо сокет не на
 // цьому інстансі, публікуємо в канал, а інстанс-власник доставить. Решта коду
 // не зміниться. Повертає true, якщо доставлено локально.
+// ── Storage 2.3: приватні бакети + підписані URL ────────────────────────────
+// У БД/повідомленнях зберігається РЕФ `eion://<bucket>/<path>`, а не публічний
+// URL. Сервер підписує реф при ВІДДАЧІ (тут — у sendToUser для живих WS; історія
+// підписується окремо). Повні http-URL (легасі-публічні) і не-рефи ПРОПУСКАЮТЬСЯ
+// без змін → поки дані ще публічні, це повний no-op (жодного зайвого запиту).
+const STORAGE_BUCKETS_SET = new Set(['files', 'avatars']);
+const SIGNED_URL_TTL = 7 * 24 * 3600;        // 7 діб життя підписаного URL
+const SIGNED_URL_REFRESH_MS = 24 * 3600 * 1000; // перепідписуємо, якщо лишилось <1 доби
+const _signedUrlCache = new Map();           // ref → { url, exp(ms) }
+
+function _parseMediaRef(value) {
+  if (typeof value !== 'string' || !value.startsWith('eion://')) return null;
+  const rest = value.slice(7);
+  const slash = rest.indexOf('/');
+  if (slash <= 0) return null;
+  const bucket = rest.slice(0, slash);
+  const path = rest.slice(slash + 1);
+  if (!STORAGE_BUCKETS_SET.has(bucket) || !path) return null;
+  return { bucket, path };
+}
+
+// Підписує один реф. Не-реф (повний URL/порожнє/звичайний текст) → повертає як є.
+// Помилка підпису → повертає вихідне значення (не валимо відповідь).
+async function signMediaRef(value) {
+  const ref = _parseMediaRef(value);
+  if (!ref) return value;
+  const now = Date.now();
+  const cached = _signedUrlCache.get(value);
+  if (cached && cached.exp - now > SIGNED_URL_REFRESH_MS) return cached.url;
+  try {
+    const { data, error } = await supabase.storage.from(ref.bucket)
+      .createSignedUrl(ref.path, SIGNED_URL_TTL);
+    if (error || !data || !data.signedUrl) return value;
+    _signedUrlCache.set(value, { url: data.signedUrl, exp: now + SIGNED_URL_TTL * 1000 });
+    return data.signedUrl;
+  } catch (_) { return value; }
+}
+
+// Рекурсивно замінює всі медіа-рефи в структурі на підписані URL.
+async function signDeep(node) {
+  if (typeof node === 'string') return signMediaRef(node);
+  if (Array.isArray(node)) return Promise.all(node.map(signDeep));
+  if (node && typeof node === 'object') {
+    const out = {};
+    for (const k of Object.keys(node)) out[k] = await signDeep(node[k]);
+    return out;
+  }
+  return node;
+}
+
 function sendToUser(nick, payload) {
   const u = onlineUsers.get(nick);
   if (!u || !u.ws || u.ws.readyState !== 1 /* OPEN */) return false;
-  try {
-    u.ws.send(typeof payload === 'string' ? payload : JSON.stringify(payload));
-    return true;
-  } catch (_) {
-    return false;
+  const raw = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  // Швидкий відсів: немає нашого префікса → шлемо синхронно (поточна поведінка).
+  if (!raw.includes('eion://')) {
+    try { u.ws.send(raw); return true; } catch (_) { return false; }
   }
+  // Є медіа-рефи → підписуємо, тоді шлемо. Reachability (онлайн?) відома вже зараз,
+  // тож boolean-контракт збережено; сам send асинхронний після підпису.
+  (async () => {
+    try {
+      const obj = typeof payload === 'string' ? JSON.parse(raw) : payload;
+      const signed = await signDeep(obj);
+      const u2 = onlineUsers.get(nick);
+      if (u2 && u2.ws && u2.ws.readyState === 1) u2.ws.send(JSON.stringify(signed));
+    } catch (_) {}
+  })();
+  return true;
 }
 
 // Онлайн-запис адресата ЛИШЕ якщо сокет справді живий (readyState OPEN +
@@ -1021,10 +1081,9 @@ app.delete('/call-logs', async (req, res) => {
 // файли). Тепер заливка можлива лише в автентифікованій сесії: сервер service-
 // ключем видає одноразовий підписаний URL, клієнт заливає по ньому. Після переходу
 // всіх клієнтів прибираємо anon INSERT-політики (migrations/storage_lockdown_2_2.sql).
-const STORAGE_BUCKETS = new Set(['files', 'avatars']);
 app.post('/storage/signed-upload', async (req, res) => {
   const { bucket, path, upsert } = req.body;
-  if (!bucket || !path || !STORAGE_BUCKETS.has(bucket)) {
+  if (!bucket || !path || !STORAGE_BUCKETS_SET.has(bucket)) {
     return res.json({ ok: false, error: 'Невірні параметри' });
   }
   // Санітизація шляху: без обходу вгору й провідного слеша, розумна довжина.
@@ -1036,6 +1095,21 @@ app.post('/storage/signed-upload', async (req, res) => {
       .createSignedUploadUrl(path, { upsert: upsert !== false });
     if (error || !data) return res.json({ ok: false, error: error?.message || 'Не вдалось створити URL' });
     res.json({ ok: true, token: data.token, path: data.path, signedUrl: data.signedUrl });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// Storage 2.3: пакетний підпис медіа-рефів для клієнта (ехо щойновідправленого,
+// кеш аватарів тощо). Приймає масив рефів `eion://bucket/path`, повертає підписані
+// URL у ТОМУ Ж порядку. Не-рефи повертаються без змін. Автентифіковано (req.nick).
+app.post('/storage/resolve', async (req, res) => {
+  const refs = Array.isArray(req.body && req.body.refs) ? req.body.refs : null;
+  if (!refs) return res.json({ ok: false, error: 'refs обовʼязкові' });
+  if (refs.length > 100) return res.json({ ok: false, error: 'Забагато рефів' });
+  try {
+    const urls = await Promise.all(refs.map(signMediaRef));
+    res.json({ ok: true, urls });
   } catch (e) {
     res.json({ ok: false, error: e.message });
   }
