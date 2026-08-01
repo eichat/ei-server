@@ -2653,9 +2653,18 @@ wss.on('connection', (ws) => {
         // не бути прибраним із onlineUsers (delete/heartbeat не встигли). Тоді
         // наївний target.ws.send піде в нікуди, а FCM не спрацює — дзвінок
         // зникає безслідно. Тому доставляємо через WS лише якщо сокет ЖИВИЙ.
+        //
+        // НЕ покладаємось на смикливий isAlive: heartbeat щоцикла (30с) ставить
+        // isAlive=false до наступного pong/app-ping. call_offer — одномоментна
+        // подія: влучивши в це вікно, він помилково йшов у FCM (а в десктопі FCM
+        // немає → офер зникав), тоді як наступні call_ice цієї перевірки не мають
+        // і долітали → симптом «ICE є, а оферу нема, вхідний не дзвенить».
+        // lastSeen оновлюється кожні ≤15с app-пінгом (і на pong), тож свіжий
+        // lastSeen = сокет реально живий; мертвий перестає пінгувати → lastSeen
+        // застаріє → підемо у FCM-гілку (зомбі-захист збережено).
         const wsAlive = target && target.ws
           && target.ws.readyState === 1 /* WebSocket.OPEN */
-          && target.ws.isAlive !== false;
+          && (target.ws.isAlive !== false || Date.now() - (target.lastSeen || 0) < 35000);
         if (wsAlive) {
           target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
         } else {
