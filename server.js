@@ -2649,27 +2649,32 @@ wss.on('connection', (ws) => {
           return;
         }
         const target = onlineUsers.get(msg.to);
+        const openSocket = !!(target && target.ws && target.ws.readyState === 1 /* WebSocket.OPEN */);
+        const hasToken = fcmTokens.has(msg.to);
         // ВАЖЛИВО: сокет міг «померти» (клієнт пішов у фон, code=1006), але ще
         // не бути прибраним із onlineUsers (delete/heartbeat не встигли). Тоді
         // наївний target.ws.send піде в нікуди, а FCM не спрацює — дзвінок
-        // зникає безслідно. Тому доставляємо через WS лише якщо сокет ЖИВИЙ.
+        // зникає безслідно. Тому для клієнта З FCM-токеном доставляємо через WS
+        // лише якщо сокет виглядає ЖИВИМ, інакше — пуш.
         //
         // НЕ покладаємось на смикливий isAlive: heartbeat щоцикла (30с) ставить
         // isAlive=false до наступного pong/app-ping. call_offer — одномоментна
-        // подія: влучивши в це вікно, він помилково йшов у FCM (а в десктопі FCM
-        // немає → офер зникав), тоді як наступні call_ice цієї перевірки не мають
-        // і долітали → симптом «ICE є, а оферу нема, вхідний не дзвенить».
-        // lastSeen оновлюється кожні ≤15с app-пінгом (і на pong), тож свіжий
-        // lastSeen = сокет реально живий; мертвий перестає пінгувати → lastSeen
-        // застаріє → підемо у FCM-гілку (зомбі-захист збережено).
-        const wsAlive = target && target.ws
-          && target.ws.readyState === 1 /* WebSocket.OPEN */
+        // подія: влучивши в це вікно, він помилково йшов у FCM.
+        const wsAlive = openSocket
           && (target.ws.isAlive !== false || Date.now() - (target.lastSeen || 0) < 35000);
-        if (wsAlive) {
+        // Доставляємо offer через WS, якщо: (а) сокет живий за евристикою, АБО
+        // (б) сокет ВІДКРИТИЙ, але FCM-фолбеку однаково немає (десктоп без токена).
+        // Випадок (б) — це і був баг: для десктопа евристика isAlive/lastSeen лише
+        // шкодила. Хибно спрацювавши (Render глушить протокольні pong; app-ping
+        // десктопа міг відставати → lastSeen «протухав»), вона кидала offer ЖИВОГО
+        // десктопа у FCM-гілку, а там для десктопа глухий кут — call_error «не в
+        // мережі». Симптом (підтверджено логом 03.08): call_ice долітали ДЕСЯТКАМИ
+        // (вони без гейту), а call_offer — жодного разу, вхідний не дзвенів. Для
+        // Android із токеном поведінка НЕ змінюється (зомбі-сокет → FCM, як і було).
+        if (wsAlive || (openSocket && !hasToken)) {
           target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
         } else {
           if (target) { onlineUsers.delete(msg.to); console.log(`call_offer: ${msg.to} stale socket → FCM`); }
-          const hasToken = fcmTokens.has(msg.to);
           // Missed-лог створюємо ЗАВЖДИ, коли доставити наживо не вдалось —
           // і для FCM (адресат у фоні/офлайн, пуш міг не розбудити), і без токена.
           // Це єдиний запис, який БАЧИТЬ адресат: no_answer від того-хто-дзвонив
