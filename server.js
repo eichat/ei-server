@@ -391,7 +391,12 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   }
 }
 
-async function sendFcmPush(toNick, data) {
+// ttlMs — скільки Google ТРИМАЄ пуш, поки пристрій недоступний (Doze/екран
+// вимкнено/фон/поганий зв'язок). Було жорстко 10 с → фонові пуші гинули, і
+// сповіщення «спливало» лише при відкритті застосунку (симптом «приходить
+// після перезапуску»). Дефолт — 4 год для повідомлень; коротші значення
+// передаються явно там, де протухлий пуш недоречний (напр. call_end).
+async function sendFcmPush(toNick, data, ttlMs = 14400000) {
   const token = fcmTokens.get(toNick); if (!token) return;
   // Не шлемо пуш на ВЛАСНИЙ пристрій: якщо адресат — інший акаунт на тому
   // самому телефоні (спільний FCM-токен), сповіщення набридали б власнику.
@@ -405,7 +410,7 @@ async function sendFcmPush(toNick, data) {
       return;
     }
   }
-  try { await admin.messaging().send({ token, data, android: { priority: 'high', ttl: 10000 } }); }
+  try { await admin.messaging().send({ token, data, android: { priority: 'high', ttl: ttlMs } }); }
   catch (e) { console.error(`FCM push error до ${toNick}:`, e.message); if (e.code === 'messaging/registration-token-not-registered') fcmTokens.delete(toNick); }
 }
 
@@ -2710,7 +2715,7 @@ wss.on('connection', (ws) => {
         if (target && target.ws && target.ws.readyState === 1) {
           try { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); delivered = true; } catch (_) {}
         }
-        if (!delivered) { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }); }
+        if (!delivered) { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }, 60000); }
         console.log(`[calldiag] WS call_reject ${userNick}->${msg.to} delivered=${delivered}${delivered ? '' : ' (fallback FCM push)'}`);
       }
       if (msg.type === 'call_end') {
@@ -2721,7 +2726,7 @@ wss.on('connection', (ws) => {
         // Android онлайн — сам WS-call_end нативний дзвінок не спинить. FCM-пуш
         // прибирає CallActivity нативно; для foreground-Flutter це безпечний no-op
         // (activeConnection == null, рингтон не грає, нотифікації 1 нема).
-        await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick });
+        await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }, 60000);
       }
     } catch (e) { console.error('Помилка:', e); }
   });
