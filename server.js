@@ -1174,9 +1174,19 @@ app.get('/missed-calls', async (req, res) => {
 // третій лог у адресата + хибне сповіщення «пропущений» при відкритті застосунку.
 async function clearPreemptiveMissed(callerNick, calleeNick) {
   try {
-    await supabase.from('call_logs').delete()
+    // Видаляємо ЛИШЕ НАЙНОВІШИЙ передчасний missed цієї пари — він відповідає
+    // ПОТОЧНОМУ дзвінку (offer щойно був). Старіші missed чіпати НЕ можна: якщо
+    // дзвінок A не підняли (законний «пропущений»), а наступний дзвінок B
+    // відхилили — стирання всіх missed за вікном згубило б законний missed від A.
+    const { data } = await supabase.from('call_logs')
+      .select('id')
       .eq('from_nick', callerNick).eq('to_nick', calleeNick).eq('status', 'missed')
-      .gt('started_at', Date.now() - 120000);
+      .gt('started_at', Date.now() - 120000)
+      .order('started_at', { ascending: false })
+      .limit(1);
+    if (data && data.length) {
+      await supabase.from('call_logs').delete().eq('id', data[0].id);
+    }
   } catch (_) {}
 }
 
