@@ -562,9 +562,12 @@ app.get('/call-offer', (req, res) => {
   res.json({ ok: true, fromNick: data.fromNick, offer: data.offer, hasVideo: data.hasVideo });
 });
 
-app.post('/decline-call', (req, res) => {
+app.post('/decline-call', async (req, res) => {
   const { toNick } = req.body; const fromNick = req.nick; if (!fromNick || !toNick) return res.json({ ok: false, error: 'Невірні параметри' });
   const delivered = sendToUser(toNick, { type: 'call_reject', from: fromNick });
+  // Нативне відхилення (Android у фоні) — теж свідоме, не пропущений: прибираємо
+  // передчасний missed цієї пари (from=той-хто-дзвонив=toNick, to=я=fromNick).
+  await clearPreemptiveMissed(toNick, fromNick);
   console.log(`[calldiag] /decline-call ${fromNick}->${toNick} reject delivered=${delivered} (socket ${delivered ? 'OPEN' : 'NOT-OPEN/absent'})`);
   res.json({ ok: true });
 });
@@ -1163,6 +1166,19 @@ app.get('/missed-calls', async (req, res) => {
   }
   res.json({ ok: true, missed });
 });
+
+// Прибирає передчасний 'missed'-лог пари (створюється при call_offer, коли
+// адресат у фоні → FCM). Кличемо, коли дзвінок завершився НЕ пропущеним:
+// прийняли (call_answer) АБО свідомо відхилили (call_reject / decline). Без
+// цього відхилений дзвінок лишав по собі І 'missed', І 'rejected' → зайвий
+// третій лог у адресата + хибне сповіщення «пропущений» при відкритті застосунку.
+async function clearPreemptiveMissed(callerNick, calleeNick) {
+  try {
+    await supabase.from('call_logs').delete()
+      .eq('from_nick', callerNick).eq('to_nick', calleeNick).eq('status', 'missed')
+      .gt('started_at', Date.now() - 120000);
+  } catch (_) {}
+}
 
 // ── Групи ──────────────────────────────────────
 app.post('/group/create', async (req, res) => {
@@ -2697,12 +2713,8 @@ wss.on('connection', (ws) => {
         const target = onlineUsers.get(msg.to);
         if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer }));
         // Дзвінок таки прийняли (FCM розбудив) → прибираємо передчасний missed-лог
-        // цієї пари (from=той-хто-дзвонив=msg.to, to=я=userNick) за останні 2 хв.
-        try {
-          await supabase.from('call_logs').delete()
-            .eq('from_nick', msg.to).eq('to_nick', userNick).eq('status', 'missed')
-            .gt('started_at', Date.now() - 120000);
-        } catch (_) {}
+        // цієї пари (from=той-хто-дзвонив=msg.to, to=я=userNick).
+        await clearPreemptiveMissed(msg.to, userNick);
       }
       if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
       // Перемикання аудіо↔відео посеред дзвінка (renegotiation)
@@ -2716,6 +2728,10 @@ wss.on('connection', (ws) => {
           try { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); delivered = true; } catch (_) {}
         }
         if (!delivered) { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }, 60000); }
+        // Свідоме відхилення ≠ пропущений: прибираємо передчасний missed цієї пари
+        // (from=той-хто-дзвонив=msg.to, to=я=userNick), інакше в адресата лишиться
+        // зайвий 'missed' поряд із 'rejected'.
+        await clearPreemptiveMissed(msg.to, userNick);
         console.log(`[calldiag] WS call_reject ${userNick}->${msg.to} delivered=${delivered}${delivered ? '' : ' (fallback FCM push)'}`);
       }
       if (msg.type === 'call_end') {
