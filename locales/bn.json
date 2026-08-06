@@ -511,6 +511,8 @@
   "stream_live_badge": "লাইভ",
   "stream_recording_badge": "সম্প্রচারের রেকর্ডিং",
   "stream_open_youtube": "YouTube-এ দেখুন",
+  "stream_need_libmpv": "অন্তর্নির্মিত প্লেয়ারের জন্য libmpv লাইব্রেরি প্রয়োজন। এটি ইনস্টল করে EION পুনরায় চালু করুন।",
+  "stream_player_failed": "অ্যাপে এই ভিডিওটি চালানো যায়নি",
   "stream_post_label": "লাইভ সম্প্রচার",
   "msg_chat_will_be_deleted": "চ্যাট \"{title}\" মুছে ফেলা হবে।",
   "premium_feat_nick_color": "চ্যাটে কাস্টম নিকনেমের রঙ",

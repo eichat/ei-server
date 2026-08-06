@@ -511,6 +511,8 @@
   "stream_live_badge": "НАЖИВО",
   "stream_recording_badge": "Запис трансляції",
   "stream_open_youtube": "Дивитись на YouTube",
+  "stream_need_libmpv": "Вбудований плеєр потребує бібліотеки libmpv. Встановіть її та перезапустіть EION.",
+  "stream_player_failed": "Не вдалося відтворити відео в застосунку",
   "stream_post_label": "Трансляція",
   "msg_chat_will_be_deleted": "Чат \"{title}\" буде видалено.",
   "premium_feat_nick_color": "Кастомний колір ніку в чаті",

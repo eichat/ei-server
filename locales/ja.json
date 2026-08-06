@@ -511,6 +511,8 @@
   "stream_live_badge": "ライブ",
   "stream_recording_badge": "配信の録画",
   "stream_open_youtube": "YouTubeで見る",
+  "stream_need_libmpv": "内蔵プレーヤーには libmpv ライブラリが必要です。インストールして EION を再起動してください。",
+  "stream_player_failed": "アプリ内でこの動画を再生できませんでした",
   "stream_post_label": "ライブ配信",
   "msg_chat_will_be_deleted": "チャット「{title}」を削除します。",
   "premium_feat_nick_color": "チャットでのニックネーム色のカスタマイズ",

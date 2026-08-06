@@ -511,6 +511,8 @@
   "stream_live_badge": "LIVE",
   "stream_recording_badge": "Stream recording",
   "stream_open_youtube": "Watch on YouTube",
+  "stream_need_libmpv": "The built-in player requires the libmpv library. Install it and restart EION.",
+  "stream_player_failed": "Couldn't play this video in the app",
   "stream_post_label": "Live stream",
   "msg_chat_will_be_deleted": "Chat \"{title}\" will be deleted.",
   "premium_feat_nick_color": "Custom nickname color in chat",

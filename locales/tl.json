@@ -511,6 +511,8 @@
   "stream_live_badge": "LIVE",
   "stream_recording_badge": "Recording ng stream",
   "stream_open_youtube": "Panoorin sa YouTube",
+  "stream_need_libmpv": "Kailangan ng built-in na player ang aklatang libmpv. I-install ito at i-restart ang EION.",
+  "stream_player_failed": "Hindi ma-play ang video sa app",
   "stream_post_label": "Live stream",
   "msg_chat_will_be_deleted": "Buburahin ang chat na \"{title}\".",
   "premium_feat_nick_color": "Custom na kulay ng palayaw sa chat",

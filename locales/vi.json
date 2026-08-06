@@ -511,6 +511,8 @@
   "stream_live_badge": "TRỰC TIẾP",
   "stream_recording_badge": "Bản ghi buổi phát",
   "stream_open_youtube": "Xem trên YouTube",
+  "stream_need_libmpv": "Trình phát tích hợp cần thư viện libmpv. Hãy cài đặt và khởi động lại EION.",
+  "stream_player_failed": "Không thể phát video trong ứng dụng",
   "stream_post_label": "Phát trực tiếp",
   "msg_chat_will_be_deleted": "Cuộc trò chuyện \"{title}\" sẽ bị xóa.",
   "premium_feat_nick_color": "Màu biệt danh tùy chỉnh trong trò chuyện",

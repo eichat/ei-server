@@ -511,6 +511,8 @@
   "stream_live_badge": "CANLI",
   "stream_recording_badge": "Yayın kaydı",
   "stream_open_youtube": "YouTube'da izle",
+  "stream_need_libmpv": "Yerleşik oynatıcı libmpv kitaplığını gerektirir. Kurun ve EION'u yeniden başlatın.",
+  "stream_player_failed": "Video uygulamada oynatılamadı",
   "stream_post_label": "Canlı yayın",
   "msg_chat_will_be_deleted": "\"{title}\" sohbeti silinecek.",
   "premium_feat_nick_color": "Sohbette özel takma ad rengi",

@@ -511,6 +511,8 @@
   "stream_live_badge": "AO VIVO",
   "stream_recording_badge": "Gravação da transmissão",
   "stream_open_youtube": "Assistir no YouTube",
+  "stream_need_libmpv": "O reprodutor integrado requer a biblioteca libmpv. Instale-a e reinicie o EION.",
+  "stream_player_failed": "Não foi possível reproduzir o vídeo no aplicativo",
   "stream_post_label": "Transmissão ao vivo",
   "msg_chat_will_be_deleted": "O chat \"{title}\" será excluído.",
   "premium_feat_nick_color": "Cor personalizada do apelido no chat",

@@ -511,6 +511,8 @@
   "stream_live_badge": "라이브",
   "stream_recording_badge": "방송 다시보기",
   "stream_open_youtube": "YouTube에서 보기",
+  "stream_need_libmpv": "내장 플레이어에는 libmpv 라이브러리가 필요합니다. 설치 후 EION을 다시 시작하세요.",
+  "stream_player_failed": "앱에서 이 동영상을 재생할 수 없습니다",
   "stream_post_label": "라이브 방송",
   "msg_chat_will_be_deleted": "\"{title}\" 채팅이 삭제됩니다.",
   "premium_feat_nick_color": "채팅에서 닉네임 색상 지정",

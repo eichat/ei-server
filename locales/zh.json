@@ -511,6 +511,8 @@
   "stream_live_badge": "直播中",
   "stream_recording_badge": "直播回放",
   "stream_open_youtube": "在 YouTube 观看",
+  "stream_need_libmpv": "内置播放器需要 libmpv 库。请安装后重启 EION。",
+  "stream_player_failed": "无法在应用内播放此视频",
   "stream_post_label": "直播",
   "msg_chat_will_be_deleted": "将删除聊天“{title}”。",
   "premium_feat_nick_color": "聊天中自定义昵称颜色",

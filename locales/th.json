@@ -511,6 +511,8 @@
   "stream_live_badge": "สด",
   "stream_recording_badge": "บันทึกการถ่ายทอดสด",
   "stream_open_youtube": "ดูบน YouTube",
+  "stream_need_libmpv": "โปรแกรมเล่นในตัวต้องใช้ไลบรารี libmpv ติดตั้งแล้วเริ่ม EION ใหม่",
+  "stream_player_failed": "ไม่สามารถเล่นวิดีโอในแอปได้",
   "stream_post_label": "ถ่ายทอดสด",
   "msg_chat_will_be_deleted": "แชท \"{title}\" จะถูกลบ",
   "premium_feat_nick_color": "สีชื่อเล่นแบบกำหนดเองในแชท",

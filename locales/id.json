@@ -511,6 +511,8 @@
   "stream_live_badge": "LANGSUNG",
   "stream_recording_badge": "Rekaman siaran",
   "stream_open_youtube": "Tonton di YouTube",
+  "stream_need_libmpv": "Pemutar bawaan memerlukan pustaka libmpv. Instal dan mulai ulang EION.",
+  "stream_player_failed": "Tidak dapat memutar video di aplikasi",
   "stream_post_label": "Siaran langsung",
   "msg_chat_will_be_deleted": "Obrolan \"{title}\" akan dihapus.",
   "premium_feat_nick_color": "Warna nama panggilan khusus di obrolan",

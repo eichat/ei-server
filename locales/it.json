@@ -511,6 +511,8 @@
   "stream_live_badge": "IN DIRETTA",
   "stream_recording_badge": "Registrazione della diretta",
   "stream_open_youtube": "Guarda su YouTube",
+  "stream_need_libmpv": "Il lettore integrato richiede la libreria libmpv. Installala e riavvia EION.",
+  "stream_player_failed": "Impossibile riprodurre il video nell'app",
   "stream_post_label": "Diretta",
   "msg_chat_will_be_deleted": "La chat \"{title}\" verrà eliminata.",
   "premium_feat_nick_color": "Colore personalizzato del nickname in chat",

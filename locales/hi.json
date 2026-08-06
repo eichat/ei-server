@@ -511,6 +511,8 @@
   "stream_live_badge": "लाइव",
   "stream_recording_badge": "स्ट्रीम रिकॉर्डिंग",
   "stream_open_youtube": "YouTube पर देखें",
+  "stream_need_libmpv": "अंतर्निहित प्लेयर के लिए libmpv लाइब्रेरी आवश्यक है। इसे इंस्टॉल करें और EION पुनः आरंभ करें।",
+  "stream_player_failed": "ऐप में यह वीडियो नहीं चल सका",
   "stream_post_label": "लाइव स्ट्रीम",
   "msg_chat_will_be_deleted": "चैट \"{title}\" हटा दी जाएगी।",
   "premium_feat_nick_color": "चैट में कस्टम निकनेम रंग",

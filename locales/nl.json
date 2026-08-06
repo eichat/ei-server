@@ -511,6 +511,8 @@
   "stream_live_badge": "LIVE",
   "stream_recording_badge": "Streamopname",
   "stream_open_youtube": "Bekijken op YouTube",
+  "stream_need_libmpv": "De ingebouwde speler vereist de libmpv-bibliotheek. Installeer deze en start EION opnieuw.",
+  "stream_player_failed": "Kan de video niet afspelen in de app",
   "stream_post_label": "Livestream",
   "msg_chat_will_be_deleted": "Chat \"{title}\" wordt verwijderd.",
   "premium_feat_nick_color": "Eigen nickkleur in de chat",

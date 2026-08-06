@@ -511,6 +511,8 @@
   "stream_live_badge": "EN DIRECT",
   "stream_recording_badge": "Enregistrement du direct",
   "stream_open_youtube": "Regarder sur YouTube",
+  "stream_need_libmpv": "Le lecteur intégré nécessite la bibliothèque libmpv. Installez-la et redémarrez EION.",
+  "stream_player_failed": "Impossible de lire la vidéo dans l'application",
   "stream_post_label": "Direct",
   "msg_chat_will_be_deleted": "Le chat \"{title}\" sera supprimé.",
   "premium_feat_nick_color": "Couleur personnalisée du pseudo dans le chat",

@@ -511,6 +511,8 @@
   "stream_live_badge": "مباشر",
   "stream_recording_badge": "تسجيل البث",
   "stream_open_youtube": "المشاهدة على YouTube",
+  "stream_need_libmpv": "يتطلب المشغّل المدمج مكتبة libmpv. ثبّتها وأعد تشغيل EION.",
+  "stream_player_failed": "تعذّر تشغيل الفيديو داخل التطبيق",
   "stream_post_label": "بث مباشر",
   "msg_chat_will_be_deleted": "سيتم حذف المحادثة \"{title}\".",
   "premium_feat_nick_color": "لون مخصص للاسم في المحادثة",
