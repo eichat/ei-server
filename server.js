@@ -2398,6 +2398,16 @@ wss.on('connection', (ws) => {
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` })); ws.close(); return; }
         if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився' })); old.ws.close(); }
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
+        // nickDevices має відображати, де нік ЗАРАЗ, а не де колись був.
+        // Мапа живе в памʼяті й накопичувалась: якщо акаунт колись заходив із
+        // телефона, запис лишався назавжди. Коли ТОЙ САМИЙ нік потім заходив із
+        // десктопа (десктоп deviceId не реєструє), стара привʼязка вціліла — і
+        // перевірка «дзвінок на той самий пристрій» хибно спрацьовувала для двох
+        // різних машин: блокувались і call_offer, і пуші (лог 09.08:
+        // `call_offer blocked: void->Rumpel same device dev_…`). Чистимо на вході;
+        // якщо ця сесія справді з телефона, register_fcm_token одразу поставить
+        // актуальний deviceId назад.
+        nickDevices.delete(userNick);
         ws.send(JSON.stringify({ type: 'login_ok' }));
         // Невидимі (invisible) не сповіщають інших про свій онлайн.
         if (!invisibleNicks.has(userNick)) {
@@ -2473,7 +2483,7 @@ wss.on('connection', (ws) => {
         }
       }
 
-      if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { fcmTokens.set(userNick, msg.token); if (msg.deviceId) nickDevices.set(userNick, msg.deviceId); } }
+      if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { fcmTokens.set(userNick, msg.token); if (msg.deviceId) { nickDevices.set(userNick, msg.deviceId); ws.deviceId = msg.deviceId; } } }
       if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
       if (msg.type === 'connect_request') { if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { sendToUser(msg.to, { type: 'connect_response', from: userNick, accepted: msg.accepted }); }
@@ -2672,14 +2682,19 @@ wss.on('connection', (ws) => {
         }
         // Захист від «дзвінка самому собі»: якщо адресат — інший акаунт на
         // ТОМУ САМОМУ пристрої (спільний FCM-токен), не доставляємо ні WS, ні пуш.
-        const fromDev = nickDevices.get(userNick);
-        const toDev = nickDevices.get(msg.to);
+        const target = onlineUsers.get(msg.to);
+        // Порівнюємо deviceId ФАКТИЧНИХ сокетів обох сторін, а не мапу за
+        // ніками: мапа памʼятає історію («нік колись заходив із цього
+        // телефона») і хибно блокувала дзвінки між РІЗНИМИ пристроями. Сокет
+        // же завжди належить одній конкретній машині. Десктоп deviceId не
+        // реєструє → undefined → перевірка не спрацьовує, і це правильно.
+        const fromDev = ws.deviceId;
+        const toDev = target && target.ws && target.ws.deviceId;
         if (fromDev && toDev && fromDev === toDev) {
           console.log(`call_offer blocked: ${userNick}->${msg.to} same device ${fromDev}`);
           ws.send(JSON.stringify({ type: 'call_error', error: 'Неможливо дзвонити на цей самий пристрій' }));
           return;
         }
-        const target = onlineUsers.get(msg.to);
         const openSocket = !!(target && target.ws && target.ws.readyState === 1 /* WebSocket.OPEN */);
         const hasToken = fcmTokens.has(msg.to);
         // ВАЖЛИВО: сокет міг «померти» (клієнт пішов у фон, code=1006), але ще
