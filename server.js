@@ -2407,7 +2407,16 @@ wss.on('connection', (ws) => {
         // `call_offer blocked: void->Rumpel same device dev_…`). Чистимо на вході;
         // якщо ця сесія справді з телефона, register_fcm_token одразу поставить
         // актуальний deviceId назад.
+        //
+        // Те саме стосується fcmTokens: нік, що колись заходив із телефона,
+        // назавжди лишав там токен ТОГО телефона. Перейшовши на десктоп (де
+        // FCM немає), він зберігав «привида» — сервер бачив `hasToken=true`,
+        // кидав call_offer у FCM-гілку замість живого WS і слав пуш на чужий
+        // тепер пристрій (лог 09.08: `push from=true to=true` для ніка на
+        // Linux). Чистимо разом; клієнт на Android одразу після login_ok шле
+        // register_fcm_token і повертає актуальний токен.
         nickDevices.delete(userNick);
+        fcmTokens.delete(userNick);
         ws.send(JSON.stringify({ type: 'login_ok' }));
         // Невидимі (invisible) не сповіщають інших про свій онлайн.
         if (!invisibleNicks.has(userNick)) {
