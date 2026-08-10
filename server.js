@@ -2458,7 +2458,7 @@ wss.on('connection', (ws) => {
             const { data: pendingGroup } = await supabase.from('group_messages').select('*').eq('group_id', gm.group_id).not('delivered_to', 'cs', `{"${userNick}"}`).order('timestamp', { ascending: true });
             const deliveredBySender = {}; // автор → msgIds, що аж тепер дійшли цьому юзеру
             if (pendingGroup && pendingGroup.length > 0) { for (const m of pendingGroup) {
-              if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.file_data && m.file_data.startsWith('http') ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, catchup: true, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
+              if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.file_data && /^(https?|eion):\/\//.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, catchup: true, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
               else ws.send(JSON.stringify({ type: 'group_message', groupId: m.group_id, from: m.from_nick, text: m.content, timestamp: m.timestamp, msgId: m.msg_id, catchup: true }));
               await supabase.from('group_messages').update({ delivered_to: [...(m.delivered_to || []), userNick] }).eq('id', m.id);
               if (m.msg_id && m.from_nick !== userNick) (deliveredBySender[m.from_nick] ??= []).push(m.msg_id);
