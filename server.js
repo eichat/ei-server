@@ -517,9 +517,25 @@ function sendToUser(nick, payload) {
 function liveTarget(nick) {
   const t = onlineUsers.get(nick);
   if (!t) return null;
-  if (t.ws && t.ws.readyState === 1 /* OPEN */ && t.ws.isAlive !== false) return t;
-  onlineUsers.delete(nick);
-  return null;
+  const open = !!(t.ws && t.ws.readyState === 1 /* OPEN */);
+  // Прибираємо з presence ЛИШЕ справді мертвий сокет (закритий). Раніше звідси
+  // вилітав і живий адресат, якщо виклик влучив у вікно heartbeat: цикл щоцикла
+  // (30с) ставить isAlive=false УСІМ сокетам і чекає pong. Такий адресат зникав
+  // з onlineUsers до наступного login — і все, що адресує через onlineUsers.get
+  // (реакції), більше його не бачило. Не відповів два цикли → heartbeat сам
+  // обриває сокет, плюс cleanup за lastSeen>60с; presence чиститься там.
+  if (!open) { onlineUsers.delete(nick); return null; }
+  // Для ДОСТАВКИ лишаємось консервативними: у вікні isAlive=false вважаємо офлайн,
+  // щоб повідомлення пішло надійним шляхом (збереглось недоставленим + FCM), а не
+  // в мертвий сокет із позначкою delivered — це і була втрата повідомлень.
+  return t.ws.isAlive !== false ? t : null;
+}
+// Адресат для «необов'язкових» подій (реакції): досить ВІДКРИТОГО сокета. Втрата
+// в рідкісному вікні мертвого-але-відкритого сокета не фатальна — подія лежить у
+// БД і приходить з історією, — тоді як зайва обережність тут коштує показу наживо.
+function openTarget(nick) {
+  const t = onlineUsers.get(nick);
+  return t && t.ws && t.ws.readyState === 1 /* OPEN */ ? t : null;
 }
 function isLive(nick) { return liveTarget(nick) !== null; }
 
@@ -2673,7 +2689,7 @@ wss.on('connection', (ws) => {
           }
         }
       }
-      if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: ex } = await supabase.from('group_message_reactions').select('id').eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick).eq('emoji', emoji).maybeSingle(); if (ex) { await supabase.from('group_message_reactions').delete().eq('id', ex.id); } else { await supabase.from('group_message_reactions').delete().eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick); await supabase.from('group_message_reactions').insert({ msg_id: msgId, group_id: groupId, nick: userNick, emoji }); } const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const pairKey = [userNick, chatNick].sort().join('|'); const { data: dex } = await supabase.from('direct_message_reactions').select('id').eq('msg_id', msgId).eq('from_nick', userNick).eq('emoji', emoji).maybeSingle(); if (dex) { await supabase.from('direct_message_reactions').delete().eq('id', dex.id); } else { await supabase.from('direct_message_reactions').delete().eq('msg_id', msgId).eq('from_nick', userNick).eq('pair_key', pairKey); await supabase.from('direct_message_reactions').insert({ msg_id: msgId, from_nick: userNick, emoji, pair_key: pairKey }); } const target = onlineUsers.get(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
+      if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: ex } = await supabase.from('group_message_reactions').select('id').eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick).eq('emoji', emoji).maybeSingle(); if (ex) { await supabase.from('group_message_reactions').delete().eq('id', ex.id); } else { await supabase.from('group_message_reactions').delete().eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick); await supabase.from('group_message_reactions').insert({ msg_id: msgId, group_id: groupId, nick: userNick, emoji }); } const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); for (const m of members || []) { if (m.nick === userNick) continue; const t = openTarget(m.nick); if (t) t.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); } } else if (chatNick) { const pairKey = [userNick, chatNick].sort().join('|'); const { data: dex } = await supabase.from('direct_message_reactions').select('id').eq('msg_id', msgId).eq('from_nick', userNick).eq('emoji', emoji).maybeSingle(); if (dex) { await supabase.from('direct_message_reactions').delete().eq('id', dex.id); } else { await supabase.from('direct_message_reactions').delete().eq('msg_id', msgId).eq('from_nick', userNick).eq('pair_key', pairKey); await supabase.from('direct_message_reactions').insert({ msg_id: msgId, from_nick: userNick, emoji, pair_key: pairKey }); } const target = openTarget(chatNick); if (target) target.ws.send(JSON.stringify(payload)); else await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); } }
       if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); sendToUser(msg.to, { type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }); }
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
       if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
