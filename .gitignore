@@ -1,0 +1,15 @@
+# Залежності — ставляться з package-lock.json (`npm ci` / `npm install`).
+node_modules/
+
+# Секрети. У цьому репо їх немає й бути не повинно: SUPABASE_KEY,
+# EION_ADMIN_SECRET, SESSION_SECRET, TURN_* живуть у змінних оточення
+# Render. Правило тут — щоб випадковий локальний .env ніколи не поїхав
+# у публічний репозиторій.
+.env
+.env.*
+!.env.example
+
+# Службове
+*.log
+npm-debug.log*
+.DS_Store
