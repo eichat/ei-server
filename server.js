@@ -2825,12 +2825,28 @@ async function removeChannelFile(...urls) {
   }
 }
 
+// Шлях у бакеті `files` з будь-якого представлення файлу.
+// Після Storage 2b їх три, і функція знала лише найстаріше:
+//   • eion://files/<path>              — реф (те, що клієнт шле тепер);
+//   • …/object/sign/files/<path>?token — підписаний URL (приватний бакет);
+//   • …/object/public/files/<path>     — публічний URL (до міграції).
+// Поки розпізнавався лише public, `file_downloaded` не знаходив шляху й
+// downloaded_by не оновлювався — тобто чистка файлів (2C) мовчки не
+// працювала з моменту переходу на приватний Storage.
 function storagePathFromUrl(url) {
   if (!url || typeof url !== 'string') return null;
-  const marker = '/object/public/files/';
-  const i = url.indexOf(marker);
-  if (i === -1) return null;
-  const tail = url.slice(i + marker.length);
+  let tail = null;
+  if (url.startsWith('eion://files/')) {
+    tail = url.slice('eion://files/'.length);
+  } else {
+    for (const marker of ['/object/sign/files/', '/object/public/files/']) {
+      const i = url.indexOf(marker);
+      if (i !== -1) { tail = url.slice(i + marker.length); break; }
+    }
+  }
+  if (tail === null) return null;
+  const q = tail.indexOf('?');            // підписаний URL несе ?token=…
+  if (q !== -1) tail = tail.slice(0, q);
   try { return decodeURIComponent(tail); } catch (_) { return tail; }
 }
 
