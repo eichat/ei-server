@@ -213,6 +213,7 @@
   "msg_phone_registered": "Nomor ini sudah terdaftar di EION",
   "msg_no_microphone": "Tidak ada izin mikrofon",
   "voice_no_recorder": "Tidak bisa memulai perekaman — mikrofon tidak tersedia",
+  "voice_mic_too_loud": "Mikrofon kelebihan beban — turunkan volume masukan di pengaturan suara",
   "msg_no_camera_mic": "Tidak ada akses ke mikrofon atau kamera",
   "msg_no_contacts_access": "Tidak ada akses ke kontak",
   "msg_no_contacts_found": "Kontak tidak ditemukan",

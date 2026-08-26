@@ -213,6 +213,7 @@
   "msg_phone_registered": "该号码已在 EION 注册",
   "msg_no_microphone": "没有麦克风权限",
   "voice_no_recorder": "无法开始录音 — 麦克风不可用",
+  "voice_mic_too_loud": "麦克风输入过载 — 请在声音设置中调低输入音量",
   "msg_no_camera_mic": "无法访问麦克风或摄像头",
   "msg_no_contacts_access": "无法访问联系人",
   "msg_no_contacts_found": "未找到联系人",

@@ -213,6 +213,7 @@
   "msg_phone_registered": "Số này đã được đăng ký trên EION",
   "msg_no_microphone": "Không có quyền micro",
   "voice_no_recorder": "Không thể bắt đầu ghi âm — micrô không khả dụng",
+  "voice_mic_too_loud": "Micrô bị quá tải — hãy giảm âm lượng đầu vào trong cài đặt âm thanh",
   "msg_no_camera_mic": "Không có quyền truy cập micro hoặc camera",
   "msg_no_contacts_access": "Không có quyền truy cập danh bạ",
   "msg_no_contacts_found": "Không tìm thấy liên hệ",

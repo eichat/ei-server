@@ -213,6 +213,7 @@
   "msg_phone_registered": "Bu numara EION'da zaten kayıtlı",
   "msg_no_microphone": "Mikrofon izni yok",
   "voice_no_recorder": "Kayıt başlatılamadı — mikrofon kullanılamıyor",
+  "voice_mic_too_loud": "Mikrofon aşırı yükleniyor — ses ayarlarından giriş seviyesini düşürün",
   "msg_no_camera_mic": "Mikrofon veya kameraya erişim yok",
   "msg_no_contacts_access": "Kişilere erişim yok",
   "msg_no_contacts_found": "Kişi bulunamadı",

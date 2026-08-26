@@ -213,6 +213,7 @@
   "msg_phone_registered": "Ten numer jest już zarejestrowany w EION",
   "msg_no_microphone": "Brak uprawnień do mikrofonu",
   "voice_no_recorder": "Nie udało się rozpocząć nagrywania — mikrofon niedostępny",
+  "voice_mic_too_loud": "Mikrofon przesterowany — zmniejsz głośność wejścia w ustawieniach dźwięku",
   "msg_no_camera_mic": "Brak dostępu do mikrofonu lub kamery",
   "msg_no_contacts_access": "Brak dostępu do kontaktów",
   "msg_no_contacts_found": "Nie znaleziono kontaktów",
