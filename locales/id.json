@@ -212,7 +212,7 @@
   "msg_invalid_phone": "Nomor tidak valid (format: +380XXXXXXXXX)",
   "msg_phone_registered": "Nomor ini sudah terdaftar di EION",
   "msg_no_microphone": "Tidak ada izin mikrofon",
-  "voice_no_recorder": "Perekaman suara memerlukan paket pulseaudio-utils: sudo apt install pulseaudio-utils",
+  "voice_no_recorder": "Tidak bisa memulai perekaman — mikrofon tidak tersedia",
   "msg_no_camera_mic": "Tidak ada akses ke mikrofon atau kamera",
   "msg_no_contacts_access": "Tidak ada akses ke kontak",
   "msg_no_contacts_found": "Kontak tidak ditemukan",

@@ -212,7 +212,7 @@
   "msg_invalid_phone": "หมายเลขไม่ถูกต้อง (รูปแบบ: +380XXXXXXXXX)",
   "msg_phone_registered": "หมายเลขนี้ลงทะเบียนใน EION แล้ว",
   "msg_no_microphone": "ไม่มีสิทธิ์ใช้ไมโครโฟน",
-  "voice_no_recorder": "การบันทึกเสียงต้องใช้แพ็กเกจ pulseaudio-utils: sudo apt install pulseaudio-utils",
+  "voice_no_recorder": "เริ่มบันทึกเสียงไม่ได้ — ไมโครโฟนไม่พร้อมใช้งาน",
   "msg_no_camera_mic": "ไม่มีสิทธิ์เข้าถึงไมโครโฟนหรือกล้อง",
   "msg_no_contacts_access": "ไม่มีสิทธิ์เข้าถึงรายชื่อติดต่อ",
   "msg_no_contacts_found": "ไม่พบรายชื่อติดต่อ",

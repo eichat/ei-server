@@ -210,7 +210,7 @@
   "msg_invalid_phone": "Неверный номер (формат: +380XXXXXXXXX)",
   "msg_phone_registered": "Этот номер уже зарегистрирован в EION",
   "msg_no_microphone": "Нет доступа к микрофону",
-  "voice_no_recorder": "Для записи голосовых нужен пакет pulseaudio-utils: sudo apt install pulseaudio-utils",
+  "voice_no_recorder": "Не удалось начать запись — микрофон недоступен",
   "msg_no_camera_mic": "Нет доступа к микрофону или камере",
   "msg_no_contacts_access": "Нет доступа к контактам",
   "msg_no_contacts_found": "Контакты не найдены",

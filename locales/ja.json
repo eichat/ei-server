@@ -212,7 +212,7 @@
   "msg_invalid_phone": "無効な番号（形式：+380XXXXXXXXX）",
   "msg_phone_registered": "この番号はすでにEIONに登録されています",
   "msg_no_microphone": "マイクの権限がありません",
-  "voice_no_recorder": "音声メッセージの録音には pulseaudio-utils パッケージが必要です: sudo apt install pulseaudio-utils",
+  "voice_no_recorder": "録音を開始できません — マイクを使用できません",
   "msg_no_camera_mic": "マイクまたはカメラにアクセスできません",
   "msg_no_contacts_access": "連絡先にアクセスできません",
   "msg_no_contacts_found": "連絡先が見つかりません",

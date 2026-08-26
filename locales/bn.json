@@ -212,7 +212,7 @@
   "msg_invalid_phone": "অবৈধ নম্বর (ফরম্যাট: +380XXXXXXXXX)",
   "msg_phone_registered": "এই নম্বরটি ইতিমধ্যে EION-এ নিবন্ধিত",
   "msg_no_microphone": "মাইক্রোফোন অনুমতি নেই",
-  "voice_no_recorder": "ভয়েস রেকর্ডিংয়ের জন্য pulseaudio-utils প্যাকেজ প্রয়োজন: sudo apt install pulseaudio-utils",
+  "voice_no_recorder": "রেকর্ডিং শুরু করা যায়নি — মাইক্রোফোন উপলব্ধ নয়",
   "msg_no_camera_mic": "মাইক্রোফোন বা ক্যামেরায় প্রবেশাধিকার নেই",
   "msg_no_contacts_access": "পরিচিতিতে প্রবেশাধিকার নেই",
   "msg_no_contacts_found": "কোনো পরিচিতি পাওয়া যায়নি",
