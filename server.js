@@ -532,6 +532,25 @@ function liveTarget(nick) {
 }
 function isLive(nick) { return liveTarget(nick) !== null; }
 
+// ПОВНИЙ стан реакцій одного повідомлення: { emoji: [nick, ...] }.
+// Клієнт присвоює його як є, замість того щоб «перемикати» реакцію в себе.
+// Перемикання було крихким: одну подію нерідко застосовували двічі (панель +
+// відкритий екран ділять ті самі об'єкти повідомлень), і друге застосування
+// знімало щойно поставлену реакцію. Присвоєння ідемпотентне — повтор нешкідливий.
+function groupReactionsState(groupId, msgId) {
+  return supabase.from('group_message_reactions').select('emoji, nick').eq('group_id', groupId).eq('msg_id', msgId)
+    .then(({ data }) => reactionsToMap(data, 'nick'));
+}
+function directReactionsState(pairKey, msgId) {
+  return supabase.from('direct_message_reactions').select('emoji, from_nick').eq('pair_key', pairKey).eq('msg_id', msgId)
+    .then(({ data }) => reactionsToMap(data, 'from_nick'));
+}
+function reactionsToMap(rows, nickField) {
+  const out = {};
+  for (const r of rows || []) (out[r.emoji] ??= []).push(r[nickField]);
+  return out;
+}
+
 // Лічильники непрочитаного (chat_reads). Повертає мапу {chat_id: last_read_ts}
 // для одного юзера й типу ('group'|'channel'). Відсутній вказівник → трактуємо як
 // 0 (усе прочитане до першого відкриття), щоб на першому запуску після цієї фічі
@@ -2501,7 +2520,22 @@ wss.on('connection', (ws) => {
 
         const { data: pendingReactions, error: prErr } = await supabase.from('pending_reactions').select('*').eq('to_nick', userNick);
         if (prErr) console.log(`[reaction] pending SELECT FAILED for=${userNick}: ${prErr.message}`);
-        if (pendingReactions && pendingReactions.length > 0) { for (const r of pendingReactions) ws.send(JSON.stringify({ type: 'reaction', msgId: r.msg_id, emoji: r.emoji, from: r.from_nick, chatNick: r.chat_nick, groupId: r.group_id != null ? Number(r.group_id) : null })); await supabase.from('pending_reactions').delete().eq('to_nick', userNick); }
+        if (pendingReactions && pendingReactions.length > 0) {
+          // Дедуп: на одне повідомлення могло накопичитись кілька відкладених
+          // подій — актуальний стан у них однаковий, тож шлемо його раз.
+          const seen = new Set();
+          for (const r of pendingReactions) {
+            const gid = r.group_id != null ? Number(r.group_id) : null;
+            const key = `${gid ?? r.chat_nick}|${r.msg_id}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const reactions = gid != null
+              ? await groupReactionsState(gid, r.msg_id)
+              : await directReactionsState([userNick, r.chat_nick].sort().join('|'), r.msg_id);
+            ws.send(JSON.stringify({ type: 'reaction', msgId: r.msg_id, emoji: r.emoji, from: r.from_nick, chatNick: r.chat_nick, groupId: gid, reactions }));
+          }
+          await supabase.from('pending_reactions').delete().eq('to_nick', userNick);
+        }
 
         const { data: modGroups } = await supabase.from('group_members').select('group_id').eq('nick', userNick).in('role', ['creator', 'moderator']);
         if (modGroups && modGroups.length > 0) { for (const gm of modGroups) { const { data: reqs } = await supabase.from('group_join_requests').select('nick').eq('group_id', gm.group_id).eq('status', 'pending'); if (reqs && reqs.length > 0) { const { data: g } = await supabase.from('groups').select('name').eq('id', gm.group_id).single(); for (const r of reqs) ws.send(JSON.stringify({ type: 'group_join_request', groupId: gm.group_id, groupName: g?.name, nick: r.nick })); } } }
@@ -2683,7 +2717,38 @@ wss.on('connection', (ws) => {
           }
         }
       }
-      if (msg.type === 'reaction') { const { msgId, emoji, chatNick, groupId } = msg; const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, groupId }; if (groupId) { const { data: ex } = await supabase.from('group_message_reactions').select('id').eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick).eq('emoji', emoji).maybeSingle(); if (ex) { await supabase.from('group_message_reactions').delete().eq('id', ex.id); } else { await supabase.from('group_message_reactions').delete().eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick); await supabase.from('group_message_reactions').insert({ msg_id: msgId, group_id: groupId, nick: userNick, emoji }); } const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId); const rcpt = (members || []).filter(m => m.nick !== userNick); for (const m of rcpt) { if (sendToUser(m.nick, payload)) continue; const { error: pErr } = await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null }); if (pErr) console.log(`[reaction] pending INSERT FAILED to=${m.nick}: ${pErr.message}`); } } else if (chatNick) { const pairKey = [userNick, chatNick].sort().join('|'); const { data: dex } = await supabase.from('direct_message_reactions').select('id').eq('msg_id', msgId).eq('from_nick', userNick).eq('emoji', emoji).maybeSingle(); if (dex) { await supabase.from('direct_message_reactions').delete().eq('id', dex.id); } else { await supabase.from('direct_message_reactions').delete().eq('msg_id', msgId).eq('from_nick', userNick).eq('pair_key', pairKey); await supabase.from('direct_message_reactions').insert({ msg_id: msgId, from_nick: userNick, emoji, pair_key: pairKey }); } if (!sendToUser(chatNick, payload)) { const { error: pErr } = await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null }); if (pErr) console.log(`[reaction] pending INSERT FAILED to=${chatNick}: ${pErr.message}`); } } }
+      if (msg.type === 'reaction') {
+        const { msgId, emoji, chatNick, groupId } = msg;
+        if (groupId) {
+          const { data: ex } = await supabase.from('group_message_reactions').select('id').eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick).eq('emoji', emoji).maybeSingle();
+          if (ex) { await supabase.from('group_message_reactions').delete().eq('id', ex.id); }
+          else {
+            await supabase.from('group_message_reactions').delete().eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick);
+            await supabase.from('group_message_reactions').insert({ msg_id: msgId, group_id: groupId, nick: userNick, emoji });
+          }
+          const payload = { type: 'reaction', msgId, emoji, from: userNick, groupId, reactions: await groupReactionsState(groupId, msgId) };
+          const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
+          for (const m of (members || [])) {
+            if (m.nick === userNick) continue;
+            if (sendToUser(m.nick, payload)) continue;
+            const { error: pErr } = await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: m.nick, group_id: groupId, chat_nick: null });
+            if (pErr) console.log(`[reaction] pending INSERT FAILED to=${m.nick}: ${pErr.message}`);
+          }
+        } else if (chatNick) {
+          const pairKey = [userNick, chatNick].sort().join('|');
+          const { data: dex } = await supabase.from('direct_message_reactions').select('id').eq('msg_id', msgId).eq('from_nick', userNick).eq('emoji', emoji).maybeSingle();
+          if (dex) { await supabase.from('direct_message_reactions').delete().eq('id', dex.id); }
+          else {
+            await supabase.from('direct_message_reactions').delete().eq('msg_id', msgId).eq('from_nick', userNick).eq('pair_key', pairKey);
+            await supabase.from('direct_message_reactions').insert({ msg_id: msgId, from_nick: userNick, emoji, pair_key: pairKey });
+          }
+          const payload = { type: 'reaction', msgId, emoji, from: userNick, chatNick, reactions: await directReactionsState(pairKey, msgId) };
+          if (!sendToUser(chatNick, payload)) {
+            const { error: pErr } = await supabase.from('pending_reactions').insert({ msg_id: msgId, emoji, from_nick: userNick, to_nick: chatNick, chat_nick: chatNick, group_id: null });
+            if (pErr) console.log(`[reaction] pending INSERT FAILED to=${chatNick}: ${pErr.message}`);
+          }
+        }
+      }
       if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); sendToUser(msg.to, { type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }); }
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
       if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
