@@ -212,6 +212,7 @@
   "msg_invalid_phone": "号码无效（格式：+380XXXXXXXXX）",
   "msg_phone_registered": "该号码已在 EION 注册",
   "msg_no_microphone": "没有麦克风权限",
+  "voice_no_recorder": "录制语音需要 pulseaudio-utils 软件包：sudo apt install pulseaudio-utils",
   "msg_no_camera_mic": "无法访问麦克风或摄像头",
   "msg_no_contacts_access": "无法访问联系人",
   "msg_no_contacts_found": "未找到联系人",

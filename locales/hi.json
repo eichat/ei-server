@@ -212,6 +212,7 @@
   "msg_invalid_phone": "अमान्य नंबर (प्रारूप: +380XXXXXXXXX)",
   "msg_phone_registered": "यह नंबर पहले से EION में पंजीकृत है",
   "msg_no_microphone": "माइक्रोफ़ोन की अनुमति नहीं",
+  "voice_no_recorder": "वॉइस रिकॉर्डिंग के लिए pulseaudio-utils पैकेज चाहिए: sudo apt install pulseaudio-utils",
   "msg_no_camera_mic": "माइक्रोफ़ोन या कैमरे तक पहुँच नहीं",
   "msg_no_contacts_access": "संपर्कों तक पहुँच नहीं",
   "msg_no_contacts_found": "कोई संपर्क नहीं मिला",

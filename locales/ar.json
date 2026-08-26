@@ -212,6 +212,7 @@
   "msg_invalid_phone": "رقم غير صالح (الصيغة: +380XXXXXXXXX)",
   "msg_phone_registered": "هذا الرقم مسجّل بالفعل في EION",
   "msg_no_microphone": "لا يوجد إذن للميكروفون",
+  "voice_no_recorder": "يتطلب تسجيل الرسائل الصوتية حزمة pulseaudio-utils: sudo apt install pulseaudio-utils",
   "msg_no_camera_mic": "لا يوجد وصول إلى الميكروفون أو الكاميرا",
   "msg_no_contacts_access": "لا يوجد وصول إلى جهات الاتصال",
   "msg_no_contacts_found": "لم يتم العثور على جهات اتصال",

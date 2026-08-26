@@ -212,6 +212,7 @@
   "msg_invalid_phone": "잘못된 번호 (형식: +380XXXXXXXXX)",
   "msg_phone_registered": "이 번호는 이미 EION에 등록되어 있습니다",
   "msg_no_microphone": "마이크 권한이 없습니다",
+  "voice_no_recorder": "음성 녹음에는 pulseaudio-utils 패키지가 필요합니다: sudo apt install pulseaudio-utils",
   "msg_no_camera_mic": "마이크 또는 카메라에 접근할 수 없습니다",
   "msg_no_contacts_access": "연락처에 접근할 수 없습니다",
   "msg_no_contacts_found": "연락처를 찾을 수 없습니다",

@@ -212,6 +212,7 @@
   "msg_invalid_phone": "Número inválido (formato: +380XXXXXXXXX)",
   "msg_phone_registered": "Este número já está cadastrado no EION",
   "msg_no_microphone": "Sem permissão para microfone",
+  "voice_no_recorder": "A gravação de voz precisa do pacote pulseaudio-utils: sudo apt install pulseaudio-utils",
   "msg_no_camera_mic": "Sem acesso ao microfone ou câmera",
   "msg_no_contacts_access": "Sem acesso aos contatos",
   "msg_no_contacts_found": "Nenhum contato encontrado",
