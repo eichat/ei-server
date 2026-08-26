@@ -514,7 +514,7 @@ $function$
 -- ─────────────────────────────────────────────────────────────────
 
 alter table public.block_allowlist enable row level security;
-alter table public.blocked_contacts disable row level security;
+alter table public.blocked_contacts enable row level security;
 alter table public.call_logs enable row level security;
 alter table public.channel_blocked enable row level security;
 alter table public.channel_comment_reactions enable row level security;
@@ -529,7 +529,7 @@ alter table public.chat_reads enable row level security;
 alter table public.coin_transactions enable row level security;
 alter table public.deleted_messages enable row level security;
 alter table public.direct_message_reactions enable row level security;
-alter table public.file_objects disable row level security;
+alter table public.file_objects enable row level security;
 alter table public.group_bans enable row level security;
 alter table public.group_history_cleared enable row level security;
 alter table public.group_join_requests enable row level security;
@@ -703,8 +703,6 @@ create policy "service_all" on public.users
 
 grant delete, insert, references, select, trigger, truncate, update on table public.block_allowlist to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.block_allowlist to service_role;
-grant references, trigger, truncate on table public.blocked_contacts to anon;
-grant references, trigger, truncate on table public.blocked_contacts to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.blocked_contacts to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.blocked_contacts to service_role;
 grant references, trigger, truncate on table public.call_logs to anon;
@@ -735,8 +733,6 @@ grant references, trigger, truncate on table public.channel_paid_subs to anon;
 grant references, trigger, truncate on table public.channel_paid_subs to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_paid_subs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_paid_subs to service_role;
-grant delete, insert, references, select, trigger, truncate, update on table public.channel_post_views to anon;
-grant delete, insert, references, select, trigger, truncate, update on table public.channel_post_views to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_post_views to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_post_views to service_role;
 grant references, trigger, truncate on table public.channel_reactions to anon;
@@ -747,8 +743,6 @@ grant references, trigger, truncate on table public.channels to anon;
 grant references, trigger, truncate on table public.channels to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channels to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channels to service_role;
-grant delete, insert, references, select, trigger, truncate, update on table public.chat_reads to anon;
-grant delete, insert, references, select, trigger, truncate, update on table public.chat_reads to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.chat_reads to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.chat_reads to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_transactions to postgres;
@@ -761,8 +755,6 @@ grant references, trigger, truncate on table public.direct_message_reactions to 
 grant references, trigger, truncate on table public.direct_message_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to service_role;
-grant delete, insert, references, select, trigger, truncate, update on table public.file_objects to anon;
-grant references, trigger, truncate on table public.file_objects to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.file_objects to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.file_objects to service_role;
 grant references, trigger, truncate on table public.group_bans to anon;
@@ -809,8 +801,6 @@ grant references, trigger, truncate on table public.pending_reactions to anon;
 grant references, trigger, truncate on table public.pending_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_reactions to service_role;
-grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to anon;
-grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to service_role;
 grant references, trigger, truncate on table public.platform_bans to anon;
