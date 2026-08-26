@@ -125,7 +125,7 @@ app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/re
 // моніторинг + /admin/* (свій захист секретом X-Admin-Secret). WS автентифікується
 // окремо в login-хендлері.
 const PUBLIC_PATHS = new Set([
-  '/health', '/stats', '/ping',
+  '/health', '/stats', '/ping', '/keepalive',
   '/login', '/register', '/forgot', '/reset', '/verify-email',
   '/phone/request-code', '/phone/verify-code',
 ]);
@@ -142,6 +142,25 @@ app.use((req, res, next) => {
 // ── Моніторинг ────────────────────────────────────────────────────────────
 // Публічний liveness — БЕЗ чутливих даних (його бачить будь-хто): лише «живий».
 app.get('/health', (req, res) => res.json({ ok: true }));
+
+// Не дати заснути БАЗІ, а не лише веб-сервісу.
+// Supabase на безкоштовному тарифі присипляє проєкт після ~7 днів без
+// ЗАПИТІВ ДО БД. `/health` і `/ping` до Supabase не звертаються взагалі,
+// тож пінг на них піднімає Render, а база далі спить — і виглядає це
+// як «моніторинг працює». Тут навмисно робиться справжній запит.
+// Будиться ззовні: .github/workflows/keepalive.yml, кожні 6 годин.
+// 503 при збої — щоб зламана БД була ВИДНА (workflow впаде), а не тиха.
+app.get('/keepalive', async (req, res) => {
+  const t0 = Date.now();
+  try {
+    const { error } = await supabase.from('users').select('nick').limit(1);
+    if (error) throw new Error(error.message);
+    res.json({ ok: true, db: true, ms: Date.now() - t0 });
+  } catch (e) {
+    console.log('[keepalive] db error:', e.message);
+    res.status(503).json({ ok: false, db: false, error: e.message, ms: Date.now() - t0 });
+  }
+});
 // Приватна статистика — лише за секретним токеном з env (STATS_KEY).
 app.get('/stats', (req, res) => {
   const key = process.env.STATS_KEY;
