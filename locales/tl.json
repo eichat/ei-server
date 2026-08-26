@@ -214,6 +214,7 @@
   "msg_no_microphone": "Walang pahintulot sa mikropono",
   "voice_no_recorder": "Hindi masimulan ang pag-record — hindi available ang mikropono",
   "voice_mic_too_loud": "Sobra ang lakas ng mikropono — babaan ang input volume sa sound settings",
+  "voice_mic_adjusted": "Sobra ang lakas ng mikropono — awtomatikong binabaan ang input volume",
   "msg_no_camera_mic": "Walang access sa mikropono o camera",
   "msg_no_contacts_access": "Walang access sa mga contact",
   "msg_no_contacts_found": "Walang nahanap na contact",

@@ -214,6 +214,7 @@
   "msg_no_microphone": "Sem permissão para microfone",
   "voice_no_recorder": "Não foi possível iniciar a gravação — microfone indisponível",
   "voice_mic_too_loud": "Microfone sobrecarregado — reduza o volume de entrada nas configurações de som",
+  "voice_mic_adjusted": "O microfone estava sobrecarregado — volume reduzido automaticamente",
   "msg_no_camera_mic": "Sem acesso ao microfone ou câmera",
   "msg_no_contacts_access": "Sem acesso aos contatos",
   "msg_no_contacts_found": "Nenhum contato encontrado",

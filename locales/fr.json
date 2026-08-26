@@ -214,6 +214,7 @@
   "msg_no_microphone": "Pas d'autorisation microphone",
   "voice_no_recorder": "Impossible de démarrer l'enregistrement — microphone indisponible",
   "voice_mic_too_loud": "Micro saturé — baissez le volume d'entrée dans les réglages audio",
+  "voice_mic_adjusted": "Le micro saturait — volume d'entrée baissé automatiquement",
   "msg_no_camera_mic": "Pas d'accès au microphone ou à la caméra",
   "msg_no_contacts_access": "Pas d'accès aux contacts",
   "msg_no_contacts_found": "Aucun contact trouvé",

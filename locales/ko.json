@@ -214,6 +214,7 @@
   "msg_no_microphone": "마이크 권한이 없습니다",
   "voice_no_recorder": "녹음을 시작할 수 없습니다 — 마이크를 사용할 수 없습니다",
   "voice_mic_too_loud": "마이크 입력이 너무 큽니다 — 소리 설정에서 입력 볼륨을 낮추세요",
+  "voice_mic_adjusted": "마이크 입력이 너무 커서 입력 볼륨을 자동으로 낮췄습니다",
   "msg_no_camera_mic": "마이크 또는 카메라에 접근할 수 없습니다",
   "msg_no_contacts_access": "연락처에 접근할 수 없습니다",
   "msg_no_contacts_found": "연락처를 찾을 수 없습니다",

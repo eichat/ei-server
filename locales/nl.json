@@ -214,6 +214,7 @@
   "msg_no_microphone": "Geen microfoontoestemming",
   "voice_no_recorder": "Opname kon niet starten — microfoon niet beschikbaar",
   "voice_mic_too_loud": "Microfoon oversturd — verlaag het ingangsvolume in de geluidsinstellingen",
+  "voice_mic_adjusted": "Microfoon was oversturd — ingangsvolume automatisch verlaagd",
   "msg_no_camera_mic": "Geen toegang tot microfoon of camera",
   "msg_no_contacts_access": "Geen toegang tot contacten",
   "msg_no_contacts_found": "Geen contacten gevonden",

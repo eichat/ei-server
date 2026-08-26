@@ -214,6 +214,7 @@
   "msg_no_microphone": "Keine Mikrofonberechtigung",
   "voice_no_recorder": "Aufnahme konnte nicht gestartet werden – Mikrofon nicht verfügbar",
   "voice_mic_too_loud": "Mikrofon übersteuert – Eingangspegel in den Toneinstellungen senken",
+  "voice_mic_adjusted": "Mikrofon war übersteuert – Eingangspegel automatisch gesenkt",
   "msg_no_camera_mic": "Kein Zugriff auf Mikrofon oder Kamera",
   "msg_no_contacts_access": "Kein Zugriff auf Kontakte",
   "msg_no_contacts_found": "Keine Kontakte gefunden",
