@@ -590,5 +590,6 @@
   "missed_calls_title": "Gemiste oproepen",
   "missed_call_from": "Gemiste oproep van {nick}",
   "missed_calls_count": "{count} gemiste oproepen",
-  "video_broken_source": "Deze video is onvolledig gelezen — verstuur hem via «Bestanden»"
+  "video_broken_source": "Deze video is onvolledig gelezen — verstuur hem via «Bestanden»",
+  "media_gallery_video": "Video uit galerij"
 }

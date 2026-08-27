@@ -590,5 +590,6 @@
   "missed_calls_title": "Пропущені дзвінки",
   "missed_call_from": "Пропущений дзвінок від {nick}",
   "missed_calls_count": "{count} пропущених дзвінків",
-  "video_broken_source": "Це відео прочиталось не повністю — надішліть його через «Файли»"
+  "video_broken_source": "Це відео прочиталось не повністю — надішліть його через «Файли»",
+  "media_gallery_video": "Відео з галереї"
 }

@@ -590,5 +590,6 @@
   "missed_calls_title": "Mga hindi nasagot na tawag",
   "missed_call_from": "Hindi nasagot na tawag mula kay {nick}",
   "missed_calls_count": "{count} hindi nasagot na tawag",
-  "video_broken_source": "Hindi kumpletong nabasa ang video na ito — ipadala ito sa pamamagitan ng «Mga File»"
+  "video_broken_source": "Hindi kumpletong nabasa ang video na ito — ipadala ito sa pamamagitan ng «Mga File»",
+  "media_gallery_video": "Video mula sa gallery"
 }

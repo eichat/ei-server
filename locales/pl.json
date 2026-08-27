@@ -590,5 +590,6 @@
   "missed_calls_title": "Nieodebrane połączenia",
   "missed_call_from": "Nieodebrane połączenie od {nick}",
   "missed_calls_count": "{count} nieodebranych połączeń",
-  "video_broken_source": "To wideo zostało odczytane niekompletnie — wyślij je przez „Pliki”"
+  "video_broken_source": "To wideo zostało odczytane niekompletnie — wyślij je przez „Pliki”",
+  "media_gallery_video": "Wideo z galerii"
 }
