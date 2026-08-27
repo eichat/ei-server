@@ -589,5 +589,6 @@
   "call_connect_failed": "连接失败",
   "missed_calls_title": "未接来电",
   "missed_call_from": "来自 {nick} 的未接来电",
-  "missed_calls_count": "{count} 个未接来电"
+  "missed_calls_count": "{count} 个未接来电",
+  "video_broken_source": "此视频未完整读取，请通过“文件”发送"
 }

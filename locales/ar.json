@@ -589,5 +589,6 @@
   "call_connect_failed": "تعذّر الاتصال",
   "missed_calls_title": "مكالمات فائتة",
   "missed_call_from": "مكالمة فائتة من {nick}",
-  "missed_calls_count": "{count} مكالمات فائتة"
+  "missed_calls_count": "{count} مكالمات فائتة",
+  "video_broken_source": "تمت قراءة هذا الفيديو بشكل غير مكتمل — أرسله عبر «الملفات»"
 }

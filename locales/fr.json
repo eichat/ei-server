@@ -589,5 +589,6 @@
   "call_connect_failed": "Échec de la connexion",
   "missed_calls_title": "Appels manqués",
   "missed_call_from": "Appel manqué de {nick}",
-  "missed_calls_count": "{count} appels manqués"
+  "missed_calls_count": "{count} appels manqués",
+  "video_broken_source": "Cette vidéo a été lue de façon incomplète — envoyez-la via « Fichiers »"
 }

@@ -589,5 +589,6 @@
   "call_connect_failed": "연결하지 못했습니다",
   "missed_calls_title": "부재중 전화",
   "missed_call_from": "{nick}님의 부재중 전화",
-  "missed_calls_count": "부재중 전화 {count}건"
+  "missed_calls_count": "부재중 전화 {count}건",
+  "video_broken_source": "이 동영상을 완전히 읽지 못했습니다. «파일»을 통해 보내세요"
 }

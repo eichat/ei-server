@@ -589,5 +589,6 @@
   "call_connect_failed": "সংযোগ ব্যর্থ হয়েছে",
   "missed_calls_title": "মিসড কল",
   "missed_call_from": "{nick} থেকে মিসড কল",
-  "missed_calls_count": "{count}টি মিসড কল"
+  "missed_calls_count": "{count}টি মিসড কল",
+  "video_broken_source": "এই ভিডিওটি সম্পূর্ণ পড়া যায়নি — «ফাইল» দিয়ে পাঠান"
 }

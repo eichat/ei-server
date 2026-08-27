@@ -589,5 +589,6 @@
   "call_connect_failed": "Failed to connect",
   "missed_calls_title": "Missed calls",
   "missed_call_from": "Missed call from {nick}",
-  "missed_calls_count": "{count} missed calls"
+  "missed_calls_count": "{count} missed calls",
+  "video_broken_source": "This video was read incompletely — send it via \"Files\""
 }

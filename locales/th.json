@@ -589,5 +589,6 @@
   "call_connect_failed": "เชื่อมต่อไม่สำเร็จ",
   "missed_calls_title": "สายที่ไม่ได้รับ",
   "missed_call_from": "สายที่ไม่ได้รับจาก {nick}",
-  "missed_calls_count": "สายที่ไม่ได้รับ {count} สาย"
+  "missed_calls_count": "สายที่ไม่ได้รับ {count} สาย",
+  "video_broken_source": "อ่านวิดีโอนี้ได้ไม่ครบ — กรุณาส่งผ่าน «ไฟล์»"
 }

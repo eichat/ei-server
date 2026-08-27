@@ -589,5 +589,6 @@
   "call_connect_failed": "Không thể kết nối",
   "missed_calls_title": "Cuộc gọi nhỡ",
   "missed_call_from": "Cuộc gọi nhỡ từ {nick}",
-  "missed_calls_count": "{count} cuộc gọi nhỡ"
+  "missed_calls_count": "{count} cuộc gọi nhỡ",
+  "video_broken_source": "Video này đọc không đầy đủ — hãy gửi qua «Tệp»"
 }

@@ -589,5 +589,6 @@
   "call_connect_failed": "Verbinden mislukt",
   "missed_calls_title": "Gemiste oproepen",
   "missed_call_from": "Gemiste oproep van {nick}",
-  "missed_calls_count": "{count} gemiste oproepen"
+  "missed_calls_count": "{count} gemiste oproepen",
+  "video_broken_source": "Deze video is onvolledig gelezen — verstuur hem via «Bestanden»"
 }

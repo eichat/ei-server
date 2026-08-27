@@ -589,5 +589,6 @@
   "call_connect_failed": "Nabigong kumonekta",
   "missed_calls_title": "Mga hindi nasagot na tawag",
   "missed_call_from": "Hindi nasagot na tawag mula kay {nick}",
-  "missed_calls_count": "{count} hindi nasagot na tawag"
+  "missed_calls_count": "{count} hindi nasagot na tawag",
+  "video_broken_source": "Hindi kumpletong nabasa ang video na ito — ipadala ito sa pamamagitan ng «Mga File»"
 }
