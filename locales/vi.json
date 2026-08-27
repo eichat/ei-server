@@ -591,5 +591,6 @@
   "missed_call_from": "Cuộc gọi nhỡ từ {nick}",
   "missed_calls_count": "{count} cuộc gọi nhỡ",
   "video_broken_source": "Video này đọc không đầy đủ — hãy gửi qua «Tệp»",
-  "media_gallery_video": "Video từ thư viện"
+  "media_gallery_video": "Video từ thư viện",
+  "upload_sending": "Đang gửi…"
 }

@@ -591,5 +591,6 @@
   "missed_call_from": "Verpasster Anruf von {nick}",
   "missed_calls_count": "{count} verpasste Anrufe",
   "video_broken_source": "Dieses Video wurde unvollständig gelesen – senden Sie es über „Dateien“",
-  "media_gallery_video": "Video aus der Galerie"
+  "media_gallery_video": "Video aus der Galerie",
+  "upload_sending": "Wird gesendet…"
 }

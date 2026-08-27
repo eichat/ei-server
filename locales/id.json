@@ -591,5 +591,6 @@
   "missed_call_from": "Panggilan tidak terjawab dari {nick}",
   "missed_calls_count": "{count} panggilan tidak terjawab",
   "video_broken_source": "Video ini terbaca tidak lengkap — kirim melalui «File»",
-  "media_gallery_video": "Video dari galeri"
+  "media_gallery_video": "Video dari galeri",
+  "upload_sending": "Mengirim…"
 }

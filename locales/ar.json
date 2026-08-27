@@ -591,5 +591,6 @@
   "missed_call_from": "مكالمة فائتة من {nick}",
   "missed_calls_count": "{count} مكالمات فائتة",
   "video_broken_source": "تمت قراءة هذا الفيديو بشكل غير مكتمل — أرسله عبر «الملفات»",
-  "media_gallery_video": "فيديو من المعرض"
+  "media_gallery_video": "فيديو من المعرض",
+  "upload_sending": "جارٍ الإرسال…"
 }

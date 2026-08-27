@@ -591,5 +591,6 @@
   "missed_call_from": "{nick} से छूटी हुई कॉल",
   "missed_calls_count": "{count} छूटी हुई कॉल",
   "video_broken_source": "यह वीडियो पूरी तरह नहीं पढ़ा गया — इसे «फ़ाइलें» से भेजें",
-  "media_gallery_video": "गैलरी से वीडियो"
+  "media_gallery_video": "गैलरी से वीडियो",
+  "upload_sending": "भेजा जा रहा है…"
 }

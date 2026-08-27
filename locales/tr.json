@@ -591,5 +591,6 @@
   "missed_call_from": "{nick} kişisinden cevapsız arama",
   "missed_calls_count": "{count} cevapsız arama",
   "video_broken_source": "Bu video eksik okundu — «Dosyalar» üzerinden gönderin",
-  "media_gallery_video": "Galeriden video"
+  "media_gallery_video": "Galeriden video",
+  "upload_sending": "Gönderiliyor…"
 }
