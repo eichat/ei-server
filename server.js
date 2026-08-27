@@ -2527,7 +2527,7 @@ wss.on('connection', (ws) => {
           for (const m of pending) {
             // Storage 2.3: реф (eion://) теж іде як fileUrl (не base64 data), а весь
             // payload підписується — цей шлях повз sendToUser і res.json чокпойнти.
-            const payload = m.type === 'sticker' ? { type: 'sticker', from: m.from_nick, ...decodeStickerContent(m.content), timestamp: m.timestamp, msgId: m.msg_id } : m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, ...(m.file_data && /^(https?:\/\/|eion:\/\/)/.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}), ...(m.reply_to_image ? { replyToImage: m.reply_to_image } : {}) };
+            const payload = m.type === 'sticker' ? { type: 'sticker', from: m.from_nick, ...decodeStickerContent(m.content), timestamp: m.timestamp, msgId: m.msg_id } : m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, ...(m.content && m.content !== m.file_name ? { caption: m.content } : {}), ...(m.file_data && /^(https?:\/\/|eion:\/\/)/.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}), ...(m.reply_to_image ? { replyToImage: m.reply_to_image } : {}) };
             ws.send(JSON.stringify(await signDeep(payload)));
           }
           await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
@@ -2539,7 +2539,7 @@ wss.on('connection', (ws) => {
             const { data: pendingGroup } = await supabase.from('group_messages').select('*').eq('group_id', gm.group_id).not('delivered_to', 'cs', `{"${userNick}"}`).order('timestamp', { ascending: true });
             const deliveredBySender = {}; // автор → msgIds, що аж тепер дійшли цьому юзеру
             if (pendingGroup && pendingGroup.length > 0) { for (const m of pendingGroup) {
-              if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.file_data && /^(https?|eion):\/\//.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, catchup: true, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
+              if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.content && m.content !== m.file_name ? { caption: m.content } : {}), ...(m.file_data && /^(https?|eion):\/\//.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, catchup: true, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
               else ws.send(JSON.stringify({ type: 'group_message', groupId: m.group_id, from: m.from_nick, text: m.content, timestamp: m.timestamp, msgId: m.msg_id, catchup: true }));
               await supabase.from('group_messages').update({ delivered_to: [...(m.delivered_to || []), userNick] }).eq('id', m.id);
               if (m.msg_id && m.from_nick !== userNick) (deliveredBySender[m.from_nick] ??= []).push(m.msg_id);
@@ -2674,9 +2674,9 @@ wss.on('connection', (ws) => {
           if (!membership) return;
           const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId);
           const onlineMembers = (members || []).map(m => m.nick).filter(n => n !== userNick && isLive(n));
-          await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.fileName, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: fileData, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
+          await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: mediaCaption(msg), timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'file', file_name: msg.fileName, file_data: fileData, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, (members || []).map(m => m.nick).filter(n => n !== userNick)); // 2C
-          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
+          for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
           notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
         } else {
           if (await isBlockedBy(msg.to, userNick)) return;
@@ -2686,9 +2686,9 @@ wss.on('connection', (ws) => {
           }
           await grantAllowlistIfBlocking(userNick, msg.to);
           const target = liveTarget(msg.to); const status = target ? 'delivered' : 'sent';
-          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: msg.fileName, file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
+          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: mediaCaption(msg), file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, [msg.to]); // 2C
-          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
           else { sendFcmPush(msg.to, { type: 'message', from_nick: userNick }); }
         }
       }
@@ -3052,6 +3052,15 @@ async function cleanupGroups() {
 const FILE_OBJECT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // жорсткий TTL: 30 днів
 
 // Заводимо облік для надісланого файлу: хто має забрати (recipients).
+// Підпис до медіа їде в колонці `content`: для файлових повідомлень вона й так
+// дублювала `file_name` (саме ім'я лежить в окремій колонці), тож нової колонки
+// не треба. Клієнт відрізняє підпис від службового імені саме за цією
+// нерівністю — так само, як це давно зроблено в коментарях каналів.
+function mediaCaption(msg) {
+  const c = typeof msg.caption === 'string' ? msg.caption.trim() : '';
+  return c ? c.slice(0, 4000) : msg.fileName;
+}
+
 async function trackFileObject(fileData, recipients) {
   const path = storagePathFromUrl(fileData);
   if (!path || !recipients || !recipients.length) return;
