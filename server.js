@@ -196,6 +196,42 @@ const fcmTokens = new Map();
 // інакше дзвінок «сам собі»).
 const nickDevices = new Map();
 const pendingCallOffers = new Map();
+
+// FCM-токени живуть у БД, а ці Map — лише кеш процесу. Тримати їх ЛИШЕ в
+// пам'яті не можна: кожен деплой на Render обнуляв мапу, і пуші замовкали, бо
+// відновити токен міг тільки сам клієнт при WS-логіні — а клієнт, якому
+// потрібен пуш, за визначенням офлайн і залогінитись не може (27.08.2026).
+async function saveFcmToken(nick, token, deviceId) {
+  fcmTokens.set(nick, token);
+  if (deviceId) nickDevices.set(nick, deviceId);
+  try {
+    const patch = { fcm_token: token };
+    if (deviceId) patch.fcm_device_id = deviceId;
+    await supabase.from('users').update(patch).eq('nick_lower', nick.toLowerCase());
+  } catch (e) { console.error(`saveFcmToken(${nick}):`, e.message); }
+}
+
+async function getFcmToken(nick) {
+  const cached = fcmTokens.get(nick);
+  if (cached) return cached;
+  try {
+    const { data } = await supabase.from('users').select('fcm_token, fcm_device_id').eq('nick_lower', nick.toLowerCase()).single();
+    if (data && data.fcm_token) {
+      fcmTokens.set(nick, data.fcm_token);
+      if (data.fcm_device_id) nickDevices.set(nick, data.fcm_device_id);
+      return data.fcm_token;
+    }
+  } catch (e) { console.error(`getFcmToken(${nick}):`, e.message); }
+  return null;
+}
+
+async function clearFcmToken(nick) {
+  fcmTokens.delete(nick);
+  nickDevices.delete(nick);
+  try {
+    await supabase.from('users').update({ fcm_token: null, fcm_device_id: null }).eq('nick_lower', nick.toLowerCase());
+  } catch (e) { console.error(`clearFcmToken(${nick}):`, e.message); }
+}
 const linkPreviewCache = new Map();
 
 // ── Сесійні токени (Фаза 1 аудиту): STATELESS HMAC ──────────────────────────
@@ -397,7 +433,7 @@ app.post('/ai/chat', (req, res) => {
 });
 
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
-  const token = fcmTokens.get(toNick); if (!token) return;
+  const token = await getFcmToken(toNick); if (!token) return;
   const callId = `${fromNick}_${toNick}_${Date.now()}`;
   pendingCallOffers.set(callId, { fromNick, toNick, offer: typeof offer === 'string' ? offer : JSON.stringify(offer), hasVideo, expires: Date.now() + 60000 });
   try {
@@ -406,7 +442,7 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   } catch (e) {
     console.error(`Помилка FCM push до ${toNick}:`, e.message);
     pendingCallOffers.delete(callId);
-    if (e.code === 'messaging/registration-token-not-registered') fcmTokens.delete(toNick);
+    if (e.code === 'messaging/registration-token-not-registered') await clearFcmToken(toNick);
   }
 }
 
@@ -416,7 +452,7 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
 // після перезапуску»). Дефолт — 4 год для повідомлень; коротші значення
 // передаються явно там, де протухлий пуш недоречний (напр. call_end).
 async function sendFcmPush(toNick, data, ttlMs = 14400000) {
-  const token = fcmTokens.get(toNick); if (!token) return;
+  const token = await getFcmToken(toNick); if (!token) return;
   // Не шлемо пуш на ВЛАСНИЙ пристрій: якщо адресат — інший акаунт на тому
   // самому телефоні (спільний FCM-токен), сповіщення набридали б власнику.
   // Саме повідомлення вже збережене й буде видиме при відкритті того акаунта.
@@ -430,7 +466,7 @@ async function sendFcmPush(toNick, data, ttlMs = 14400000) {
     }
   }
   try { await admin.messaging().send({ token, data, android: { priority: 'high', ttl: ttlMs } }); }
-  catch (e) { console.error(`FCM push error до ${toNick}:`, e.message); if (e.code === 'messaging/registration-token-not-registered') fcmTokens.delete(toNick); }
+  catch (e) { console.error(`FCM push error до ${toNick}:`, e.message); if (e.code === 'messaging/registration-token-not-registered') await clearFcmToken(toNick); }
 }
 
 // ── Єдина точка доставки повідомлення одному користувачу ──────────────────
@@ -998,7 +1034,7 @@ app.post('/delete-account', async (req, res) => {
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль' });
   await supabase.from('messages').delete().or(`from_nick.eq.${nick},to_nick.eq.${nick}`);
   await supabase.from('users').delete().eq('nick_lower', nick.toLowerCase());
-  onlineUsers.delete(nick); fcmTokens.delete(nick);
+  onlineUsers.delete(nick); await clearFcmToken(nick);
   await destroySessionsForNick(nick);
   res.json({ ok: true });
 });
@@ -1059,8 +1095,7 @@ app.post('/register-fcm-token', (req, res) => {
   const { token, deviceId } = req.body; // token тут = FCM-токен (не сесійний)
   const nick = req.nick; // Фаза 1/#14: FCM-токен реєструється ЛИШЕ на свій нік.
   if (!nick || !token) return res.json({ ok: false, error: 'Невірні параметри' });
-  fcmTokens.set(nick, token);
-  if (deviceId) nickDevices.set(nick, deviceId);
+  saveFcmToken(nick, token, deviceId);
   res.json({ ok: true });
 });
 
@@ -2462,8 +2497,7 @@ wss.on('connection', (ws) => {
         // тепер пристрій (лог 09.08: `push from=true to=true` для ніка на
         // Linux). Чистимо разом; клієнт на Android одразу після login_ok шле
         // register_fcm_token і повертає актуальний токен.
-        nickDevices.delete(userNick);
-        fcmTokens.delete(userNick);
+        await clearFcmToken(userNick);
         ws.send(JSON.stringify({ type: 'login_ok' }));
         // Невидимі (invisible) не сповіщають інших про свій онлайн.
         if (!invisibleNicks.has(userNick)) {
@@ -2555,7 +2589,7 @@ wss.on('connection', (ws) => {
         }
       }
 
-      if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { fcmTokens.set(userNick, msg.token); if (msg.deviceId) { nickDevices.set(userNick, msg.deviceId); ws.deviceId = msg.deviceId; } } }
+      if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { if (msg.deviceId) ws.deviceId = msg.deviceId; await saveFcmToken(userNick, msg.token, msg.deviceId); } }
       if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
       if (msg.type === 'connect_request') { if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
       if (msg.type === 'connect_response') { sendToUser(msg.to, { type: 'connect_response', from: userNick, accepted: msg.accepted }); }
@@ -2799,7 +2833,7 @@ wss.on('connection', (ws) => {
           return;
         }
         const openSocket = !!(target && target.ws && target.ws.readyState === 1 /* WebSocket.OPEN */);
-        const hasToken = fcmTokens.has(msg.to);
+        const hasToken = !!(await getFcmToken(msg.to));
         // ВАЖЛИВО: сокет міг «померти» (клієнт пішов у фон, code=1006), але ще
         // не бути прибраним із onlineUsers (delete/heartbeat не встигли). Тоді
         // наївний target.ws.send піде в нікуди, а FCM не спрацює — дзвінок
