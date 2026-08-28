@@ -36,8 +36,16 @@ const TRANSFER_FEE_PCT = 1;
 // Без цього rate-limit бачив би один IP проксі для всіх і різав би всіх гуртом.
 app.set('trust proxy', 1);
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-app.use(express.json({ limit: '60mb' }));
+// maxPayload (аудит #8): без нього ws приймає до 100 МБ на кадр. Реально
+// найбільше, що йде через WS, — голосове як base64-запасний шлях, коли
+// заливка у Storage не вдалась: 2 хв WAV 16 кГц ≈ 3,8 МБ → ≈5,1 МБ у base64.
+// 16 МБ лишає запас і водночас закриває найдешевший спосіб покласти інстанс.
+const wss = new WebSocket.Server({ server, maxPayload: 16 * 1024 * 1024 });
+// 60 МБ лишались із часів, коли файли йшли base64 всередині JSON. Після
+// переходу на підписані upload-URL (Storage 2.2) байти в HTTP більше не
+// потрапляють: найбільші тіла тепер — список телефонів (до 2000 номерів,
+// ≈30 КБ) і переписка для /ai/chat. 4 МБ — із великим запасом.
+app.use(express.json({ limit: '4mb' }));
 
 // ── Storage 2.3: підпис медіа-рефів у ВСІХ JSON-відповідях (чокпойнт HTTP) ───
 // Обгортає res.json так, що будь-який `eion://<bucket>/<path>` у тілі відповіді
@@ -155,7 +163,10 @@ app.get('/keepalive', async (req, res) => {
   try {
     const { error } = await supabase.from('users').select('nick').limit(1);
     if (error) throw new Error(error.message);
-    res.json({ ok: true, db: true, ms: Date.now() - t0 });
+    // node у відповіді — щоб бачити, на якій версії реально крутиться прод
+    // (локально 18.19.1, а @supabase/supabase-js уже просить 20+). Без цього
+    // фіксувати `engines` довелось би навмання.
+    res.json({ ok: true, db: true, ms: Date.now() - t0, node: process.version });
   } catch (e) {
     console.log('[keepalive] db error:', e.message);
     res.status(503).json({ ok: false, db: false, error: e.message, ms: Date.now() - t0 });
