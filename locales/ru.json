@@ -591,6 +591,5 @@
   "missed_call_from": "Пропущенный звонок от {nick}",
   "missed_calls_count": "{count} пропущенных звонков",
   "video_broken_source": "Это видео прочиталось не полностью — отправьте его через «Файлы»",
-  "media_gallery_video": "Видео из галереи",
   "upload_sending": "Отправка…"
 }

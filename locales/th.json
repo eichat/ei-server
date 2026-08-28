@@ -591,6 +591,5 @@
   "missed_call_from": "สายที่ไม่ได้รับจาก {nick}",
   "missed_calls_count": "สายที่ไม่ได้รับ {count} สาย",
   "video_broken_source": "อ่านวิดีโอนี้ได้ไม่ครบ — กรุณาส่งผ่าน «ไฟล์»",
-  "media_gallery_video": "วิดีโอจากแกลเลอรี",
   "upload_sending": "กำลังส่ง…"
 }

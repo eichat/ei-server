@@ -591,6 +591,5 @@
   "missed_call_from": "Chiamata persa da {nick}",
   "missed_calls_count": "{count} chiamate perse",
   "video_broken_source": "Questo video è stato letto in modo incompleto: invialo tramite «File»",
-  "media_gallery_video": "Video dalla galleria",
   "upload_sending": "Invio…"
 }

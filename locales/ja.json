@@ -591,6 +591,5 @@
   "missed_call_from": "{nick} からの不在着信",
   "missed_calls_count": "不在着信 {count} 件",
   "video_broken_source": "この動画は完全に読み込めませんでした。「ファイル」から送信してください",
-  "media_gallery_video": "ギャラリーの動画",
   "upload_sending": "送信中…"
 }

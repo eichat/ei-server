@@ -591,6 +591,5 @@
   "missed_call_from": "Llamada perdida de {nick}",
   "missed_calls_count": "{count} llamadas perdidas",
   "video_broken_source": "Este vídeo se leyó de forma incompleta: envíalo mediante «Archivos»",
-  "media_gallery_video": "Vídeo de la galería",
   "upload_sending": "Enviando…"
 }
