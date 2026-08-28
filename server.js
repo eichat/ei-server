@@ -549,10 +549,33 @@ function _parseMediaRef(value) {
   return { bucket, path };
 }
 
-// Підписує один реф. Не-реф (повний URL/порожнє/звичайний текст) → повертає як є.
-// Помилка підпису → повертає вихідне значення (не валимо відповідь).
+// Шлях зі СТАРОГО представлення: до рефів у БД лягали підписані та публічні
+// URL. Підпис живе SIGNED_URL_TTL (7 діб) — тобто таке медіа мовчки протухало
+// назавжди (Storage віддає 400), і його не можна було ні показати, ні зберегти.
+// Дістаємо з нього bucket+path, щоб підписати заново.
+function _parseStorageUrl(value) {
+  if (typeof value !== 'string') return null;
+  for (const marker of ['/object/sign/', '/object/public/']) {
+    const i = value.indexOf(marker);
+    if (i === -1) continue;
+    let tail = value.slice(i + marker.length);
+    const q = tail.indexOf('?');
+    if (q !== -1) tail = tail.slice(0, q);
+    const slash = tail.indexOf('/');
+    if (slash <= 0) return null;
+    const bucket = tail.slice(0, slash);
+    let path = tail.slice(slash + 1);
+    if (!STORAGE_BUCKETS_SET.has(bucket) || !path) return null;
+    try { path = decodeURIComponent(path); } catch (_) { /* лишаємо як є */ }
+    return { bucket, path };
+  }
+  return null;
+}
+
+// Підписує реф АБО перепідписує старий Storage-URL. Не наше (порожнє, чужий
+// хост, звичайний текст) → повертає як є. Помилка підпису → теж як є.
 async function signMediaRef(value) {
-  const ref = _parseMediaRef(value);
+  const ref = _parseMediaRef(value) || _parseStorageUrl(value);
   if (!ref) return value;
   const now = Date.now();
   const cached = _signedUrlCache.get(value);
