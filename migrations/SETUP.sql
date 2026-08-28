@@ -222,6 +222,16 @@ create table if not exists public.direct_message_reactions (
   constraint direct_message_reactions_msg_id_from_nick_emoji_key unique (msg_id, from_nick, emoji)
 );
 
+create table if not exists public.email_codes (
+  attempts integer NOT NULL DEFAULT 0,
+  code text NOT NULL,
+  email text NOT NULL,
+  expires_at timestamp with time zone NOT NULL,
+  last_sent_at timestamp with time zone,
+  nick text NOT NULL,
+  primary key (email)
+);
+
 create table if not exists public.file_objects (
   created_at bigint NOT NULL,
   downloaded_by text[] NOT NULL DEFAULT '{}'::text[],
@@ -529,6 +539,7 @@ alter table public.chat_reads enable row level security;
 alter table public.coin_transactions enable row level security;
 alter table public.deleted_messages enable row level security;
 alter table public.direct_message_reactions enable row level security;
+alter table public.email_codes enable row level security;
 alter table public.file_objects enable row level security;
 alter table public.group_bans enable row level security;
 alter table public.group_history_cleared enable row level security;
@@ -755,6 +766,8 @@ grant references, trigger, truncate on table public.direct_message_reactions to 
 grant references, trigger, truncate on table public.direct_message_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.email_codes to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.email_codes to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.file_objects to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.file_objects to service_role;
 grant references, trigger, truncate on table public.group_bans to anon;

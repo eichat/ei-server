@@ -205,7 +205,8 @@ const mailer = nodemailer.createTransport({
   socketTimeout: 20000,     // мовчання посеред сесії
 });
 const onlineUsers = new Map();
-const resetCodes = new Map();
+// Коди відновлення пароля живуть у таблиці email_codes (migrations/email_reset_codes.sql):
+// в пам'яті вони гинули при кожному рестарті/засинанні Render — див. коментар у міграції.
 const pendingRegistrations = new Map();
 const verifiedPhones = new Map(); // нормалізований номер -> expires (підтверджені, для реєстрації)
 const fcmTokens = new Map();
@@ -918,25 +919,54 @@ app.post('/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Код відновлення лежить у БД (email_codes), а не в пам'яті: Render присипляє
+// інстанс після ~15 хв бездіяльності, тобто рівно в межах життя коду.
 app.post('/forgot', async (req, res) => {
   const { email } = req.body;
-  const { data: user } = await supabase.from('users').select('*').eq('email', email).single();
+  const { data: user } = await supabase.from('users').select('nick').eq('email', email).single();
   if (!user) return res.json({ ok: false, error: 'Email не знайдено' });
+  // Cooldown 60 с на адресу (як у /phone/request-code): ліміт по IP обходиться
+  // зміною IP, а за спам у чужу скриньку платить її власник — і наша квота Brevo.
+  const { data: existing } = await supabase.from('email_codes').select('last_sent_at').eq('email', email).single();
+  if (existing && existing.last_sent_at) {
+    const elapsed = Date.now() - new Date(existing.last_sent_at).getTime();
+    if (elapsed < 60000) return res.json({ ok: false, error: `Зачекайте ${Math.ceil((60000 - elapsed) / 1000)} с` });
+  }
   const code = Math.floor(100000 + Math.random() * 900000).toString();
-  resetCodes.set(email, { code, nick: user.nick, expires: Date.now() + 15 * 60 * 1000 });
+  const { error } = await supabase.from('email_codes').upsert({
+    email, code, nick: user.nick,
+    expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    attempts: 0, last_sent_at: new Date().toISOString(),
+  });
+  if (error) { console.error('[forgot] email_codes upsert:', error); return res.json({ ok: false, error: 'Помилка збереження коду' }); }
   try { await sendEmail(email, 'EION — Відновлення пароля', `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`); res.json({ ok: true }); }
   catch (e) { console.log('[forgot] sendEmail:', e.message); res.json({ ok: false, error: 'Помилка відправки email' }); }
 });
 
 app.post('/reset', async (req, res) => {
   const { email, code, newPassword } = req.body;
-  const reset = resetCodes.get(email); if (!reset) return res.json({ ok: false, error: 'Код не знайдено' });
-  if (Date.now() > reset.expires) return res.json({ ok: false, error: 'Код застарів' });
-  if (reset.code !== code) return res.json({ ok: false, error: 'Невірний код' });
+  const { data: reset } = await supabase.from('email_codes').select('*').eq('email', email).single();
+  if (!reset) return res.json({ ok: false, error: 'Код не знайдено' });
+  if (new Date(reset.expires_at).getTime() < Date.now()) {
+    await supabase.from('email_codes').delete().eq('email', email);
+    return res.json({ ok: false, error: 'Код застарів' });
+  }
+  // 5 спроб на код: захист від перебору, не зав'язаний на IP.
+  if (reset.attempts >= 5) {
+    await supabase.from('email_codes').delete().eq('email', email);
+    return res.json({ ok: false, error: 'Забагато спроб. Запросіть новий код' });
+  }
+  if (reset.code !== String(code)) {
+    await supabase.from('email_codes').update({ attempts: reset.attempts + 1 }).eq('email', email);
+    return res.json({ ok: false, error: 'Невірний код' });
+  }
+  // Довжину перевіряємо ПІСЛЯ коду й ДО видалення — щоб закороткий пароль
+  // не спалював уже підтверджений код (користувач просто вводить довший).
   if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 8 символів)' });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', reset.nick.toLowerCase());
-  resetCodes.delete(email); res.json({ ok: true });
+  await supabase.from('email_codes').delete().eq('email', email);
+  res.json({ ok: true });
 });
 
 app.post('/update-nick', async (req, res) => {
