@@ -673,7 +673,35 @@ app.post('/decline-call', async (req, res) => {
   res.json({ ok: true });
 });
 
-async function sendEmail(to, subject, text) { return mailer.sendMail({ from: 'EION <eichatserver@gmail.com>', to, subject, text }); }
+// ⚠️ Пошта йде через HTTP API Brevo, а НЕ через SMTP.
+//
+// Render блокує вихідні з'єднання на портах 25/465/587 (політика проти спаму),
+// тож `smtp-relay.brevo.com:587` із прода недосяжний узагалі: сире TCP-
+// з'єднання не встановлюється (перевірено 28.08.2026 — `/admin/mail-test`,
+// probe timeout 8 с при живих кредах). Це означає, що відновлення пароля не
+// працювало в проді й раніше, просто мовчки: без таймаутів запит вішався, а
+// клієнт через 10 с показував «перевір інтернет».
+//
+// HTTP API йде на 443 і не блокується. SMTP лишається запасним шляхом — для
+// запуску деінде, де порт відкритий (і щоб не втратити роботу без API-ключа).
+const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
+const MAIL_FROM = { name: 'EION', email: process.env.MAIL_FROM || 'eichatserver@gmail.com' };
+
+async function sendEmail(to, subject, text) {
+  if (BREVO_API_KEY) {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({ sender: MAIL_FROM, to: [{ email: to }], subject, textContent: text }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = await r.text();
+    if (!r.ok) throw new Error(`Brevo API ${r.status}: ${body.slice(0, 200)}`);
+    return { response: body.slice(0, 200), via: 'api' };
+  }
+  const info = await mailer.sendMail({ from: `${MAIL_FROM.name} <${MAIL_FROM.email}>`, to, subject, text });
+  return { ...info, via: 'smtp' };
+}
 
 // ── OTP: підключюваний відправник SMS ──────────
 function httpPostJson(targetUrl, headers, bodyObj) {
@@ -2537,13 +2565,13 @@ app.get('/admin/mail-test', async (req, res) => {
     sock.on('error', (e) => done({ connected: false, error: e.message, code: e.code || null }));
   });
 
-  const creds = { login: !!process.env.BREVO_LOGIN, password: !!process.env.BREVO_PASSWORD };
+  const creds = { apiKey: !!BREVO_API_KEY, login: !!process.env.BREVO_LOGIN, password: !!process.env.BREVO_PASSWORD };
   const to = req.query.to;
   if (!to || !String(to).includes('@')) return res.json({ ok: false, probe, creds, hint: 'Додай ?to=адреса, щоб спробувати справжню відправку' });
   const t0 = Date.now();
   try {
     const info = await sendEmail(String(to), 'EION — перевірка пошти', 'Тестовий лист. Якщо він прийшов — тракт відправки працює.');
-    res.json({ ok: true, probe, creds, ms: Date.now() - t0, info: info && info.response ? String(info.response) : null });
+    res.json({ ok: true, probe, creds, via: info && info.via, ms: Date.now() - t0, info: info && info.response ? String(info.response) : null });
   } catch (e) {
     res.json({ ok: false, probe, creds, ms: Date.now() - t0, error: e.message, code: e.code || null });
   }
