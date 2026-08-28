@@ -2522,14 +2522,30 @@ app.get('/admin/orphan-audit', async (req, res) => {
 // розкриває конфігурацію релею), тому — під адмін-секретом.
 app.get('/admin/mail-test', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
+  // Крок 1 — сирий TCP-пробник. Відрізняє «порт/мережа закриті» (сокет не
+  // відкривається) від «бібліотека або облікові дані» (сокет відкрився, релей
+  // привітався). Без цього обидва випадки виглядають однаково.
+  const probe = await new Promise((resolve) => {
+    const t0 = Date.now();
+    const sock = net.connect({ host: 'smtp-relay.brevo.com', port: 587 });
+    let greeting = '';
+    const done = (r) => { try { sock.destroy(); } catch (_) {} resolve({ ...r, ms: Date.now() - t0 }); };
+    sock.setTimeout(8000);
+    sock.on('data', (d) => { greeting += d.toString(); if (greeting.includes('\n')) done({ connected: true, greeting: greeting.trim().slice(0, 120) }); });
+    sock.on('connect', () => { /* чекаємо привітання 220 */ });
+    sock.on('timeout', () => done({ connected: false, error: 'timeout' }));
+    sock.on('error', (e) => done({ connected: false, error: e.message, code: e.code || null }));
+  });
+
+  const creds = { login: !!process.env.BREVO_LOGIN, password: !!process.env.BREVO_PASSWORD };
   const to = req.query.to;
-  if (!to || !String(to).includes('@')) return res.json({ ok: false, error: 'Вкажи ?to=адреса' });
+  if (!to || !String(to).includes('@')) return res.json({ ok: false, probe, creds, hint: 'Додай ?to=адреса, щоб спробувати справжню відправку' });
   const t0 = Date.now();
   try {
     const info = await sendEmail(String(to), 'EION — перевірка пошти', 'Тестовий лист. Якщо він прийшов — тракт відправки працює.');
-    res.json({ ok: true, ms: Date.now() - t0, info: info && info.response ? String(info.response) : null });
+    res.json({ ok: true, probe, creds, ms: Date.now() - t0, info: info && info.response ? String(info.response) : null });
   } catch (e) {
-    res.json({ ok: false, ms: Date.now() - t0, error: e.message, code: e.code || null });
+    res.json({ ok: false, probe, creds, ms: Date.now() - t0, error: e.message, code: e.code || null });
   }
 });
 
