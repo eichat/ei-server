@@ -685,7 +685,21 @@ app.post('/decline-call', async (req, res) => {
 // HTTP API йде на 443 і не блокується. SMTP лишається запасним шляхом — для
 // запуску деінде, де порт відкритий (і щоб не втратити роботу без API-ключа).
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
-const MAIL_FROM = { name: 'EION', email: process.env.MAIL_FROM || 'eichatserver@gmail.com' };
+
+// ⚠️ ВІДПРАВНИК НЕ МОЖЕ БУТИ НА @gmail.com — і це не примха Brevo.
+// Gmail/Yahoo/Microsoft з 2024 вимагають, щоб домен відправника проходив
+// автентифікацію (SPF/DKIM/DMARC), а публічні домени (gmail.com, yahoo.com…)
+// автентифікувати НЕМОЖЛИВО в принципі — вони чужі. Тому Brevo такого
+// відправника відхиляє одразу (швидка відмова, не таймаут), і будь-який
+// інший провайдер зробив би так само. Лікується лише власним доменом.
+//
+// У проєкту він є: eion.network (реєстратор Porkbun, DNS там же).
+// Порядок: Brevo → Senders & domains → додати домен → покласти в Porkbun
+// TXT-записи (brevo-code + DKIM) → підтвердити → сюди MAIL_FROM.
+// Адресу треба ще й підтвердити листом, тож вона має десь прийматись:
+// на домені вже стоїть ImprovMX (MX → mx1/mx2.improvmx.com), у ньому
+// заводиться форвард потрібного ящика на пошту розробника.
+const MAIL_FROM = { name: 'EION', email: process.env.MAIL_FROM || 'noreply@eion.network' };
 
 async function sendEmail(to, subject, text) {
   if (BREVO_API_KEY) {
