@@ -2566,14 +2566,41 @@ app.get('/admin/mail-test', async (req, res) => {
   });
 
   const creds = { apiKey: !!BREVO_API_KEY, login: !!process.env.BREVO_LOGIN, password: !!process.env.BREVO_PASSWORD };
+
+  // Крок 2 — стан акаунта Brevo. Без нього «швидка відмова» виглядає однаково
+  // для невірного ключа, для непідтвердженого відправника і для домену, який
+  // Brevo не приймає. Питаємо саме сервіс, а не вгадуємо за текстом помилки.
+  let brevo = null;
+  if (BREVO_API_KEY) {
+    const ask = async (path) => {
+      try {
+        const r = await fetch(`https://api.brevo.com/v3${path}`, {
+          headers: { 'api-key': BREVO_API_KEY, accept: 'application/json' },
+          signal: AbortSignal.timeout(10000),
+        });
+        return { status: r.status, body: await r.json().catch(() => null) };
+      } catch (e) { return { status: 0, error: e.message }; }
+    };
+    const acc = await ask('/account');
+    const snd = await ask('/senders');
+    const list = snd.body && Array.isArray(snd.body.senders) ? snd.body.senders : null;
+    brevo = {
+      keyValid: acc.status === 200,
+      account: acc.status === 200 ? ((acc.body && acc.body.email) || null) : `HTTP ${acc.status} ${JSON.stringify(acc.body || acc.error || '').slice(0, 120)}`,
+      from: MAIL_FROM.email,
+      senders: list ? list.map((x) => `${x.email}${x.active ? '' : ' — НЕ підтверджений'}`) : `HTTP ${snd.status}`,
+      fromActive: list ? list.some((x) => String(x.email).toLowerCase() === MAIL_FROM.email.toLowerCase() && x.active) : null,
+    };
+  }
+
   const to = req.query.to;
-  if (!to || !String(to).includes('@')) return res.json({ ok: false, probe, creds, hint: 'Додай ?to=адреса, щоб спробувати справжню відправку' });
+  if (!to || !String(to).includes('@')) return res.json({ ok: false, probe, creds, brevo, hint: 'Додай ?to=адреса, щоб спробувати справжню відправку' });
   const t0 = Date.now();
   try {
     const info = await sendEmail(String(to), 'EION — перевірка пошти', 'Тестовий лист. Якщо він прийшов — тракт відправки працює.');
-    res.json({ ok: true, probe, creds, via: info && info.via, ms: Date.now() - t0, info: info && info.response ? String(info.response) : null });
+    res.json({ ok: true, probe, creds, brevo, via: info && info.via, ms: Date.now() - t0, info: info && info.response ? String(info.response) : null });
   } catch (e) {
-    res.json({ ok: false, probe, creds, ms: Date.now() - t0, error: e.message, code: e.code || null });
+    res.json({ ok: false, probe, creds, brevo, ms: Date.now() - t0, error: e.message, code: e.code || null });
   }
 });
 
