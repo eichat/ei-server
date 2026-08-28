@@ -2607,13 +2607,20 @@ app.get('/admin/mail-test', async (req, res) => {
     };
     const acc = await ask('/account');
     const snd = await ask('/senders');
+    const dom = await ask('/senders/domains');
     const list = snd.body && Array.isArray(snd.body.senders) ? snd.body.senders : null;
+    const dlist = dom.body && Array.isArray(dom.body.domains) ? dom.body.domains : null;
+    const fromDomain = MAIL_FROM.email.split('@')[1] || '';
     brevo = {
       keyValid: acc.status === 200,
       account: acc.status === 200 ? ((acc.body && acc.body.email) || null) : `HTTP ${acc.status} ${JSON.stringify(acc.body || acc.error || '').slice(0, 120)}`,
+      plan: acc.status === 200 && acc.body && Array.isArray(acc.body.plan) ? acc.body.plan.map((x) => `${x.type}${x.credits != null ? ` (${x.credits})` : ''}`) : null,
       from: MAIL_FROM.email,
       senders: list ? list.map((x) => `${x.email}${x.active ? '' : ' — НЕ підтверджений'}`) : `HTTP ${snd.status}`,
       fromActive: list ? list.some((x) => String(x.email).toLowerCase() === MAIL_FROM.email.toLowerCase() && x.active) : null,
+      // Домен важливіший за відправника: без DKIM лист піде, але в спам.
+      domains: dlist ? dlist.map((x) => `${x.domain}: ${x.authenticated ? 'автентифікований' : 'НЕ автентифікований'}${x.verified === false ? ', не підтверджений' : ''}`) : `HTTP ${dom.status}`,
+      fromDomainOk: dlist ? dlist.some((x) => String(x.domain).toLowerCase() === fromDomain.toLowerCase() && x.authenticated) : null,
     };
   }
 
