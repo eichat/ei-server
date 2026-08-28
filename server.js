@@ -2423,6 +2423,93 @@ app.post('/report', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Аудит осиротілих файлів (тільки читання) ─────────────────────────────────
+//
+// Чому endpoint, а не скрипт. Скрипт (`~/EION-нотатки/orphan/orphan_audit.js`)
+// вимагає service-ключ, який живе ЛИШЕ в env Render — тягти його на машину
+// розробника чи в чат заради разової довідки не варто. Тут ключ уже є, а
+// назовні виходить сама лише зведена цифра.
+//
+// ⚠️ Видалення тут НЕМАЄ і не буде: endpoint лише рахує. Реальна чистка — це
+// окремий, свідомий крок з переглянутим списком.
+const ORPHAN_MARKERS = ['/object/public/files/', '/object/sign/files/'];
+const ORPHAN_REF = 'eion://files/';
+const ORPHAN_PREFIXES = ['direct/', 'group/', 'channel/', 'channels/'];
+
+function orphanPathFromValue(val) {
+  if (!val || typeof val !== 'string') return null;
+  for (const marker of ORPHAN_MARKERS) {
+    const i = val.indexOf(marker);
+    if (i !== -1) {
+      const tail = val.slice(i + marker.length).split('?')[0];
+      try { return decodeURIComponent(tail); } catch (_) { return tail; }
+    }
+  }
+  const r = val.indexOf(ORPHAN_REF);
+  if (r !== -1) {
+    const tail = val.slice(r + ORPHAN_REF.length).split('?')[0];
+    try { return decodeURIComponent(tail); } catch (_) { return tail; }
+  }
+  const trimmed = val.trim();
+  if (ORPHAN_PREFIXES.some(p => trimmed.startsWith(p))) {
+    try { return decodeURIComponent(trimmed.split('?')[0]); } catch (_) { return trimmed.split('?')[0]; }
+  }
+  return null;
+}
+
+async function orphanWalk(prefix, out, depth = 0) {
+  if (depth > 6) return; // захист від нескінченного обходу
+  let offset = 0; const limit = 100;
+  while (true) {
+    const { data, error } = await supabase.storage.from('files')
+      .list(prefix, { limit, offset, sortBy: { column: 'name', order: 'asc' } });
+    if (error || !data || !data.length) break;
+    for (const item of data) {
+      const full = prefix ? `${prefix}/${item.name}` : item.name;
+      const isFolder = item.id === null && !item.metadata;
+      if (isFolder) await orphanWalk(full, out, depth + 1);
+      else out.push({ path: full, size: (item.metadata && item.metadata.size) || 0 });
+    }
+    if (data.length < limit) break;
+    offset += limit;
+  }
+}
+
+app.get('/admin/orphan-audit', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
+  const tables = ['messages', 'group_messages', 'channel_messages', 'channel_comments'];
+  const refs = new Set();
+  let hadError = false;
+  for (const table of tables) {
+    let from = 0; const page = 1000;
+    while (true) {
+      const { data, error } = await supabase.from(table).select('*').range(from, from + page - 1);
+      if (error) { hadError = true; break; }
+      if (!data || !data.length) break;
+      for (const row of data) for (const v of Object.values(row)) {
+        const p = orphanPathFromValue(v); if (p) refs.add(p);
+      }
+      if (data.length < page) break;
+      from += page;
+    }
+  }
+  const files = [];
+  await orphanWalk('', files);
+  const orphans = files.filter(f => !refs.has(f.path));
+  const bytes = orphans.reduce((n, f) => n + (f.size || 0), 0);
+  res.json({
+    ok: true,
+    // hadError означає, що набір посилань НЕПОВНИЙ → числу вірити не можна.
+    complete: !hadError,
+    files: files.length,
+    referenced: refs.size,
+    orphans: orphans.length,
+    orphanBytes: bytes,
+    orphanMB: +(bytes / 1048576).toFixed(1),
+    sample: orphans.slice(0, 20).map(o => o.path),
+  });
+});
+
 // Тестовий endpoint для перевірки механізму адмін-авторизації (нешкідливий).
 app.get('/admin/ping', (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
