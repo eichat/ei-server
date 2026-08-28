@@ -703,10 +703,13 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
 // У проєкту він є: eion.network (реєстратор Porkbun, DNS там же).
 // Порядок: Brevo → Senders & domains → додати домен → покласти в Porkbun
 // TXT-записи (brevo-code + DKIM) → підтвердити → сюди MAIL_FROM.
-// Адресу треба ще й підтвердити листом, тож вона має десь прийматись:
-// на домені вже стоїть ImprovMX (MX → mx1/mx2.improvmx.com), у ньому
-// заводиться форвард потрібного ящика на пошту розробника.
-const MAIL_FROM = { name: 'EION', email: process.env.MAIL_FROM || 'noreply@eion.network' };
+//
+// Береться support@ (а не noreply@) з двох причин: пошта на нього вже
+// доставляється — MX домену вказують на ImprovMX, форвард заведено й
+// перевірено живим листом 28.08.2026, тож код підтвердження Brevo є куди
+// прийняти; і Gmail/Yahoo прихильніші до відправника, який приймає
+// відповіді, ніж до глухого noreply@.
+const MAIL_FROM = { name: 'EION', email: process.env.MAIL_FROM || 'support@eion.network' };
 
 async function sendEmail(to, subject, text) {
   if (BREVO_API_KEY) {
