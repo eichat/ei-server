@@ -2611,6 +2611,7 @@ app.get('/admin/mail-test', async (req, res) => {
     const list = snd.body && Array.isArray(snd.body.senders) ? snd.body.senders : null;
     const dlist = dom.body && Array.isArray(dom.body.domains) ? dom.body.domains : null;
     const fromDomain = MAIL_FROM.email.split('@')[1] || '';
+    const domName = (x) => String(x.domain_name || x.domain || x.name || '');
     brevo = {
       keyValid: acc.status === 200,
       account: acc.status === 200 ? ((acc.body && acc.body.email) || null) : `HTTP ${acc.status} ${JSON.stringify(acc.body || acc.error || '').slice(0, 120)}`,
@@ -2619,8 +2620,13 @@ app.get('/admin/mail-test', async (req, res) => {
       senders: list ? list.map((x) => `${x.email}${x.active ? '' : ' — НЕ підтверджений'}`) : `HTTP ${snd.status}`,
       fromActive: list ? list.some((x) => String(x.email).toLowerCase() === MAIL_FROM.email.toLowerCase() && x.active) : null,
       // Домен важливіший за відправника: без DKIM лист піде, але в спам.
-      domains: dlist ? dlist.map((x) => `${x.domain}: ${x.authenticated ? 'автентифікований' : 'НЕ автентифікований'}${x.verified === false ? ', не підтверджений' : ''}`) : `HTTP ${dom.status}`,
-      fromDomainOk: dlist ? dlist.some((x) => String(x.domain).toLowerCase() === fromDomain.toLowerCase() && x.authenticated) : null,
+      // Ім'я домену Brevo віддає під різними назвами залежно від версії API
+      // (domain_name / domain / name) — читали лише `domain`, і звіт показував
+      // `undefined: автентифікований`, а fromDomainOk хибно казав «ні».
+      domains: dlist ? dlist.map((x) => `${domName(x)}: ${x.authenticated ? 'автентифікований' : 'НЕ автентифікований'}${x.verified === false ? ', не підтверджений' : ''}`) : `HTTP ${dom.status}`,
+      fromDomainOk: dlist ? dlist.some((x) => domName(x).toLowerCase() === fromDomain.toLowerCase() && x.authenticated) : null,
+      // Ключі сирого елемента — щоб наступного разу не гадати, як зветься поле.
+      domainFields: dlist && dlist[0] ? Object.keys(dlist[0]) : null,
     };
   }
 
