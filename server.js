@@ -193,9 +193,16 @@ const BCRYPT_ROUNDS = 10; // аудит #9: підняли з 8 (лише нов
 const REQUIRE_EMAIL_VERIFICATION = false;
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// ⚠️ Таймаути обовʼязкові. 28.08.2026 `/forgot` із реальною адресою висів
+// понад 2 хвилини без відповіді: без них nodemailer чекає на SMTP нескінченно,
+// і запит користувача просто вмирає (клієнт здається через 10 с і показує
+// «перевір інтернет» — причина при цьому невидима).
 const mailer = nodemailer.createTransport({
   host: 'smtp-relay.brevo.com', port: 587,
   auth: { user: process.env.BREVO_LOGIN, pass: process.env.BREVO_PASSWORD },
+  connectionTimeout: 10000, // з'єднання з релеєм
+  greetingTimeout: 10000,   // привітання SMTP
+  socketTimeout: 20000,     // мовчання посеред сесії
 });
 const onlineUsers = new Map();
 const resetCodes = new Map();
@@ -666,7 +673,7 @@ app.post('/decline-call', async (req, res) => {
   res.json({ ok: true });
 });
 
-async function sendEmail(to, subject, text) { await mailer.sendMail({ from: 'EI° <eichatserver@gmail.com>', to, subject, text }); }
+async function sendEmail(to, subject, text) { return mailer.sendMail({ from: 'EION <eichatserver@gmail.com>', to, subject, text }); }
 
 // ── OTP: підключюваний відправник SMS ──────────
 function httpPostJson(targetUrl, headers, bodyObj) {
@@ -866,7 +873,7 @@ app.post('/forgot', async (req, res) => {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   resetCodes.set(email, { code, nick: user.nick, expires: Date.now() + 15 * 60 * 1000 });
   try { await sendEmail(email, 'EION — Відновлення пароля', `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`); res.json({ ok: true }); }
-  catch (e) { res.json({ ok: false, error: 'Помилка відправки email' }); }
+  catch (e) { console.log('[forgot] sendEmail:', e.message); res.json({ ok: false, error: 'Помилка відправки email' }); }
 });
 
 app.post('/reset', async (req, res) => {
@@ -2508,6 +2515,22 @@ app.get('/admin/orphan-audit', async (req, res) => {
     orphanMB: +(bytes / 1048576).toFixed(1),
     sample: orphans.slice(0, 20).map(o => o.path),
   });
+});
+
+// Перевірка поштового тракту: віддає СПРАВЖНЮ помилку SMTP, а не загальне
+// «Помилка відправки email». Публічним такий текст робити не можна (він
+// розкриває конфігурацію релею), тому — під адмін-секретом.
+app.get('/admin/mail-test', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
+  const to = req.query.to;
+  if (!to || !String(to).includes('@')) return res.json({ ok: false, error: 'Вкажи ?to=адреса' });
+  const t0 = Date.now();
+  try {
+    const info = await sendEmail(String(to), 'EION — перевірка пошти', 'Тестовий лист. Якщо він прийшов — тракт відправки працює.');
+    res.json({ ok: true, ms: Date.now() - t0, info: info && info.response ? String(info.response) : null });
+  } catch (e) {
+    res.json({ ok: false, ms: Date.now() - t0, error: e.message, code: e.code || null });
+  }
 });
 
 // Тестовий endpoint для перевірки механізму адмін-авторизації (нешкідливий).
