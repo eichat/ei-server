@@ -420,6 +420,8 @@ create table if not exists public.users (
   coins integer DEFAULT 50,
   color bigint DEFAULT '4280391411'::bigint,
   email text,
+  fcm_device_id text,
+  fcm_token text,
   id bigint generated always as identity,
   invisible boolean NOT NULL DEFAULT false,
   nick text NOT NULL,
@@ -432,6 +434,7 @@ create table if not exists public.users (
   premium_expires_at timestamp with time zone,
   premium_plan text,
   status text,
+  tokens_valid_from bigint,
   primary key (id),
   constraint users_nick_lower_key unique (nick_lower)
 );

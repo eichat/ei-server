@@ -280,15 +280,50 @@ function resolveSession(token) {
   const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
   const a = Buffer.from(sig), b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-  try { return JSON.parse(Buffer.from(payload, 'base64url').toString()).n || null; }
-  catch (_) { return null; }
+  try {
+    const { n, t } = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (!n) return null;
+    // Відкликання: токени, випущені до межі, недійсні (зміна пароля, бан, …).
+    const cut = sessionValidFrom.get(String(n).toLowerCase());
+    if (cut && !(Number(t) >= cut)) return null;
+    return n;
+  } catch (_) { return null; }
 }
 // Сумісність зі старими викликами (async). БД більше не потрібна.
 async function createSession(nick, _deviceId = null) { return createSessionToken(nick); }
-// Stateless → миттєвого відкликання немає (no-op). Бан діє через platform_bans
-// у WS-login; зміна ніка видає новий токен; клієнт при виході стирає свій.
+
+// ── Відкликання сесій ────────────────────────────────────────────────────────
+// Раніше це були заглушки, тобто НІЩО не гасило токен: зміна пароля лишала
+// викрадену сесію робочою. Тепер зберігається межа на користувача — момент,
+// раніше за який усі його токени недійсні (у токені вже є час випуску).
+// Кеш у пам'яті тримає resolveSession синхронною (вона в кожному HTTP-запиті),
+// джерело істини — users.tokens_valid_from, тож межа переживає рестарт.
+const sessionValidFrom = new Map(); // nick_lower -> ms
+async function loadSessionValidFrom() {
+  try {
+    const { data } = await supabase.from('users').select('nick_lower, tokens_valid_from').not('tokens_valid_from', 'is', null);
+    sessionValidFrom.clear();
+    for (const u of (data || [])) sessionValidFrom.set(u.nick_lower, Number(u.tokens_valid_from));
+    console.log('[sessions] меж відкликання завантажено:', sessionValidFrom.size);
+  } catch (e) { console.error('[loadSessionValidFrom]', e.message); }
+}
+loadSessionValidFrom();
+
+// Одиничний токен stateless-схема відкликати не вміє (немає реєстру виданих),
+// тож logout лишається клієнтським — він стирає свій токен у себе.
 async function destroySession(_token) {}
-async function destroySessionsForNick(_nick) {}
+
+async function destroySessionsForNick(nick) {
+  if (!nick) return;
+  const key = String(nick).toLowerCase();
+  const now = Date.now();
+  sessionValidFrom.set(key, now);
+  // Для ВИДАЛЕНОГО акаунта рядка вже немає й update нічого не зачепить — межа
+  // лишиться тільки в пам'яті. Це не діра: нік звільнено, а якщо його займе
+  // інший, новий акаунт отримає власний tokens_valid_from при реєстрації.
+  const { error } = await supabase.from('users').update({ tokens_valid_from: now }).eq('nick_lower', key);
+  if (error) console.error('[sessions] revoke', key, error.message);
+}
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   try {
@@ -866,6 +901,8 @@ app.post('/register', async (req, res) => {
   const userData = {
     nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash,
     email, color: color || 4280391411, coins: 50,
+    // Нік міг належати комусь раніше — відсікаємо його токени (див. destroySessionsForNick).
+    tokens_valid_from: Date.now(),
     ...(phone ? { phone } : {}),
     ...(phoneNormalized ? { phone_normalized: phoneNormalized, phone_verified: verifiedPhones.has(phoneNormalized) } : {}),
   };
@@ -965,6 +1002,17 @@ app.post('/reset', async (req, res) => {
   if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 8 символів)' });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', reset.nick.toLowerCase());
+  // Сенс відновлення пароля — вигнати того, хто захопив акаунт: старі токени
+  // мають померти. Тут це нікого не турбує — власник ще на екрані входу.
+  await destroySessionsForNick(reset.nick);
+  // Токен помер, але вже відкритий сокет живе далі — його треба розірвати окремо
+  // (той самий патерн, що в /admin/ban). onlineUsers тримає один сокет на нік, а
+  // власник зараз на екрані входу, тож тут ми виганяємо саме чужий пристрій.
+  const kickWs = onlineUsers.get(reset.nick);
+  if (kickWs) {
+    try { kickWs.ws.send(JSON.stringify({ type: 'kicked', reason: 'Пароль змінено, увійдіть знову' })); kickWs.ws.close(); }
+    catch (e) { console.log('[reset] kick:', e.message); }
+  }
   await supabase.from('email_codes').delete().eq('email', email);
   res.json({ ok: true });
 });
@@ -1019,7 +1067,11 @@ app.post('/update-password', async (req, res) => {
   if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'Новий пароль занадто короткий (мін. 8 символів)' });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', nick.toLowerCase());
-  res.json({ ok: true });
+  // Гасимо всі сесії й одразу видаємо новий токен ЦЬОМУ пристрою: інші виходять,
+  // той, з якого міняли пароль, лишається залогіненим (клієнт зберігає token).
+  await destroySessionsForNick(nick);
+  const token = await createSession(nick, req.body.deviceId || null);
+  res.json({ ok: true, token });
 });
 
 app.post('/update-phone', async (req, res) => {
