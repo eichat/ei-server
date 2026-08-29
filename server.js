@@ -3385,6 +3385,14 @@ async function cleanupGroups() {
 // ── 2C: облік завантажень файлів (видаляємо зі Storage лише коли ВСІ забрали АБО вийшов TTL) ──
 const FILE_OBJECT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // жорсткий TTL: 30 днів
 
+// Мінімальне утримання: файл живе щонайменше стільки, НАВІТЬ коли всі забрали.
+// Без цього фото зникало зі Storage за хвилини: «забрав» рахується на НІК, а
+// автокеш вхідного (лише фото й голосові) шле file_downloaded одразу після
+// отримання. Тобто другий пристрій того ж користувача, перевстановлення чи
+// чистка кешу лишали медіа недоступним назавжди — при живому повідомленні в
+// історії. Документи цього не мали: їх ніхто не качає автоматично.
+const FILE_MIN_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
 // Заводимо облік для надісланого файлу: хто має забрати (recipients).
 // Підпис до медіа їде в колонці `content`: для файлових повідомлень вона й так
 // дублювала `file_name` (саме ім'я лежить в окремій колонці), тож нової колонки
@@ -3417,13 +3425,15 @@ async function fileObjectActive(path) {
     const dl = new Set(r.downloaded_by || []);
     const allDownloaded = recips.length > 0 && recips.every(x => dl.has(x));
     const expired = Date.now() > (r.expires_at || 0);
+    // Свіжий файл тримаємо незалежно від того, чи всі забрали (див. константу).
+    if (Date.now() < (r.created_at || 0) + FILE_MIN_RETENTION_MS) return true;
     return !(allDownloaded || expired);
   } catch (_) { return false; }
 }
 
 async function cleanupFileObjects() {
   const now = Date.now();
-  const { data: rows } = await supabase.from('file_objects').select('storage_path, recipients, downloaded_by, expires_at');
+  const { data: rows } = await supabase.from('file_objects').select('storage_path, recipients, downloaded_by, created_at, expires_at');
   const list = rows || [];
   if (!list.length) return;
   let removed = 0;
@@ -3433,6 +3443,7 @@ async function cleanupFileObjects() {
     const allDownloaded = recips.length > 0 && recips.every(x => dl.has(x));
     const expired = now > (r.expires_at || 0);
     if (!allDownloaded && !expired) continue;
+    if (now < (r.created_at || 0) + FILE_MIN_RETENTION_MS) continue; // ще свіже
     if (CLEANUP_DRY_RUN) {
       console.log(`[cleanup][dry] 2C would remove ${r.storage_path} (allDownloaded=${allDownloaded}, expired=${expired})`);
       continue;
