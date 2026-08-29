@@ -506,87 +506,208 @@ function parseOpenGraph(html, url) {
 // не в PUBLIC_PATHS, тож req.nick є), ключ лишається на сервері. Модель і ліміти
 // ФОРСУЮТЬСЯ тут (клієнт не обере дорожчу модель / більший max_tokens), а відповідь
 // GROQ (SSE-стрім або JSON) пайпиться клієнту байт-у-байт — його парсер незмінний.
-// ── Вибір моделі AI ───────────────────────────────────────────────────────
-// Groq знімає моделі з обслуговування без попередження: 29.08.2026 зашита
-// llama-3.3-70b-versatile зникла, і AI мовчки віддавав 404 на КОЖЕН запит —
-// побачити це можна було лише прочитавши тіло відповіді.
+// ── Провайдери AI ─────────────────────────────────────────────────────────
+// Асистент не привʼязаний до одного постачальника. Причин дві, і обидві вже
+// боліли:
+//  1. НАДІЙНІСТЬ. 29.08.2026 Groq зняв зашиту llama-3.3 — кожен запит почав
+//     давати 404, і асистент був мертвий, доки ми цього не помітили. Другий
+//     провайдер перетворює таку подію на «стало трохи повільніше».
+//  2. ЕКОНОМІЯ. У більшості постачальників є безкоштовна денна норма. Коли
+//     їх кілька, запити йдуть по черзі й безкоштовні норми складаються.
 //
-// Тому модель не зашита намертво: при старті питаємо, що доступно, і беремо
-// першу з переліку переваг. Якщо список недоступний — лишається дефолт.
-const AI_MODEL_PREFS = [
-  'openai/gpt-oss-20b',    // швидка й дешева, 131k контексту — для чат-асистента досить
-  'openai/gpt-oss-120b',   // якісніша, якщо перша зникне
-  'qwen/qwen3.8-27b',
-  'groq/compound-mini',
+// Усі перелічені сумісні з форматом OpenAI (`/chat/completions`), тож код
+// один — різняться лише хост, шлях і назви моделей. Провайдер вважається
+// доступним, ЯКЩО задано його ключ у env: жодних правок коду, щоб додати ще
+// одного, не потрібно.
+//
+// ⚠️ Назви моделей у `prefs` — це переваги, а не жорсткий вибір. При старті
+// ми питаємо в провайдера список і беремо першу наявну; якщо не збіглась
+// жодна — провайдер позначається несправним і в чергу не потрапляє (а не
+// мовчки шле запити з неіснуючою моделлю). Перекрити вручну: env
+// `AI_MODEL_<ID>` і `AI_MODEL_<ID>_PRO`, напр. `AI_MODEL_GROQ`.
+const AI_PROVIDERS = [
+  {
+    id: 'groq', env: 'GROQ_API_KEY',
+    host: 'api.groq.com', path: '/openai/v1/chat/completions', modelsPath: '/openai/v1/models',
+    prefs: {
+      base: ['openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'groq/compound-mini'],
+      pro: ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'],
+    },
+  },
+  {
+    id: 'cerebras', env: 'CEREBRAS_API_KEY',
+    host: 'api.cerebras.ai', path: '/v1/chat/completions', modelsPath: '/v1/models',
+    prefs: {
+      base: ['llama3.1-8b', 'llama-3.3-70b', 'qwen-3-32b'],
+      pro: ['llama-3.3-70b', 'qwen-3-32b', 'llama3.1-8b'],
+    },
+  },
+  {
+    id: 'mistral', env: 'MISTRAL_API_KEY',
+    host: 'api.mistral.ai', path: '/v1/chat/completions', modelsPath: '/v1/models',
+    prefs: {
+      base: ['mistral-small-latest', 'open-mistral-nemo'],
+      pro: ['mistral-large-latest', 'mistral-small-latest'],
+    },
+  },
+  {
+    id: 'gemini', env: 'GEMINI_API_KEY',
+    host: 'generativelanguage.googleapis.com',
+    path: '/v1beta/openai/chat/completions', modelsPath: '/v1beta/openai/models',
+    prefs: {
+      base: ['gemini-2.5-flash', 'gemini-2.0-flash'],
+      pro: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+    },
+  },
+  {
+    id: 'openrouter', env: 'OPENROUTER_API_KEY',
+    host: 'openrouter.ai', path: '/api/v1/chat/completions', modelsPath: '/api/v1/models',
+    // Тут перелік безкоштовних моделей змінюється надто часто, щоб його
+    // зашивати: беремо будь-яку з міткою `:free`.
+    prefs: { base: [], pro: [] }, preferFree: true,
+  },
 ];
-// Преміум отримує сильнішу модель — це одна з його переваг (див. eion.network).
-// Список окремий і в тому самому порядку падіння: якщо 120b знімуть, преміум
-// поїде на наступну, а не залишиться без AI.
-const AI_MODEL_PRO_PREFS = [
-  'openai/gpt-oss-120b',
-  'qwen/qwen3.8-27b',
-  'openai/gpt-oss-20b',
-];
-let AI_MODEL = process.env.AI_MODEL || AI_MODEL_PREFS[0];
-let AI_MODEL_PRO = process.env.AI_MODEL_PRO || AI_MODEL_PRO_PREFS[0];
 
-function refreshAiModel() {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return;
-  if (process.env.AI_MODEL && process.env.AI_MODEL_PRO) return;  // обидві задані в env — не чіпаємо
-  const req = https.request({
-    method: 'GET', hostname: 'api.groq.com', path: '/openai/v1/models',
-    headers: { Authorization: `Bearer ${key}` }, timeout: 15000,
-  }, (up) => {
-    let body = '';
-    up.on('data', (c) => { body += c; });
-    up.on('end', () => {
-      try {
-        const ids = new Set((JSON.parse(body).data || []).map(m => m.id));
-        const choose = (prefs, current, label, envName) => {
-          if (process.env[envName]) return current;
-          const pick = prefs.find(m => ids.has(m));
-          if (!pick) {
-            console.error(`[ai] ${label}: жодна з переваг недоступна, лишаю ${current} — перевір /admin/ai-models`);
-            return current;
-          }
-          if (pick !== current) console.log(`[ai] ${label}: ${current} → ${pick}`);
-          return pick;
-        };
-        AI_MODEL = choose(AI_MODEL_PREFS, AI_MODEL, 'базова', 'AI_MODEL');
-        AI_MODEL_PRO = choose(AI_MODEL_PRO_PREFS, AI_MODEL_PRO, 'преміум', 'AI_MODEL_PRO');
-      } catch (e) { console.error('[ai] список моделей:', e.message); }
-    });
-  });
-  req.on('error', (e) => console.error('[ai] список моделей:', e.message));
-  req.end();
+/// Обрані моделі по провайдерах: id → { base, pro, ok, error, checkedAt }.
+const aiModels = {};
+
+const aiKey = (p) => process.env[p.env];
+const aiEnvModel = (p, tier) =>
+  process.env[`AI_MODEL_${p.id.toUpperCase()}${tier === 'pro' ? '_PRO' : ''}`]
+  || (p.id === 'groq' ? process.env[tier === 'pro' ? 'AI_MODEL_PRO' : 'AI_MODEL'] : null);
+
+/// Порядок опитування. `AI_PROVIDER_ORDER` (через кому) дозволяє поставити
+/// поперед дешевшого — без деплою.
+function aiProviderOrder() {
+  const raw = (process.env.AI_PROVIDER_ORDER || '').split(',').map(s => s.trim()).filter(Boolean);
+  const known = AI_PROVIDERS.filter(p => aiKey(p) && aiModels[p.id] && aiModels[p.id].ok);
+  if (!raw.length) return known;
+  const byId = new Map(known.map(p => [p.id, p]));
+  const first = raw.map(id => byId.get(id)).filter(Boolean);
+  return [...first, ...known.filter(p => !raw.includes(p.id))];
 }
-refreshAiModel();
-setInterval(refreshAiModel, 24 * 60 * 60 * 1000);
 
-// Які моделі доступні за нашим ключем. Потрібно, бо Groq знімає моделі з
-// обслуговування без попередження: 29.08.2026 зашита llama-3.3-70b-versatile
-// зникла, і AI мовчки віддавав 404 на кожен запит.
-app.get('/admin/ai-models', (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return res.json({ ok: false, error: 'GROQ_API_KEY не задано' });
-  https.request({
-    method: 'GET', hostname: 'api.groq.com', path: '/openai/v1/models',
-    headers: { Authorization: `Bearer ${key}` }, timeout: 15000,
-  }, (up) => {
-    let body = '';
-    up.on('data', (c) => { body += c; });
-    up.on('end', () => {
-      try {
-        const parsed = JSON.parse(body);
-        const models = (parsed.data || []).map(m => ({
-          id: m.id, context: m.context_window, owned: m.owned_by, active: m.active !== false,
-        })).sort((a, b) => String(a.id).localeCompare(String(b.id)));
-        res.json({ ok: true, count: models.length, models });
-      } catch (e) { res.json({ ok: false, error: body.slice(0, 300) }); }
+function httpJson({ method = 'GET', host, path, headers = {}, body = null, timeout = 20000 }) {
+  return new Promise((resolve) => {
+    const r = https.request({ method, hostname: host, path, headers, timeout }, (up) => {
+      let b = '';
+      up.on('data', (c) => { b += c; });
+      up.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(b); } catch (_) {}
+        resolve({ status: up.statusCode || 500, body: b, json });
+      });
     });
-  }).on('error', (e) => res.json({ ok: false, error: e.message })).end();
+    r.on('timeout', () => { r.destroy(); resolve({ status: 504, body: 'timeout' }); });
+    r.on('error', (e) => resolve({ status: 502, body: e.message }));
+    if (body) r.write(body);
+    r.end();
+  });
+}
+
+async function refreshProviderModels(p) {
+  if (!aiKey(p)) { delete aiModels[p.id]; return; }
+  const envBase = aiEnvModel(p, 'base');
+  const envPro = aiEnvModel(p, 'pro');
+  if (envBase && envPro) {
+    aiModels[p.id] = { base: envBase, pro: envPro, ok: true, source: 'env', checkedAt: Date.now() };
+    return;
+  }
+  const r = await httpJson({ host: p.host, path: p.modelsPath, headers: { Authorization: `Bearer ${aiKey(p)}` } });
+  if (r.status !== 200 || !r.json) {
+    aiModels[p.id] = { ok: false, error: `список моделей: ${r.status} ${String(r.body).slice(0, 120)}`, checkedAt: Date.now() };
+    console.error(`[ai] ${p.id}: не вдалось отримати список моделей —`, r.status);
+    return;
+  }
+  const ids = (r.json.data || r.json.models || []).map(m => m.id || m.name).filter(Boolean);
+  const idSet = new Set(ids);
+  const pick = (tier) => {
+    const env = aiEnvModel(p, tier);
+    if (env) return env;
+    const fromPrefs = (p.prefs[tier] || []).find(m => idSet.has(m));
+    if (fromPrefs) return fromPrefs;
+    if (p.preferFree) return ids.find(id => String(id).endsWith(':free')) || null;
+    return null;
+  };
+  const base = pick('base');
+  const pro = pick('pro') || base;
+  if (!base) {
+    aiModels[p.id] = { ok: false, error: 'жодна з бажаних моделей недоступна', checkedAt: Date.now(), available: ids.slice(0, 40) };
+    console.error(`[ai] ${p.id}: жодна з бажаних моделей недоступна — задай AI_MODEL_${p.id.toUpperCase()}`);
+    return;
+  }
+  const prev = aiModels[p.id];
+  aiModels[p.id] = { base, pro, ok: true, source: 'discovered', checkedAt: Date.now() };
+  if (!prev || prev.base !== base || prev.pro !== pro) console.log(`[ai] ${p.id}: base=${base} pro=${pro}`);
+}
+
+async function refreshAiModels() {
+  await Promise.all(AI_PROVIDERS.map(p => refreshProviderModels(p).catch(() => {})));
+  const live = aiProviderOrder().map(p => p.id);
+  console.log('[ai] провайдери в черзі:', live.join(', ') || 'ЖОДНОГО');
+}
+refreshAiModels();
+setInterval(refreshAiModels, 12 * 60 * 60 * 1000);
+
+/// Денна стеля запитів на провайдера — щоб безкоштовні норми не вигорали за
+/// годину і черга справді розкладалась між постачальниками. Задається env
+/// `AI_CAP_<ID>` (напр. `AI_CAP_GROQ=800`); без неї стелі немає.
+/// Лічильник живе в тій самій `usage_counters` під службовим ніком, тобто
+/// переживає рестарти Render (в памʼяті він обнулявся б на кожному деплої —
+/// саме так ми вже втрачали FCM-токени).
+const AI_PROVIDER_NICK = '#ai-provider';
+async function providerCapLeft(p) {
+  const cap = parseInt(process.env[`AI_CAP_${p.id.toUpperCase()}`] || '', 10);
+  if (!Number.isFinite(cap) || cap <= 0) return Infinity;
+  const used = await usageToday(AI_PROVIDER_NICK, p.id);
+  if (used === null) return Infinity;   // лічильник недоступний — не блокуємо
+  return Math.max(0, cap - used);
+}
+
+/// Черга провайдерів на цей запит: спершу ті, у кого лишилась денна норма.
+///
+/// Вичерпані НЕ викидаємо — вони йдуть у хвіст. Стеля потрібна, щоб рознести
+/// навантаження по безкоштовних нормах, а не щоб лишити користувача без
+/// асистента, коли всі норми вибрано.
+async function aiQueue() {
+  let order = aiProviderOrder();
+  // Холодний старт: `refreshAiModels` асинхронний, а Render будиться саме на
+  // першому запиті. Без цього перший після сну виклик AI бачив би порожню
+  // чергу й повертав «AI недоступний» на рівному місці.
+  if (!order.length && AI_PROVIDERS.some(p => aiKey(p))) {
+    await refreshAiModels();
+    order = aiProviderOrder();
+  }
+  const fresh = [], spent = [];
+  for (const p of order) ((await providerCapLeft(p)) > 0 ? fresh : spent).push(p);
+  return [...fresh, ...spent];
+}
+
+// Стан усіх провайдерів AI: який ключ заданий, яка модель обрана, чи жива.
+// Потрібно, бо постачальники знімають моделі без попередження: 29.08.2026
+// Groq зняв зашиту llama-3.3, і кожен запит мовчки давав 404.
+app.get('/admin/ai-models', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  if (req.query.refresh === '1') await refreshAiModels();
+  const queue = (await aiQueue()).map(p => p.id);
+  const providers = [];
+  for (const p of AI_PROVIDERS) {
+    const m = aiModels[p.id];
+    const cap = parseInt(process.env[`AI_CAP_${p.id.toUpperCase()}`] || '', 10);
+    providers.push({
+      id: p.id,
+      keySet: !!aiKey(p),
+      ok: !!(m && m.ok),
+      base: m && m.base || null,
+      pro: m && m.pro || null,
+      source: m && m.source || null,
+      error: m && m.error || null,
+      available: m && m.available || undefined,
+      usedToday: aiKey(p) ? await usageToday(AI_PROVIDER_NICK, p.id) : null,
+      dailyCap: Number.isFinite(cap) && cap > 0 ? cap : null,
+    });
+  }
+  res.json({ ok: true, queue, providers });
 });
 
 /// Коротка довідка про EION, яку сервер підкладає асистенту.
@@ -612,6 +733,148 @@ function eionFactsPrompt() {
     '- You have tools for the current user: balance, today\'s usage against the daily allowance, sticker packs, coin supply. Call them instead of guessing or asking the user to check.',
     '- If you do not know something about EION, say so instead of guessing.',
   ].join('\n');
+}
+
+// ── Переклад повідомлень ──────────────────────────────────────────────────
+// ОКРЕМИЙ шлях, а не `/ai/chat` із перекладацьким промптом від клієнта. Три
+// причини, і кожна вже боліла б у проді:
+//  1. Квота. Переклад витрачається на КОЖНЕ вхідне повідомлення, тобто не за
+//     рішенням користувача. На нормі асистента (15/добу) автопереклад помирав
+//     би за 15 чужих реплік і далі брав по 3 монети за те, що тобі написали.
+//  2. Зловживання. Коли промпт складає клієнт, «переклад» — це просто дешевший
+//     тариф на довільні запити до моделі. Тут промпт складає сервер, а від
+//     клієнта приходять лише текст і мова.
+//  3. Ціна. Перекладу не потрібні ні 2048 токенів, ні температура 0.7.
+const TRANSLATE_LANGS = {
+  en: 'English', uk: 'Ukrainian', ru: 'Russian', de: 'German', es: 'Spanish',
+  fr: 'French', it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+  tr: 'Turkish', id: 'Indonesian', vi: 'Vietnamese', tl: 'Tagalog', th: 'Thai',
+  ja: 'Japanese', ko: 'Korean', zh: 'Chinese', hi: 'Hindi', bn: 'Bengali',
+  ar: 'Arabic',
+};
+const TRANSLATE_MAX_CHARS = 2000;
+
+/// Непотоковий виклик із перемиканням провайдерів: відповідає перший, хто зміг.
+async function aiComplete(messages, { maxTokens = 512, temperature = 0, tier = 'base' } = {}) {
+  const queue = await aiQueue();
+  if (!queue.length) throw new Error('немає доступних провайдерів');
+  let last = '';
+  for (const p of queue) {
+    const r = await aiJsonOnce(p, JSON.stringify({
+      model: aiModels[p.id][tier], messages, max_tokens: maxTokens, temperature,
+    }));
+    if (r.status === 200 && r.json && !r.json.error) {
+      await bumpUsage(AI_PROVIDER_NICK, p.id, 1);
+      const m = r.json.choices && r.json.choices[0] && r.json.choices[0].message;
+      return String((m && m.content) || '');
+    }
+    // Тіло читаємо ЗАВЖДИ: саме мовчазний 404 у тілі приховував зняту Groq
+    // модель, поки кожен запит «просто не працював» (29.08.2026).
+    last = `${p.id} ${r.status} ${String(r.body || '').slice(0, 150)}`;
+    console.error('[ai/complete] провайдер відмовив:', last);
+  }
+  throw new Error(last || 'усі провайдери відмовили');
+}
+
+app.post('/ai/translate', async (req, res) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const target = typeof req.body?.target === 'string' ? req.body.target.toLowerCase() : '';
+  const lang = TRANSLATE_LANGS[target];
+  if (!text || !lang) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  if (text.length > TRANSLATE_MAX_CHARS) return res.json({ ok: false, error: 'Текст задовгий', code: 'err_text_too_long' });
+  if (!aiProviderOrder().length) return res.json({ ok: false, error: 'AI недоступний', code: 'err_ai_unavailable' });
+
+  const charge = await chargeSink(req.nick, 'translate');
+  if (!charge.ok) return res.status(402).json({ ok: false, error: charge.error, code: charge.code });
+
+  try {
+    const content = (await aiComplete([
+      { role: 'system', content: 'You are a translation engine. Output only the translation, with no quotes, notes or explanations.' },
+      { role: 'user', content: `Translate the message below into ${lang}. If it is already in ${lang}, reply with exactly: OK\n\n${text}` },
+    ], { maxTokens: 700, temperature: 0 })).trim();
+    // Модель відповідає «OK» на текст, що вже цільовою мовою. Порівнюємо без
+    // розділових знаків: трапляються «OK.» і «ok».
+    const same = content.replace(/[^a-z]/gi, '').toLowerCase() === 'ok';
+    res.json({ ok: true, same, text: same ? null : content, freeLeft: charge.free ?? 0, paid: charge.paid ?? 0 });
+  } catch (e) {
+    console.error('[ai/translate]', e.message);
+    res.json({ ok: false, error: 'AI помилка', code: 'err_ai_failed' });
+  }
+});
+
+// ── Памʼять відповідей ────────────────────────────────────────────────────
+// Питання повторюються: «як створити канал», «скільки коштує преміум», «що
+// таке монети». Платити моделі за ту саму відповідь щоразу — марно, тож
+// відповідь запамʼятовується і наступному віддається одразу, без виклику
+// моделі й без списання норми.
+//
+// 🔴 Кеш СПІЛЬНИЙ для всіх, тому головне тут — не пустити в нього приватне.
+// Чотири умови разом (`cacheEligible` + перевірка після відповіді):
+//   1. це ПЕРШЕ питання розмови — інакше відповідь залежить від контексту,
+//      якого в іншого користувача немає;
+//   2. у питанні немає цифр, пошти й посилань — найдешевший спосіб відсіяти
+//      номери, суми й адреси;
+//   3. відповідь дана БЕЗ жодного інструмента — саме інструменти приносять
+//      у розмову особисті дані (баланс, витрату норми);
+//   4. у відповіді немає ніка того, хто питав — інакше «як мене звати»
+//      осіло б у кеші з чужим імʼям.
+const AI_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // факти змінюються; місяць — розумна межа
+
+function normalizeQuestion(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[\s\u00a0]+/g, ' ')
+    .replace(/[!?.,;:()\[\]"'«»„“”…-]+/g, '')
+    .trim();
+}
+
+/// Чи можна взагалі кешувати це питання (до того, як пішли до моделі).
+/// `messages` — уже із санітизацією, але ДО додавання довідки.
+function cacheEligible(messages) {
+  const users = messages.filter(m => m.role === 'user');
+  if (users.length !== 1) return null;                  // не перше питання розмови
+  const q = users[0].content.trim();
+  if (q.length < 8 || q.length > 200) return null;      // надто коротке або надто своєрідне
+  if (/\d/.test(q) || q.includes('@') || /https?:\/\//i.test(q)) return null;
+  const norm = normalizeQuestion(q);
+  if (!norm) return null;
+  // Мову задає системний промпт клієнта; нік у ньому в кожного свій, тож
+  // прибираємо його — лишається саме мовний шаблон. Його відбиток і розрізняє
+  // «як створити канал» українською та англійською.
+  const sys = messages.filter(m => m.role === 'system').map(m => m.content).join(' ');
+  return { question: q, norm, sysTemplate: sys };
+}
+
+function cacheKeyFor(elig, nick) {
+  const template = elig.sysTemplate.split(nick).join('');
+  const fp = crypto.createHash('sha1').update(template).digest('hex').slice(0, 8);
+  return `${fp}:${crypto.createHash('sha1').update(elig.norm).digest('hex')}`;
+}
+
+async function cacheLookup(key) {
+  const { data, error } = await supabase.from('ai_cache').select('answer, created_at, hits').eq('key', key).limit(1);
+  if (error) { console.error('[ai-cache] читання:', error.message); return null; }
+  const row = data && data[0];
+  if (!row) return null;
+  if (Date.now() - Number(row.created_at || 0) > AI_CACHE_TTL_MS) {
+    await supabase.from('ai_cache').delete().eq('key', key);
+    return null;
+  }
+  // hits — щоб було видно, які питання справді повторюються (і що варто
+  // винести в довідку самого застосунку). Гонка тут нікому не шкодить.
+  await supabase.from('ai_cache')
+    .update({ hits: Number(row.hits || 0) + 1, last_used: Date.now() }).eq('key', key);
+  return row.answer;
+}
+
+async function cacheStore(key, question, answer, model, nick) {
+  const a = String(answer || '').trim();
+  if (a.length < 4 || a.length > 4000) return;
+  if (nick && a.toLowerCase().includes(String(nick).toLowerCase())) return;   // умова 4
+  const now = Date.now();
+  const { error } = await supabase.from('ai_cache')
+    .upsert({ key, question, answer: a, model, hits: 0, created_at: now, last_used: now }, { onConflict: 'key' });
+  if (error) console.error('[ai-cache] запис:', error.message);
 }
 
 // ── Інструменти асистента ─────────────────────────────────────────────────
@@ -744,7 +1007,7 @@ async function runAiTool(name, rawArgs, nick) {
 /// доводиться склеювати по `index`. Окрема функція дає перевірити це тестом,
 /// не ганяючи прод.
 /// `calls` мутується; рядки з текстом ідуть у `onData` як є.
-function parseGroqSseLine(line, calls, onData) {
+function parseGroqSseLine(line, calls, onData, sink) {
   const s = line.trim();
   if (!s.startsWith('data:')) return;
   const body = s.slice(5).trim();
@@ -761,20 +1024,24 @@ function parseGroqSseLine(line, calls, onData) {
         if (tc.function && tc.function.arguments) calls[i].args += tc.function.arguments;
       }
     }
-    if (typeof delta.content === 'string' && delta.content.length) onData(`${line}\n\n`);
+    if (typeof delta.content === 'string' && delta.content.length) {
+      if (sink) sink.push(delta.content);
+      onData(`${line}\n\n`);
+    }
   } catch (_) { /* не-JSON у потоці (коментар SSE) — пропускаємо */ }
 }
 
-function groqStreamOnce(payload, onData, holder) {
+function aiStreamOnce(p, payload, onData, holder) {
   return new Promise((resolve) => {
     const calls = [];
+    const textParts = [];
     let buf = '';
-    const handleLine = (line) => parseGroqSseLine(line, calls, onData);
+    const handleLine = (line) => parseGroqSseLine(line, calls, onData, textParts);
     const up = https.request({
-      method: 'POST', hostname: 'api.groq.com', path: '/openai/v1/chat/completions',
+      method: 'POST', hostname: p.host, path: p.path,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Authorization': `Bearer ${aiKey(p)}`,
         'Content-Length': Buffer.byteLength(payload),
       },
       timeout: 60000,
@@ -791,7 +1058,7 @@ function groqStreamOnce(payload, onData, holder) {
         let i;
         while ((i = buf.indexOf('\n')) >= 0) { handleLine(buf.slice(0, i)); buf = buf.slice(i + 1); }
       });
-      r.on('end', () => { if (buf) handleLine(buf); resolve({ status: 200, toolCalls: calls.filter(Boolean) }); });
+      r.on('end', () => { if (buf) handleLine(buf); resolve({ status: 200, toolCalls: calls.filter(Boolean), text: textParts.join('') }); });
     });
     if (holder) holder.req = up;
     up.on('timeout', () => { up.destroy(); resolve({ status: 504 }); });
@@ -801,13 +1068,13 @@ function groqStreamOnce(payload, onData, holder) {
 }
 
 /// Один непотоковий виклик. Повертає сире тіло — клієнт розбирає його сам.
-function groqJsonOnce(payload, holder) {
+function aiJsonOnce(p, payload, holder) {
   return new Promise((resolve) => {
     const up = https.request({
-      method: 'POST', hostname: 'api.groq.com', path: '/openai/v1/chat/completions',
+      method: 'POST', hostname: p.host, path: p.path,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Authorization': `Bearer ${aiKey(p)}`,
         'Content-Length': Buffer.byteLength(payload),
       },
       timeout: 60000,
@@ -827,77 +1094,115 @@ function groqJsonOnce(payload, holder) {
   });
 }
 
-// Чи вміє поточна модель викликати інструменти. Без цього «асистент не
-// покликав інструмент» не відрізнити від «Groq їх не прийняв»: відкат на
-// роботу без інструментів навмисно тихий для користувача.
+// Чи вміє обрана модель викликати інструменти. Без цього «асистент не покликав
+// інструмент» не відрізнити від «провайдер їх не прийняв»: відкат на роботу
+// без інструментів навмисно тихий для користувача.
 app.get('/admin/ai-tools-check', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
-  const out = {};
-  for (const [label, m] of [['base', AI_MODEL], ['pro', AI_MODEL_PRO]]) {
-    const r = await groqJsonOnce(JSON.stringify({
-      model: m,
-      messages: [
-        { role: 'system', content: 'Use the tools when asked about the user data.' },
-        { role: 'user', content: 'How many coins do I have?' },
-      ],
-      tools: AI_TOOLS, tool_choice: 'auto', max_tokens: 256, temperature: 0,
-    }));
-    const msg = r.json && r.json.choices && r.json.choices[0] && r.json.choices[0].message;
-    out[label] = {
-      model: m,
-      status: r.status,
-      toolCalls: (msg && msg.tool_calls || []).map(c => c.function && c.function.name),
-      content: msg && typeof msg.content === 'string' ? msg.content.slice(0, 200) : null,
-      error: r.status === 200 ? null : String(r.body || '').slice(0, 400),
-    };
+  const out = [];
+  for (const p of AI_PROVIDERS) {
+    const m = aiModels[p.id];
+    if (!m || !m.ok) continue;
+    for (const tier of ['base', 'pro']) {
+      if (tier === 'pro' && m.pro === m.base) continue;
+      const r = await aiJsonOnce(p, JSON.stringify({
+        model: m[tier],
+        messages: [
+          { role: 'system', content: 'Use the tools when asked about the user data.' },
+          { role: 'user', content: 'How many coins do I have?' },
+        ],
+        tools: AI_TOOLS, tool_choice: 'auto', max_tokens: 256, temperature: 0,
+      }));
+      const msg = r.json && r.json.choices && r.json.choices[0] && r.json.choices[0].message;
+      out.push({
+        provider: p.id, tier, model: m[tier], status: r.status,
+        toolCalls: ((msg && msg.tool_calls) || []).map(c => c.function && c.function.name),
+        content: msg && typeof msg.content === 'string' ? msg.content.slice(0, 160) : null,
+        error: r.status === 200 ? null : String(r.body || '').slice(0, 300),
+      });
+    }
   }
-  res.json({ ok: true, ...out });
+  res.json({ ok: true, checks: out });
+});
+
+// Що асистент уже запамʼятав. Заразом єдиний спосіб почистити памʼять, коли
+// змінились факти (ціна, норми) — інакше стара відповідь жила б до кінця TTL.
+app.get('/admin/ai-cache', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  if (req.query.clear === '1') {
+    const { error } = await supabase.from('ai_cache').delete().neq('key', '');
+    return res.json({ ok: !error, cleared: !error, error: error ? error.message : null });
+  }
+  const { data, error } = await supabase.from('ai_cache')
+    .select('question, hits, created_at, model').order('hits', { ascending: false }).limit(50);
+  if (error) return res.json({ ok: false, error: error.message });
+  res.json({ ok: true, count: (data || []).length, ttlDays: Math.round(AI_CACHE_TTL_MS / 86400000), top: data || [] });
 });
 
 app.post('/ai/chat', async (req, res) => {
-  const key = process.env.GROQ_API_KEY;
-  if (!key) return res.status(503).json({ error: { message: 'AI недоступний' } });
   const raw = Array.isArray(req.body && req.body.messages) ? req.body.messages : null;
   if (!raw || raw.length === 0) return res.status(400).json({ error: { message: 'messages обовʼязкові' } });
-  // Кожен запит коштує нам грошей у Groq, тож понад денну норму — за монети.
-  // Це сінк, що покриває реальні витрати (токеноміка §4-A): саме такі створюють
-  // справжній попит на монету, на відміну від суто косметичних.
-  const charge = await chargeSink(req.nick, 'ai');
-  if (!charge.ok) {
-    return res.status(402).json({ error: { message: charge.error }, code: charge.code });
-  }
-  res.set('X-AI-Free-Left', String(charge.free ?? 0));
-  res.set('X-AI-Paid', String(charge.paid ?? 0));
   // Санітизація + ліміти проти абʼюзу: лише валідні role/content-рядки, останні 40, обрізка довжини.
   const messages = raw
     .filter(m => m && typeof m.role === 'string' && typeof m.content === 'string')
     .slice(-40)
     .map(m => ({ role: m.role, content: m.content.slice(0, 8000) }));
   if (messages.length === 0) return res.status(400).json({ error: { message: 'messages невалідні' } });
+
+  // Памʼять відповідей — ДО списання норми: якщо відповідь уже знаємо, вона
+  // не коштує нам виклику моделі, а отже не має коштувати нічого й користувачу.
+  const elig = cacheEligible(messages);
+  const cacheKey = elig ? cacheKeyFor(elig, req.nick) : null;
+  if (cacheKey) {
+    const cached = await cacheLookup(cacheKey);
+    if (cached) {
+      res.set('X-AI-Cache', 'hit');
+      if (req.body.stream === true) {
+        res.status(200);
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: cached } }] })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
+      return res.json({ choices: [{ message: { role: 'assistant', content: cached }, finish_reason: 'stop' }], cached: true });
+    }
+  }
+
+  // Кожен запит коштує нам грошей у постачальника, тож понад денну норму — за
+  // монети. Це сінк, що покриває реальні витрати (токеноміка §4-A): саме такі
+  // створюють справжній попит на монету, на відміну від суто косметичних.
+  const charge = await chargeSink(req.nick, 'ai');
+  if (!charge.ok) {
+    return res.status(402).json({ error: { message: charge.error }, code: charge.code });
+  }
+  res.set('X-AI-Free-Left', String(charge.free ?? 0));
+  res.set('X-AI-Paid', String(charge.paid ?? 0));
   // Довідку кладемо ПІСЛЯ системного промпту клієнта (він задає мову відповіді
   // й ім'я співрозмовника), але перед розмовою.
   const firstUser = messages.findIndex(m => m.role !== 'system');
   const at = firstUser === -1 ? messages.length : firstUser;
   messages.splice(at, 0, { role: 'system', content: eionFactsPrompt() });
   const stream = req.body.stream === true;
-  // Модель форсує сервер — клієнт не обирає (див. refreshAiModel). Преміум
-  // отримує сильнішу: це одна з оголошених його переваг.
-  const model = charge.isPremium ? AI_MODEL_PRO : AI_MODEL;
+  const tier = charge.isPremium ? 'pro' : 'base';   // преміуму — сильніша модель
   // 1024 різало довші відповіді на півслові (модель впиралась у стелю й
-  // зупинялась). 2048 при ціні gpt-oss-20b нічого помітного не коштує.
-  const build = (withTools) => JSON.stringify({
-    model, messages, max_tokens: 2048, temperature: 0.7, stream,
+  // зупинялась). 2048 при ціні дешевої моделі нічого помітного не коштує.
+  const build = (p, withTools) => JSON.stringify({
+    model: aiModels[p.id][tier], messages, max_tokens: 2048, temperature: 0.7, stream,
     ...(withTools ? { tools: AI_TOOLS, tool_choice: 'auto' } : {}),
   });
 
-  // Клієнт закрив зʼєднання (скасував) — не тримаємо висячий запит до Groq.
+  // Клієнт закрив зʼєднання (скасував) — не тримаємо висячий запит до моделі.
   const holder = { req: null };
   let aborted = false;
   res.on('close', () => { aborted = true; if (holder.req) holder.req.destroy(); });
 
-  // Модель може не підтримувати інструменти (Groq міняє склад моделей без
-  // попередження — 29.08 зняли зашиту llama). Тоді Groq відповідає 400 і без
-  // цього відкату асистент був би повністю зламаний.
+  const queue = await aiQueue();
+  if (!queue.length) return res.status(503).json({ error: { message: 'AI недоступний' }, code: 'err_ai_unavailable' });
+
+  // Модель може не підтримувати інструменти. Тоді провайдер відповідає 400, і
+  // без цього відкату асистент був би зламаний повністю, а не гірший.
   let withTools = true;
   const MAX_STEPS = 4;   // стеля циклу: інакше модель могла б ганяти інструменти без кінця
 
@@ -914,6 +1219,16 @@ app.post('/ai/chat', async (req, res) => {
     }
   }
 
+  /// Провайдер, який відповів першим успіхом. Далі тримаємось його: у межах
+  /// однієї відповіді змішувати постачальників не можна — tool_call_id із
+  /// чужої розмови для наступного нічого не означає.
+  let pi = 0;
+  let usedTools = false;      // чи торкалась відповідь особистих даних
+  let answerText = '';        // для памʼяті відповідей
+  const nextProvider = () => (pi < queue.length ? queue[pi++] : null);
+  let provider = nextProvider();
+  let lastError = null;
+
   if (stream) {
     let started = false;
     const send = (chunk) => {
@@ -927,125 +1242,71 @@ app.post('/ai/chat', async (req, res) => {
       }
       res.write(chunk);
     };
-    for (let step = 0; step < MAX_STEPS && !aborted; step++) {
-      const r = await groqStreamOnce(build(withTools), send, holder);
-      if (r.status !== 200) {
-        if (withTools && r.status === 400) {
-          console.error('[ai/chat] модель відхилила інструменти, повторюю без них:', model, String(r.errorBody || '').slice(0, 300));
-          withTools = false; step--; continue;
-        }
-        if (!started) {
-          const msg = r.status === 504 ? 'AI таймаут' : 'AI помилка';
-          console.error('[ai/chat]', r.status, String(r.errorBody || '').slice(0, 200));
-          return res.status(r.status === 504 ? 504 : 502).json({ error: { message: msg }, code: r.status === 504 ? 'err_ai_timeout' : 'err_ai_failed' });
-        }
-        break;   // частину відповіді вже віддали — просто завершуємо потік
+    for (let step = 0; step < MAX_STEPS && !aborted && provider; step++) {
+      const r = await aiStreamOnce(provider, build(provider, withTools), send, holder);
+      if (r.status === 200) {
+        await bumpUsage(AI_PROVIDER_NICK, provider.id, 1);
+        answerText += r.text || '';
+        if (!r.toolCalls || r.toolCalls.length === 0) break;
+        usedTools = true;
+        await applyToolCalls(r.toolCalls);
+        continue;
       }
-      if (!r.toolCalls || r.toolCalls.length === 0) break;
-      await applyToolCalls(r.toolCalls);
+      lastError = `${provider.id} ${r.status} ${String(r.errorBody || '').slice(0, 200)}`;
+      if (withTools && r.status === 400) {
+        console.error('[ai] модель відхилила інструменти, повторюю без них:', lastError);
+        withTools = false; step--; continue;
+      }
+      // Провайдер відмовив (ліміт, збій, знята модель) — пробуємо наступного.
+      // Якщо частину відповіді вже віддали, переграти її не можна: продовжимо
+      // з тим, що є, інакше користувач побачив би дві різні відповіді підряд.
+      console.error('[ai] провайдер відмовив:', lastError);
+      if (started) break;
+      provider = nextProvider();
+      if (!provider) {
+        return res.status(502).json({ error: { message: 'AI помилка' }, code: r.status === 504 ? 'err_ai_timeout' : 'err_ai_failed' });
+      }
+      withTools = true; step--;
     }
     send('data: [DONE]\n\n');
     if (!res.writableEnded) res.end();
+    // Запамʼятовуємо лише відповідь, дану БЕЗ інструментів: саме вони
+    // приносять у розмову особисті дані.
+    if (cacheKey && !usedTools && !aborted && answerText.trim()) {
+      await cacheStore(cacheKey, elig.question, answerText, provider && aiModels[provider.id][tier], req.nick);
+    }
     return;
   }
 
-  for (let step = 0; step < MAX_STEPS; step++) {
-    const r = await groqJsonOnce(build(withTools), holder);
-    if (r.status !== 200) {
-      if (withTools && r.status === 400) {
-        console.error('[ai/chat] модель відхилила інструменти, повторюю без них:', model, String(r.body || '').slice(0, 300));
-        withTools = false; step--; continue;
+  for (let step = 0; step < MAX_STEPS && provider; step++) {
+    const r = await aiJsonOnce(provider, build(provider, withTools), holder);
+    if (r.status === 200) {
+      await bumpUsage(AI_PROVIDER_NICK, provider.id, 1);
+      const msg = r.json && r.json.choices && r.json.choices[0] && r.json.choices[0].message;
+      const calls = (msg && msg.tool_calls) || [];
+      if (calls.length === 0) {
+        if (cacheKey && !usedTools && msg && typeof msg.content === 'string' && msg.content.trim()) {
+          await cacheStore(cacheKey, elig.question, msg.content, aiModels[provider.id][tier], req.nick);
+        }
+        return res.type('application/json').send(r.body);
       }
-      console.error('[ai/chat]', r.status, String(r.body || '').slice(0, 200));
-      return res.status(r.status === 504 ? 504 : 502).json({
-        error: { message: r.status === 504 ? 'AI таймаут' : 'AI помилка' },
-        code: r.status === 504 ? 'err_ai_timeout' : 'err_ai_failed',
-      });
+      usedTools = true;
+      await applyToolCalls(calls.map(c => ({ id: c.id, name: c.function && c.function.name, args: c.function && c.function.arguments })));
+      continue;
     }
-    const msg = r.json && r.json.choices && r.json.choices[0] && r.json.choices[0].message;
-    const calls = (msg && msg.tool_calls) || [];
-    if (calls.length === 0) return res.type('application/json').send(r.body);
-    await applyToolCalls(calls.map(c => ({ id: c.id, name: c.function && c.function.name, args: c.function && c.function.arguments })));
+    lastError = `${provider.id} ${r.status} ${String(r.body || '').slice(0, 200)}`;
+    if (withTools && r.status === 400) {
+      console.error('[ai] модель відхилила інструменти, повторюю без них:', lastError);
+      withTools = false; step--; continue;
+    }
+    console.error('[ai] провайдер відмовив:', lastError);
+    provider = nextProvider();
+    if (!provider) {
+      return res.status(502).json({ error: { message: 'AI помилка' }, code: r.status === 504 ? 'err_ai_timeout' : 'err_ai_failed' });
+    }
+    withTools = true; step--;
   }
   res.status(502).json({ error: { message: 'AI помилка' }, code: 'err_ai_failed' });
-});
-
-// ── Переклад повідомлень ──────────────────────────────────────────────────
-// ОКРЕМИЙ шлях, а не `/ai/chat` із перекладацьким промптом від клієнта. Три
-// причини, і кожна вже боліла б у проді:
-//  1. Квота. Переклад витрачається на КОЖНЕ вхідне повідомлення, тобто не за
-//     рішенням користувача. На нормі асистента (15/добу) автопереклад помирав
-//     би за 15 чужих реплік і далі брав по 3 монети за те, що тобі написали.
-//  2. Зловживання. Коли промпт складає клієнт, «переклад» — це просто дешевший
-//     тариф на довільні запити до моделі. Тут промпт складає сервер, а від
-//     клієнта приходять лише текст і мова.
-//  3. Ціна. Перекладу не потрібні ні 2048 токенів, ні температура 0.7.
-const TRANSLATE_LANGS = {
-  en: 'English', uk: 'Ukrainian', ru: 'Russian', de: 'German', es: 'Spanish',
-  fr: 'French', it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
-  tr: 'Turkish', id: 'Indonesian', vi: 'Vietnamese', tl: 'Tagalog', th: 'Thai',
-  ja: 'Japanese', ko: 'Korean', zh: 'Chinese', hi: 'Hindi', bn: 'Bengali',
-  ar: 'Arabic',
-};
-const TRANSLATE_MAX_CHARS = 2000;
-
-/// Один непотоковий виклик Groq. Повертає текст відповіді або кидає.
-function groqComplete(messages, { maxTokens = 512, temperature = 0 } = {}) {
-  return new Promise((resolve, reject) => {
-    const key = process.env.GROQ_API_KEY;
-    if (!key) return reject(new Error('no key'));
-    const payload = JSON.stringify({ model: AI_MODEL, messages, max_tokens: maxTokens, temperature });
-    const r = https.request({
-      method: 'POST', hostname: 'api.groq.com', path: '/openai/v1/chat/completions',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${key}`,
-        'Content-Length': Buffer.byteLength(payload),
-      },
-      timeout: 25000,
-    }, (up) => {
-      let body = '';
-      up.on('data', (c) => { body += c; });
-      up.on('end', () => {
-        try {
-          const d = JSON.parse(body);
-          // Тіло читаємо ЗАВЖДИ: саме мовчазний 404 у тілі приховував зняту
-          // Groq модель, поки кожен запит «просто не працював» (29.08.2026).
-          if (d.error) return reject(new Error(d.error.message || 'groq error'));
-          resolve(String(d.choices?.[0]?.message?.content ?? ''));
-        } catch (e) { reject(new Error(body.slice(0, 200))); }
-      });
-    });
-    r.on('timeout', () => { r.destroy(); reject(new Error('timeout')); });
-    r.on('error', reject);
-    r.write(payload); r.end();
-  });
-}
-
-app.post('/ai/translate', async (req, res) => {
-  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
-  const target = typeof req.body?.target === 'string' ? req.body.target.toLowerCase() : '';
-  const lang = TRANSLATE_LANGS[target];
-  if (!text || !lang) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
-  if (text.length > TRANSLATE_MAX_CHARS) return res.json({ ok: false, error: 'Текст задовгий', code: 'err_text_too_long' });
-  if (!process.env.GROQ_API_KEY) return res.json({ ok: false, error: 'AI недоступний', code: 'err_ai_unavailable' });
-
-  const charge = await chargeSink(req.nick, 'translate');
-  if (!charge.ok) return res.status(402).json({ ok: false, error: charge.error, code: charge.code });
-
-  try {
-    const content = (await groqComplete([
-      { role: 'system', content: 'You are a translation engine. Output only the translation, with no quotes, notes or explanations.' },
-      { role: 'user', content: `Translate the message below into ${lang}. If it is already in ${lang}, reply with exactly: OK\n\n${text}` },
-    ], { maxTokens: 700, temperature: 0 })).trim();
-    // Модель відповідає «OK» на текст, що вже цільовою мовою. Порівнюємо без
-    // розділових знаків: трапляються «OK.» і «ok».
-    const same = content.replace(/[^a-z]/gi, '').toLowerCase() === 'ok';
-    res.json({ ok: true, same, text: same ? null : content, freeLeft: charge.free ?? 0, paid: charge.paid ?? 0 });
-  } catch (e) {
-    console.error('[ai/translate]', e.message);
-    res.json({ ok: false, error: 'AI помилка', code: 'err_ai_failed' });
-  }
 });
 
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
