@@ -495,6 +495,49 @@ function parseOpenGraph(html, url) {
 // не в PUBLIC_PATHS, тож req.nick є), ключ лишається на сервері. Модель і ліміти
 // ФОРСУЮТЬСЯ тут (клієнт не обере дорожчу модель / більший max_tokens), а відповідь
 // GROQ (SSE-стрім або JSON) пайпиться клієнту байт-у-байт — його парсер незмінний.
+// ── Вибір моделі AI ───────────────────────────────────────────────────────
+// Groq знімає моделі з обслуговування без попередження: 29.08.2026 зашита
+// llama-3.3-70b-versatile зникла, і AI мовчки віддавав 404 на КОЖЕН запит —
+// побачити це можна було лише прочитавши тіло відповіді.
+//
+// Тому модель не зашита намертво: при старті питаємо, що доступно, і беремо
+// першу з переліку переваг. Якщо список недоступний — лишається дефолт.
+const AI_MODEL_PREFS = [
+  'openai/gpt-oss-20b',    // швидка й дешева, 131k контексту — для чат-асистента досить
+  'openai/gpt-oss-120b',   // якісніша, якщо перша зникне
+  'qwen/qwen3.8-27b',
+  'groq/compound-mini',
+];
+let AI_MODEL = process.env.AI_MODEL || AI_MODEL_PREFS[0];
+
+function refreshAiModel() {
+  const key = process.env.GROQ_API_KEY;
+  if (!key || process.env.AI_MODEL) return;   // явно задану в env не чіпаємо
+  const req = https.request({
+    method: 'GET', hostname: 'api.groq.com', path: '/openai/v1/models',
+    headers: { Authorization: `Bearer ${key}` }, timeout: 15000,
+  }, (up) => {
+    let body = '';
+    up.on('data', (c) => { body += c; });
+    up.on('end', () => {
+      try {
+        const ids = new Set((JSON.parse(body).data || []).map(m => m.id));
+        const pick = AI_MODEL_PREFS.find(m => ids.has(m));
+        if (pick && pick !== AI_MODEL) {
+          console.log(`[ai] модель: ${AI_MODEL} → ${pick}`);
+          AI_MODEL = pick;
+        } else if (!pick) {
+          console.error('[ai] жодна з переваг недоступна, лишаю', AI_MODEL, '— перевір /admin/ai-models');
+        }
+      } catch (e) { console.error('[ai] список моделей:', e.message); }
+    });
+  });
+  req.on('error', (e) => console.error('[ai] список моделей:', e.message));
+  req.end();
+}
+refreshAiModel();
+setInterval(refreshAiModel, 24 * 60 * 60 * 1000);
+
 // Які моделі доступні за нашим ключем. Потрібно, бо Groq знімає моделі з
 // обслуговування без попередження: 29.08.2026 зашита llama-3.3-70b-versatile
 // зникла, і AI мовчки віддавав 404 на кожен запит.
@@ -542,7 +585,7 @@ app.post('/ai/chat', async (req, res) => {
   if (messages.length === 0) return res.status(400).json({ error: { message: 'messages невалідні' } });
   const stream = req.body.stream === true;
   const payload = JSON.stringify({
-    model: 'llama-3.3-70b-versatile',   // форсуємо модель — клієнт не обирає
+    model: AI_MODEL,   // форсуємо модель — клієнт не обирає (див. refreshAiModel)
     messages,
     max_tokens: 1024,
     temperature: 0.7,
