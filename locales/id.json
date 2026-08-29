@@ -546,7 +546,7 @@
   "ai_bad_state": "Status pesan tidak valid",
   "ai_unknown_error": "Kesalahan tidak dikenal",
   "ai_error_code": "Kesalahan AI {code}: {msg}",
-  "ai_timeout": "Server tidak merespons (batas waktu 30 dtk)",
+  "ai_timeout": "Server tidak merespons",
   "ai_no_internet": "Tidak ada koneksi internet",
   "shop_buy_error": "Kesalahan pembelian",
   "tab_emoji": "Emoji",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "Itu sepertinya bukan tautan YouTube",
   "err_user_blocked_in_channel": "Pengguna ini diblokir di saluran",
   "err_catalog_failed": "Gagal memuat katalog",
-  "err_quota_no_coins": "Kuota harian habis dan koin tidak cukup"
+  "err_quota_no_coins": "Kuota harian habis dan koin tidak cukup",
+  "err_text_too_long": "Teksnya terlalu panjang",
+  "err_ai_unavailable": "Asisten AI tidak tersedia",
+  "err_ai_failed": "Asisten AI tidak menjawab",
+  "ai_free_left": "Sisa permintaan gratis hari ini: {n}",
+  "ai_paid": "Jatah harian habis — koin terpakai: {n}"
 }

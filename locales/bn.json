@@ -546,7 +546,7 @@
   "ai_bad_state": "বার্তার অবস্থা অবৈধ",
   "ai_unknown_error": "অজানা ত্রুটি",
   "ai_error_code": "AI ত্রুটি {code}: {msg}",
-  "ai_timeout": "সার্ভার সাড়া দিচ্ছে না (৩০ সেকেন্ড টাইমআউট)",
+  "ai_timeout": "সার্ভার সাড়া দিচ্ছে না",
   "ai_no_internet": "ইন্টারনেট সংযোগ নেই",
   "shop_buy_error": "কেনাকাটায় ত্রুটি",
   "tab_emoji": "ইমোজি",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "এটি YouTube লিংক বলে মনে হচ্ছে না",
   "err_user_blocked_in_channel": "এই ব্যবহারকারী চ্যানেলে ব্লক",
   "err_catalog_failed": "ক্যাটালগ লোড করা যায়নি",
-  "err_quota_no_coins": "দৈনিক সীমা শেষ এবং পর্যাপ্ত কয়েন নেই"
+  "err_quota_no_coins": "দৈনিক সীমা শেষ এবং পর্যাপ্ত কয়েন নেই",
+  "err_text_too_long": "লেখাটি খুব দীর্ঘ",
+  "err_ai_unavailable": "AI সহকারী উপলব্ধ নয়",
+  "err_ai_failed": "AI সহকারী সাড়া দেয়নি",
+  "ai_free_left": "আজ বাকি বিনামূল্যের অনুরোধ: {n}",
+  "ai_paid": "দৈনিক সীমা শেষ — কাটা কয়েন: {n}"
 }

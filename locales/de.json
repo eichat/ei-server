@@ -546,7 +546,7 @@
   "ai_bad_state": "Ungültiger Nachrichtenzustand",
   "ai_unknown_error": "Unbekannter Fehler",
   "ai_error_code": "KI-Fehler {code}: {msg}",
-  "ai_timeout": "Server antwortet nicht (Timeout 30 s)",
+  "ai_timeout": "Server antwortet nicht",
   "ai_no_internet": "Keine Internetverbindung",
   "shop_buy_error": "Kauffehler",
   "tab_emoji": "Emoji",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "Das sieht nicht nach einem YouTube-Link aus",
   "err_user_blocked_in_channel": "Dieser Nutzer ist im Kanal blockiert",
   "err_catalog_failed": "Katalog konnte nicht geladen werden",
-  "err_quota_no_coins": "Tageslimit aufgebraucht und zu wenige Coins"
+  "err_quota_no_coins": "Tageslimit aufgebraucht und zu wenige Coins",
+  "err_text_too_long": "Der Text ist zu lang",
+  "err_ai_unavailable": "Der KI-Assistent ist nicht verfügbar",
+  "err_ai_failed": "Der KI-Assistent hat nicht geantwortet",
+  "ai_free_left": "Heute noch kostenlose Anfragen: {n}",
+  "ai_paid": "Tageskontingent aufgebraucht — abgebuchte Coins: {n}"
 }

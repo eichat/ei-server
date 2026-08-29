@@ -546,7 +546,7 @@
   "ai_bad_state": "संदेशों की स्थिति अमान्य",
   "ai_unknown_error": "अज्ञात त्रुटि",
   "ai_error_code": "AI त्रुटि {code}: {msg}",
-  "ai_timeout": "सर्वर जवाब नहीं दे रहा (30 सेकंड टाइमआउट)",
+  "ai_timeout": "सर्वर जवाब नहीं दे रहा",
   "ai_no_internet": "इंटरनेट कनेक्शन नहीं है",
   "shop_buy_error": "खरीद में त्रुटि",
   "tab_emoji": "इमोजी",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "यह YouTube लिंक नहीं लगता",
   "err_user_blocked_in_channel": "यह उपयोगकर्ता चैनल में अवरोधित है",
   "err_catalog_failed": "कैटलॉग लोड नहीं हो सका",
-  "err_quota_no_coins": "दैनिक सीमा समाप्त और पर्याप्त सिक्के नहीं"
+  "err_quota_no_coins": "दैनिक सीमा समाप्त और पर्याप्त सिक्के नहीं",
+  "err_text_too_long": "पाठ बहुत लंबा है",
+  "err_ai_unavailable": "AI सहायक उपलब्ध नहीं है",
+  "err_ai_failed": "AI सहायक ने जवाब नहीं दिया",
+  "ai_free_left": "आज बची मुफ़्त विनतियाँ: {n}",
+  "ai_paid": "दैनिक सीमा समाप्त — काटे गए सिक्के: {n}"
 }

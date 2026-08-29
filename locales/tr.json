@@ -546,7 +546,7 @@
   "ai_bad_state": "Geçersiz mesaj durumu",
   "ai_unknown_error": "Bilinmeyen hata",
   "ai_error_code": "Yapay zekâ hatası {code}: {msg}",
-  "ai_timeout": "Sunucu yanıt vermiyor (30 sn zaman aşımı)",
+  "ai_timeout": "Sunucu yanıt vermiyor",
   "ai_no_internet": "İnternet bağlantısı yok",
   "shop_buy_error": "Satın alma hatası",
   "tab_emoji": "Emoji",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "Bu bir YouTube bağlantısına benzemiyor",
   "err_user_blocked_in_channel": "Bu kullanıcı kanalda engelli",
   "err_catalog_failed": "Katalog yüklenemedi",
-  "err_quota_no_coins": "Günlük hak doldu ve yeterli jeton yok"
+  "err_quota_no_coins": "Günlük hak doldu ve yeterli jeton yok",
+  "err_text_too_long": "Metin çok uzun",
+  "err_ai_unavailable": "Yapay zekâ asistanı kullanılamıyor",
+  "err_ai_failed": "Yapay zekâ asistanı yanıt vermedi",
+  "ai_free_left": "Bugün kalan ücretsiz istek: {n}",
+  "ai_paid": "Günlük hak doldu — düşülen coin: {n}"
 }

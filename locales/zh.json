@@ -546,7 +546,7 @@
   "ai_bad_state": "消息状态无效",
   "ai_unknown_error": "未知错误",
   "ai_error_code": "AI 错误 {code}：{msg}",
-  "ai_timeout": "服务器无响应（超时 30 秒）",
+  "ai_timeout": "服务器没有响应",
   "ai_no_internet": "没有网络连接",
   "shop_buy_error": "购买出错",
   "tab_emoji": "表情",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "这看起来不是 YouTube 链接",
   "err_user_blocked_in_channel": "该用户在频道中被封禁",
   "err_catalog_failed": "无法加载目录",
-  "err_quota_no_coins": "今日额度已用完，且金币不足"
+  "err_quota_no_coins": "今日额度已用完，且金币不足",
+  "err_text_too_long": "文本太长",
+  "err_ai_unavailable": "AI 助手不可用",
+  "err_ai_failed": "AI 助手没有响应",
+  "ai_free_left": "今天剩余免费请求：{n}",
+  "ai_paid": "每日额度已用完 — 扣除金币：{n}"
 }

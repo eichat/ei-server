@@ -546,7 +546,7 @@
   "ai_bad_state": "メッセージの状態が正しくありません",
   "ai_unknown_error": "不明なエラー",
   "ai_error_code": "AI エラー {code}: {msg}",
-  "ai_timeout": "サーバーが応答しません（タイムアウト30秒）",
+  "ai_timeout": "サーバーが応答しません",
   "ai_no_internet": "インターネット接続がありません",
   "shop_buy_error": "購入エラー",
   "tab_emoji": "絵文字",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "YouTube のリンクではないようです",
   "err_user_blocked_in_channel": "このユーザーはチャンネルでブロックされています",
   "err_catalog_failed": "カタログを読み込めませんでした",
-  "err_quota_no_coins": "1日の上限に達し、コインも足りません"
+  "err_quota_no_coins": "1日の上限に達し、コインも足りません",
+  "err_text_too_long": "テキストが長すぎます",
+  "err_ai_unavailable": "AIアシスタントを利用できません",
+  "err_ai_failed": "AIアシスタントから応答がありませんでした",
+  "ai_free_left": "本日の無料リクエスト残り: {n}",
+  "ai_paid": "1日の無料枠を使い切りました — 差し引いたコイン: {n}"
 }

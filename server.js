@@ -34,6 +34,13 @@ function isAdmin(req) {
 // 0 = без комісії. На малих сумах Math.floor може дати 0 (це нормально для 1%).
 // При запуску токена підняти за потреби (покриття газу мережі).
 const TRANSFER_FEE_PCT = 1;
+// Ціни преміуму — на рівні модуля: їх читає і покупка, і довідка, яку сервер
+// підкладає AI-асистенту. Дві копії розійшлись би тихо, і асистент упевнено
+// називав би стару ціну.
+const PREMIUM_PRICES = { monthly: 500, yearly: 4200 };
+// Стартовий баланс нового акаунта. Задається ТУТ (у /register), колонка в БД
+// має свій DEFAULT лише як запобіжник.
+const NEW_USER_COINS = 50;
 // Render стоїть за балансувальником: реальний IP клієнта — у X-Forwarded-For.
 // Без цього rate-limit бачив би один IP проксі для всіх і різав би всіх гуртом.
 app.set('trust proxy', 1);
@@ -567,6 +574,30 @@ app.get('/admin/ai-models', (req, res) => {
   }).on('error', (e) => res.json({ ok: false, error: e.message })).end();
 });
 
+/// Коротка довідка про EION, яку сервер підкладає асистенту.
+///
+/// Без неї на «скільки коштує преміум?» чи «чому в мене списались монети?»
+/// модель відповідала загальними здогадами — вона про наш застосунок нічого
+/// не знає. Текст СКЛАДАЄТЬСЯ З КОНСТАНТ вище, тому не може розійтися з тим,
+/// що робить код: змінилась ціна — змінилась і відповідь асистента.
+/// Англійською навмисно: модель однаково відповідає мовою користувача (це
+/// задає системний промпт клієнта), а англійський опис коштує менше токенів.
+function eionFactsPrompt() {
+  return [
+    'Facts about EION, the messenger this assistant lives in. Use them when asked; do not invent features.',
+    '- Platforms: Android and Linux (beta). iOS and Windows are planned.',
+    '- Chats, groups, channels with comments and streams, HD calls, sticker packs.',
+    '- Calls are end-to-end encrypted (WebRTC). Messages are NOT end-to-end encrypted yet; that is planned.',
+    `- EION coins are an in-app unit, not money and not cryptocurrency. New accounts get ${NEW_USER_COINS}.`,
+    `- Premium costs ${PREMIUM_PRICES.monthly} coins per month or ${PREMIUM_PRICES.yearly} per year.`,
+    `- Free daily allowance: ${FREE_QUOTA.ai} AI requests, ${FREE_QUOTA.storage} MB of uploads, ${FREE_QUOTA.turn} relayed calls, ${FREE_QUOTA.translate} translations.`,
+    `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5.`,
+    `- Beyond the allowance the user pays coins: ${SINK_PRICE.ai} per AI request, ${SINK_PRICE.storage} per MB, ${SINK_PRICE.turn} per relayed call.`,
+    `- Transfers between users carry a ${TRANSFER_FEE_PCT}% fee. Paid channels give 70% to the author.`,
+    '- If you do not know something about EION, say so instead of guessing.',
+  ].join('\n');
+}
+
 app.post('/ai/chat', async (req, res) => {
   const key = process.env.GROQ_API_KEY;
   if (!key) return res.status(503).json({ error: { message: 'AI недоступний' } });
@@ -587,11 +618,18 @@ app.post('/ai/chat', async (req, res) => {
     .slice(-40)
     .map(m => ({ role: m.role, content: m.content.slice(0, 8000) }));
   if (messages.length === 0) return res.status(400).json({ error: { message: 'messages невалідні' } });
+  // Довідку кладемо ПІСЛЯ системного промпту клієнта (він задає мову відповіді
+  // й ім'я співрозмовника), але перед розмовою.
+  const firstUser = messages.findIndex(m => m.role !== 'system');
+  const at = firstUser === -1 ? messages.length : firstUser;
+  messages.splice(at, 0, { role: 'system', content: eionFactsPrompt() });
   const stream = req.body.stream === true;
   const payload = JSON.stringify({
     model: AI_MODEL,   // форсуємо модель — клієнт не обирає (див. refreshAiModel)
     messages,
-    max_tokens: 1024,
+    // 1024 різало довші відповіді на півслові (модель просто впиралась у стелю
+    // й зупинялась). 2048 при ціні gpt-oss-20b нічого помітного не коштує.
+    max_tokens: 2048,
     temperature: 0.7,
     stream,
   });
@@ -617,6 +655,84 @@ app.post('/ai/chat', async (req, res) => {
   res.on('close', () => upstream.destroy());
   upstream.write(payload);
   upstream.end();
+});
+
+// ── Переклад повідомлень ──────────────────────────────────────────────────
+// ОКРЕМИЙ шлях, а не `/ai/chat` із перекладацьким промптом від клієнта. Три
+// причини, і кожна вже боліла б у проді:
+//  1. Квота. Переклад витрачається на КОЖНЕ вхідне повідомлення, тобто не за
+//     рішенням користувача. На нормі асистента (15/добу) автопереклад помирав
+//     би за 15 чужих реплік і далі брав по 3 монети за те, що тобі написали.
+//  2. Зловживання. Коли промпт складає клієнт, «переклад» — це просто дешевший
+//     тариф на довільні запити до моделі. Тут промпт складає сервер, а від
+//     клієнта приходять лише текст і мова.
+//  3. Ціна. Перекладу не потрібні ні 2048 токенів, ні температура 0.7.
+const TRANSLATE_LANGS = {
+  en: 'English', uk: 'Ukrainian', ru: 'Russian', de: 'German', es: 'Spanish',
+  fr: 'French', it: 'Italian', pt: 'Portuguese', nl: 'Dutch', pl: 'Polish',
+  tr: 'Turkish', id: 'Indonesian', vi: 'Vietnamese', tl: 'Tagalog', th: 'Thai',
+  ja: 'Japanese', ko: 'Korean', zh: 'Chinese', hi: 'Hindi', bn: 'Bengali',
+  ar: 'Arabic',
+};
+const TRANSLATE_MAX_CHARS = 2000;
+
+/// Один непотоковий виклик Groq. Повертає текст відповіді або кидає.
+function groqComplete(messages, { maxTokens = 512, temperature = 0 } = {}) {
+  return new Promise((resolve, reject) => {
+    const key = process.env.GROQ_API_KEY;
+    if (!key) return reject(new Error('no key'));
+    const payload = JSON.stringify({ model: AI_MODEL, messages, max_tokens: maxTokens, temperature });
+    const r = https.request({
+      method: 'POST', hostname: 'api.groq.com', path: '/openai/v1/chat/completions',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+        'Content-Length': Buffer.byteLength(payload),
+      },
+      timeout: 25000,
+    }, (up) => {
+      let body = '';
+      up.on('data', (c) => { body += c; });
+      up.on('end', () => {
+        try {
+          const d = JSON.parse(body);
+          // Тіло читаємо ЗАВЖДИ: саме мовчазний 404 у тілі приховував зняту
+          // Groq модель, поки кожен запит «просто не працював» (29.08.2026).
+          if (d.error) return reject(new Error(d.error.message || 'groq error'));
+          resolve(String(d.choices?.[0]?.message?.content ?? ''));
+        } catch (e) { reject(new Error(body.slice(0, 200))); }
+      });
+    });
+    r.on('timeout', () => { r.destroy(); reject(new Error('timeout')); });
+    r.on('error', reject);
+    r.write(payload); r.end();
+  });
+}
+
+app.post('/ai/translate', async (req, res) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const target = typeof req.body?.target === 'string' ? req.body.target.toLowerCase() : '';
+  const lang = TRANSLATE_LANGS[target];
+  if (!text || !lang) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  if (text.length > TRANSLATE_MAX_CHARS) return res.json({ ok: false, error: 'Текст задовгий', code: 'err_text_too_long' });
+  if (!process.env.GROQ_API_KEY) return res.json({ ok: false, error: 'AI недоступний', code: 'err_ai_unavailable' });
+
+  const charge = await chargeSink(req.nick, 'translate');
+  if (!charge.ok) return res.status(402).json({ ok: false, error: charge.error, code: charge.code });
+
+  try {
+    const content = (await groqComplete([
+      { role: 'system', content: 'You are a translation engine. Output only the translation, with no quotes, notes or explanations.' },
+      { role: 'user', content: `Translate the message below into ${lang}. If it is already in ${lang}, reply with exactly: OK\n\n${text}` },
+    ], { maxTokens: 700, temperature: 0 })).trim();
+    // Модель відповідає «OK» на текст, що вже цільовою мовою. Порівнюємо без
+    // розділових знаків: трапляються «OK.» і «ok».
+    const same = content.replace(/[^a-z]/gi, '').toLowerCase() === 'ok';
+    res.json({ ok: true, same, text: same ? null : content, freeLeft: charge.free ?? 0, paid: charge.paid ?? 0 });
+  } catch (e) {
+    console.error('[ai/translate]', e.message);
+    res.json({ ok: false, error: 'AI помилка', code: 'err_ai_failed' });
+  }
 });
 
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
@@ -836,6 +952,7 @@ const BURN_PCT = {
   premium: 50,
   pack: 40,
   ai: 40,             // покриває реальні витрати на Groq
+  translate: 40,      // те саме джерело витрат, що й ai
   storage: 30,        // покриває Supabase Storage
   turn: 30,           // покриває релей дзвінків
   transfer_fee: 50,
@@ -876,8 +993,15 @@ const FREE_QUOTA = {
   ai: 15,          ai_premium: 100,      // запитів на добу
   storage: 200,    storage_premium: 1000, // МБ вивантажень на добу
   turn: 10,        turn_premium: 50,      // дзвінків через релей на добу
+  // Переклад — ОКРЕМА норма, і навмисно щедра. Він витрачається не рішенням
+  // користувача, а самим фактом, що йому написали: одиниця на КОЖНЕ вхідне
+  // повідомлення. На нормі AI (15) автопереклад помирав би за 15 повідомлень,
+  // далі беручи по 3 монети за чужий текст. Витрати на нього мізерні (короткий
+  // запит до найдешевшої моделі), тож обмеження тут — проти зловживання, а не
+  // заради грошей.
+  translate: 200,  translate_premium: 1000,
 };
-const SINK_PRICE = { ai: 3, storage: 1, turn: 2 }; // монет за одиницю понад норму
+const SINK_PRICE = { ai: 3, storage: 1, turn: 2, translate: 1 }; // монет за одиницю понад норму
 
 /// Скільки одиниць `kind` користувач витратив сьогодні.
 // ⚠️ Помилки тут НЕ ковтати. Якщо лічильник не читається (немає таблиці, збій
@@ -1154,7 +1278,7 @@ app.post('/register', async (req, res) => {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const userData = {
     nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash,
-    email, color: color || 4280391411, coins: 50,
+    email, color: color || 4280391411, coins: NEW_USER_COINS,
     // Нік міг належати комусь раніше — відсікаємо його токени (див. destroySessionsForNick).
     tokens_valid_from: Date.now(),
     ...(phone ? { phone } : {}),
@@ -2001,7 +2125,7 @@ app.post('/shop/buy-premium', async (req, res) => {
   const { plan } = req.body;
   const nick = req.nick; // Фаза 1: покупець — автентифікований юзер.
   if (!nick || !plan) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
-  const PRICES = { monthly: 500, yearly: 4200 };
+  const PRICES = PREMIUM_PRICES;
   const price = PRICES[plan];
   if (!price) return res.json({ ok: false, error: 'Невідомий план', code: 'err_unknown_plan' });
   const { data: user } = await supabase.from('users').select('premium_expires_at').eq('nick', nick).single();

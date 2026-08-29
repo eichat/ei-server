@@ -546,7 +546,7 @@
   "ai_bad_state": "Nieprawidłowy stan wiadomości",
   "ai_unknown_error": "Nieznany błąd",
   "ai_error_code": "Błąd AI {code}: {msg}",
-  "ai_timeout": "Serwer nie odpowiada (limit 30 s)",
+  "ai_timeout": "Serwer nie odpowiada",
   "ai_no_internet": "Brak połączenia z internetem",
   "shop_buy_error": "Błąd zakupu",
   "tab_emoji": "Emoji",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "To nie wygląda na link do YouTube",
   "err_user_blocked_in_channel": "Ten użytkownik ma blokadę na kanale",
   "err_catalog_failed": "Nie udało się wczytać katalogu",
-  "err_quota_no_coins": "Dzienny limit wyczerpany, a monet za mało"
+  "err_quota_no_coins": "Dzienny limit wyczerpany, a monet za mało",
+  "err_text_too_long": "Tekst jest za długi",
+  "err_ai_unavailable": "Asystent AI jest niedostępny",
+  "err_ai_failed": "Asystent AI nie odpowiedział",
+  "ai_free_left": "Bezpłatnych zapytań dziś zostało: {n}",
+  "ai_paid": "Limit dzienny wyczerpany — pobrane monety: {n}"
 }

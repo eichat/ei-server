@@ -546,7 +546,7 @@
   "ai_bad_state": "Invalid message state",
   "ai_unknown_error": "Unknown error",
   "ai_error_code": "AI error {code}: {msg}",
-  "ai_timeout": "Server not responding (30s timeout)",
+  "ai_timeout": "Server not responding",
   "ai_no_internet": "No internet connection",
   "shop_buy_error": "Purchase error",
   "tab_emoji": "Emoji",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "That doesn’t look like a YouTube link",
   "err_user_blocked_in_channel": "This user is blocked in the channel",
   "err_catalog_failed": "Could not load the catalog",
-  "err_quota_no_coins": "Daily allowance used up and you don’t have enough coins"
+  "err_quota_no_coins": "Daily allowance used up and you don’t have enough coins",
+  "err_text_too_long": "The text is too long",
+  "err_ai_unavailable": "The AI assistant is unavailable",
+  "err_ai_failed": "The AI assistant did not respond",
+  "ai_free_left": "Free requests left today: {n}",
+  "ai_paid": "Daily allowance used up — coins spent: {n}"
 }

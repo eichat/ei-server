@@ -546,7 +546,7 @@
   "ai_bad_state": "État des messages invalide",
   "ai_unknown_error": "Erreur inconnue",
   "ai_error_code": "Erreur IA {code} : {msg}",
-  "ai_timeout": "Le serveur ne répond pas (délai 30 s)",
+  "ai_timeout": "Le serveur ne répond pas",
   "ai_no_internet": "Pas de connexion internet",
   "shop_buy_error": "Erreur d'achat",
   "tab_emoji": "Émojis",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "Cela ne ressemble pas à un lien YouTube",
   "err_user_blocked_in_channel": "Cet utilisateur est bloqué dans le canal",
   "err_catalog_failed": "Impossible de charger le catalogue",
-  "err_quota_no_coins": "Quota quotidien épuisé et pas assez de pièces"
+  "err_quota_no_coins": "Quota quotidien épuisé et pas assez de pièces",
+  "err_text_too_long": "Le texte est trop long",
+  "err_ai_unavailable": "L'assistant IA est indisponible",
+  "err_ai_failed": "L'assistant IA n'a pas répondu",
+  "ai_free_left": "Requêtes gratuites restantes aujourd'hui : {n}",
+  "ai_paid": "Quota quotidien épuisé — pièces débitées : {n}"
 }

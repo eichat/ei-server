@@ -546,7 +546,7 @@
   "ai_bad_state": "Ongeldige berichtstatus",
   "ai_unknown_error": "Onbekende fout",
   "ai_error_code": "AI-fout {code}: {msg}",
-  "ai_timeout": "Server reageert niet (time-out 30 s)",
+  "ai_timeout": "Server reageert niet",
   "ai_no_internet": "Geen internetverbinding",
   "shop_buy_error": "Aankoopfout",
   "tab_emoji": "Emoji",
@@ -677,5 +677,10 @@
   "err_not_youtube_url": "Dat lijkt geen YouTube-link",
   "err_user_blocked_in_channel": "Deze gebruiker is geblokkeerd in het kanaal",
   "err_catalog_failed": "Catalogus laden mislukt",
-  "err_quota_no_coins": "Daglimiet op en niet genoeg munten"
+  "err_quota_no_coins": "Daglimiet op en niet genoeg munten",
+  "err_text_too_long": "De tekst is te lang",
+  "err_ai_unavailable": "De AI-assistent is niet beschikbaar",
+  "err_ai_failed": "De AI-assistent heeft niet geantwoord",
+  "ai_free_left": "Gratis verzoeken over vandaag: {n}",
+  "ai_paid": "Daglimiet op — afgeschreven munten: {n}"
 }
