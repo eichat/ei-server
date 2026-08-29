@@ -495,6 +495,31 @@ function parseOpenGraph(html, url) {
 // не в PUBLIC_PATHS, тож req.nick є), ключ лишається на сервері. Модель і ліміти
 // ФОРСУЮТЬСЯ тут (клієнт не обере дорожчу модель / більший max_tokens), а відповідь
 // GROQ (SSE-стрім або JSON) пайпиться клієнту байт-у-байт — його парсер незмінний.
+// Які моделі доступні за нашим ключем. Потрібно, бо Groq знімає моделі з
+// обслуговування без попередження: 29.08.2026 зашита llama-3.3-70b-versatile
+// зникла, і AI мовчки віддавав 404 на кожен запит.
+app.get('/admin/ai-models', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return res.json({ ok: false, error: 'GROQ_API_KEY не задано' });
+  https.request({
+    method: 'GET', hostname: 'api.groq.com', path: '/openai/v1/models',
+    headers: { Authorization: `Bearer ${key}` }, timeout: 15000,
+  }, (up) => {
+    let body = '';
+    up.on('data', (c) => { body += c; });
+    up.on('end', () => {
+      try {
+        const parsed = JSON.parse(body);
+        const models = (parsed.data || []).map(m => ({
+          id: m.id, context: m.context_window, owned: m.owned_by, active: m.active !== false,
+        })).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        res.json({ ok: true, count: models.length, models });
+      } catch (e) { res.json({ ok: false, error: body.slice(0, 300) }); }
+    });
+  }).on('error', (e) => res.json({ ok: false, error: e.message })).end();
+});
+
 app.post('/ai/chat', async (req, res) => {
   const key = process.env.GROQ_API_KEY;
   if (!key) return res.status(503).json({ error: { message: 'AI недоступний' } });
