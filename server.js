@@ -714,7 +714,7 @@ app.get('/admin/ai-models', async (req, res) => {
     });
   }
   const ep = embedProvider();
-  res.json({ ok: true, queue, providers, embeddings: ep ? { provider: ep.id, model: process.env.EMBED_MODEL || ep.model, dims: EMBED_DIMS } : null });
+  res.json({ ok: true, queue, providers, lastAiError, embeddings: ep ? { provider: ep.id, model: process.env.EMBED_MODEL || ep.model, dims: EMBED_DIMS } : null });
 });
 
 /// Коротка довідка про EION, яку сервер підкладає асистенту.
@@ -891,6 +891,9 @@ function embedProvider() {
 }
 
 let lastEmbedError = null;   // для /admin/ai-embed-test: причина має бути видима
+// Остання відмова чат-провайдера. 502 без сліду — саме те, через що ми вже
+// двічі шукали причину наосліп; тут вона лишається видимою в /admin/ai-models.
+let lastAiError = null;
 
 /// Вектор змісту речення або null (немає ключа / збій — не привід ламати чат).
 async function embedText(text) {
@@ -941,11 +944,14 @@ const KB_CONTEXT_SIM = 0.35;   // підмішати як довідку
 // Косинусна близькість живе в іншій шкалі, ніж схожість триграм: у неї навіть
 // геть різні речення однієї мови дають 0.5–0.6. Тому пороги окремі й вищі.
 const KB_VEC_SERVE_SIM = 0.88;
-// 0.70 було замало: «як створити ГРУПУ» підтягувало «як створити КАНАЛ» із
-// 0.738, а це різні речі в EION. Правильні збіги на тих самих даних дають
-// 0.81–0.83, тож 0.78 їх розділяє. Поріг усе одно лишається здогадкою — тому
-// друга лінія захисту в промпті: модель має право відкинути недоречне.
-const KB_VEC_CONTEXT_SIM = 0.78;
+// 🔴 Поріг НЕ здатен відділити доречне від недоречного, і це виміряно:
+// хибний збіг «створити групу» → «створити канал» дав 0.738, а правильний
+// «якими мовами працює застосунок» → «якими мовами працює EION» — 0.745.
+// Вони перетинаються. Тому поріг тут лише щоб відсікти зовсім далеке, а
+// розбирається промпт: моделі прямо дозволено відкинути недоречний запис.
+// Ціна помилок різна: зайвий запис у контексті модель проігнорує, а
+// пропущений означає «не знаю» про те, що ми задокументували.
+const KB_VEC_CONTEXT_SIM = 0.70;
 
 /// Пошук по базі знань. Два шляхи, і вони доповнюють один одного:
 /// вектор ловить зміст іншими словами, триграми — точні збіги й терміни,
@@ -985,7 +991,7 @@ function kbContextPrompt(rows) {
     + 'use only the entries that actually answer the question and ignore the rest. '
     + 'What you do use is authoritative: follow it exactly, answer in the user language, and do NOT invent '
     + 'extra steps, buttons or settings that are not mentioned. If nothing here covers the question, '
-    + 'say plainly that you are not sure instead of guessing.';
+    + 'just say you do not know that about EION — never mention this knowledge base, retrieval or context.';
   for (const r of rows) {
     const block = `\n\nQ: ${r.question}\nA: ${r.answer}`;
     if (out.length + block.length > 4000) break;
@@ -1523,7 +1529,7 @@ app.post('/ai/chat', async (req, res) => {
         await applyToolCalls(r.toolCalls);
         continue;
       }
-      lastError = `${provider.id} ${r.status} ${String(r.errorBody || '').slice(0, 200)}`;
+      lastError = lastAiError = `${new Date().toISOString()} ${provider.id} ${r.status} ${String(r.errorBody || '').slice(0, 200)}`;
       if (withTools && r.status === 400) {
         console.error('[ai] модель відхилила інструменти, повторюю без них:', lastError);
         withTools = false; step--; continue;
@@ -1565,7 +1571,7 @@ app.post('/ai/chat', async (req, res) => {
       await applyToolCalls(calls.map(c => ({ id: c.id, name: c.function && c.function.name, args: c.function && c.function.arguments })));
       continue;
     }
-    lastError = `${provider.id} ${r.status} ${String(r.body || '').slice(0, 200)}`;
+    lastError = lastAiError = `${new Date().toISOString()} ${provider.id} ${r.status} ${String(r.body || '').slice(0, 200)}`;
     if (withTools && r.status === 400) {
       console.error('[ai] модель відхилила інструменти, повторюю без них:', lastError);
       withTools = false; step--; continue;
