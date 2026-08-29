@@ -153,6 +153,9 @@ app.use((req, res, next) => {
 // Токеноміка вимагає прозорого burn-дашборда; це його джерело даних.
 app.get('/coin/supply', async (req, res) => {
   try {
+    // Заразом показуємо, чи живий облік використання: без нього сінки мовчки
+    // роздають усе безкоштовно, і це не видно ні з чого іншого.
+    const { error: ucErr } = await supabase.from('usage_counters').select('nick').limit(1);
     const { data } = await supabase.from('coin_supply').select('minted, burned, updated_at').eq('id', 1).single();
     const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
     res.json({
@@ -160,6 +163,7 @@ app.get('/coin/supply', async (req, res) => {
       minted: Number(data?.minted || 0),
       burned: Number(data?.burned || 0),
       treasury: Number(company?.coins || 0),
+      quotasWorking: !ucErr,
       updatedAt: data?.updated_at || null,
     });
   } catch (e) {
@@ -804,18 +808,23 @@ const FREE_QUOTA = {
 const SINK_PRICE = { ai: 3, storage: 1, turn: 2 }; // монет за одиницю понад норму
 
 /// Скільки одиниць `kind` користувач витратив сьогодні.
+// ⚠️ Помилки тут НЕ ковтати. Якщо лічильник не читається (немає таблиці, збій
+// БД), `used` дорівнює нулю — і квота не вичерпується НІКОЛИ, тобто сінк тихо
+// вимкнений. Саме так воно й поводилось при першому прогоні.
 async function usageToday(nick, kind) {
   const day = new Date().toISOString().slice(0, 10);
-  const { data } = await supabase.from('usage_counters')
+  const { data, error } = await supabase.from('usage_counters')
     .select('used').eq('nick', nick).eq('kind', kind).eq('day', day).limit(1);
+  if (error) { console.error('[sink] usageToday:', kind, error.message); return null; }
   return (data && data[0] ? data[0].used : 0);
 }
 
 async function bumpUsage(nick, kind, by = 1) {
   const day = new Date().toISOString().slice(0, 10);
-  const used = await usageToday(nick, kind);
-  await supabase.from('usage_counters')
+  const used = (await usageToday(nick, kind)) || 0;
+  const { error } = await supabase.from('usage_counters')
     .upsert({ nick, kind, day, used: used + by }, { onConflict: 'nick,kind,day' });
+  if (error) console.error('[sink] bumpUsage:', kind, error.message);
   return used + by;
 }
 
@@ -828,7 +837,14 @@ async function chargeSink(nick, kind, units = 1) {
     .select('premium_expires_at').eq('nick', nick).single();
   const isPremium = user && user.premium_expires_at && new Date(user.premium_expires_at) > new Date();
   const free = isPremium ? (FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind]) : FREE_QUOTA[kind];
-  const used = await usageToday(nick, kind);
+  const usedRaw = await usageToday(nick, kind);
+  if (usedRaw === null) {
+    // Лічильник недоступний: пропускаємо операцію (краще безкоштовно, ніж
+    // зламаний застосунок), але гучно — інакше сінк мовчки не працює.
+    console.error('[sink] лічильник недоступний, пропускаю без оплати:', kind, nick);
+    return { ok: true, paid: 0, free: 0, degraded: true };
+  }
+  const used = usedRaw;
 
   // Частина одиниць може ще влізти в безкоштовну норму — платимо лише за решту.
   const freeUnits = Math.max(0, Math.min(units, free - used));
