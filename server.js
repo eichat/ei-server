@@ -1182,23 +1182,30 @@ app.get('/admin/ai-kb', async (req, res) => {
   res.json({ ok: true, count: (data || []).length, entries: data || [] });
 });
 
+// Приймає `question` АБО `questions: [...]` — кілька формулювань однієї
+// відповіді. Це не зручність, а спосіб обійти межу триграм: вони порівнюють
+// літери, тож «не працює відео на лінуксі» не зіставиться з «Чому відео не
+// відкривається на Linux». Доки немає смислового пошуку (ембединги), запис
+// просто описують кількома способами — і кожен знаходить ту саму відповідь.
 app.post('/admin/ai-kb', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
-  const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
+  const list = Array.isArray(req.body?.questions) ? req.body.questions
+    : (typeof req.body?.question === 'string' ? [req.body.question] : []);
+  const questions = list.filter(q => typeof q === 'string').map(q => q.trim()).filter(q => q.length >= 4 && q.length <= 300);
   const answer = typeof req.body?.answer === 'string' ? req.body.answer.trim() : '';
-  if (question.length < 4 || answer.length < 2) return res.json({ ok: false, error: 'Потрібні question і answer' });
-  if (question.length > 300 || answer.length > 4000) return res.json({ ok: false, error: 'Задовге' });
-  const norm = normalizeQuestion(question);
-  const key = `curated:${crypto.createHash('sha1').update(norm).digest('hex')}`;
+  if (!questions.length || answer.length < 2) return res.json({ ok: false, error: 'Потрібні question(s) і answer' });
+  if (answer.length > 4000) return res.json({ ok: false, error: 'Відповідь задовга' });
   const now = Date.now();
-  const { error } = await supabase.from('ai_cache').upsert({
-    key, question, answer, model: null, hits: 0, created_at: now, last_used: now,
+  const rows = questions.map(question => ({
+    key: `curated:${crypto.createHash('sha1').update(normalizeQuestion(question)).digest('hex')}`,
+    question, answer, model: null, hits: 0, created_at: now, last_used: now,
     // lang_fp порожній: наш запис не привʼязаний до мови інтерфейсу, бо
     // дослівно він не віддається — лише як довідка для моделі.
     lang_fp: '', source: 'curated', enabled: req.body.enabled !== false,
-  }, { onConflict: 'key' });
+  }));
+  const { error } = await supabase.from('ai_cache').upsert(rows, { onConflict: 'key' });
   if (error) return res.json({ ok: false, error: error.message });
-  res.json({ ok: true, key });
+  res.json({ ok: true, added: rows.length, keys: rows.map(r => r.key) });
 });
 
 app.post('/admin/ai-kb/delete', async (req, res) => {
