@@ -1825,6 +1825,54 @@ async function grantFreePacks(nick) {
 
 // Каталог магазину + позначка, які паки в користувача вже є.
 // Тільки читання — нічого не списує.
+// Публічний URL наліпки. Бакет `stickers` навмисно публічний (на відміну від
+// files/avatars): це статичний контент магазину, однаковий для всіх, тож
+// підписувати кожен файл нема сенсу — лише зайві запити й зіпсований кеш.
+function stickerPublicUrl(storagePath) {
+  const { data } = supabase.storage.from('stickers').getPublicUrl(storagePath);
+  return data?.publicUrl || null;
+}
+
+// Додати або оновити пак цілком: метадані + файли. Дозволяє поповнювати
+// магазин БЕЗ нової збірки застосунку — саме заради цього все й затівалось.
+// Файли йдуть у base64; пак із 12 Lottie важить ~600 КБ і влазить у ліміт тіла.
+app.post('/admin/sticker-pack', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const { id, title, price = 0, sortOrder = 0, previewSticker, items } = req.body || {};
+  if (!id || !title || !Array.isArray(items) || !items.length) {
+    return res.json({ ok: false, error: 'Потрібні id, title і items', code: 'err_invalid_params' });
+  }
+  if (!/^[a-z0-9_-]{2,32}$/.test(id)) return res.json({ ok: false, error: 'Невірний id пака', code: 'err_invalid_params' });
+  try {
+    const uploaded = [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (!it || !it.stickerId || !it.dataBase64) {
+        return res.json({ ok: false, error: `items[${i}]: потрібні stickerId і dataBase64`, code: 'err_invalid_params' });
+      }
+      const kind = it.kind === 'image' ? 'image' : 'lottie';
+      const ext = kind === 'image' ? (it.ext || 'webp') : 'json';
+      const path = `${id}/${it.stickerId}.${ext}`;
+      const buf = Buffer.from(it.dataBase64, 'base64');
+      const { error: upErr } = await supabase.storage.from('stickers')
+        .upload(path, buf, {
+          contentType: kind === 'image' ? `image/${ext}` : 'application/json',
+          upsert: true,
+        });
+      if (upErr) return res.json({ ok: false, error: `upload ${path}: ${upErr.message}` });
+      uploaded.push({ pack_id: id, sticker_id: it.stickerId, storage_path: path, kind, sort_order: i });
+    }
+    await supabase.from('sticker_packs').upsert({
+      id, title, price: Number(price) || 0, sort_order: Number(sortOrder) || 0,
+      preview_sticker: previewSticker || uploaded[0].sticker_id, is_active: true,
+    }, { onConflict: 'id' });
+    await supabase.from('sticker_pack_items').upsert(uploaded, { onConflict: 'pack_id,sticker_id' });
+    res.json({ ok: true, packId: id, items: uploaded.length });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 app.get('/shop/sticker-packs', async (req, res) => {
   const nick = req.query.nick;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
@@ -1838,10 +1886,26 @@ app.get('/shop/sticker-packs', async (req, res) => {
   }
   const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
   const ownedSet = new Set((owned || []).map(o => o.pack_id));
+  // Склад паків — щоб клієнт міг показати наліпки, яких немає в його збірці.
+  // Раніше картинки жили лише в assets застосунку: новий пак вимагав релізу, а
+  // до того куплений пак виглядав як «зображення недоступне».
+  const { data: items } = await supabase.from('sticker_pack_items')
+    .select('pack_id, sticker_id, storage_path, kind, sort_order')
+    .order('sort_order', { ascending: true });
+  const byPack = new Map();
+  for (const it of items || []) {
+    if (!byPack.has(it.pack_id)) byPack.set(it.pack_id, []);
+    byPack.get(it.pack_id).push({
+      id: it.sticker_id,
+      url: stickerPublicUrl(it.storage_path),
+      kind: it.kind || 'lottie',
+    });
+  }
   const result = (packs || []).map(p => ({
     id: p.id, title: p.title, price: p.price,
     previewSticker: p.preview_sticker,
     owned: ownedSet.has(p.id) || p.price === 0,
+    items: byPack.get(p.id) || [],   // порожньо → пак вбудований у застосунок
   }));
   res.json({ ok: true, packs: result });
 });
