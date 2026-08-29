@@ -85,7 +85,7 @@
   "hint_description_optional": "説明（任意）",
   "hint_6digit_code": "6桁のコード",
   "hint_enter_6digit": "6桁のコードを入力",
-  "hint_password_min4": "パスワード（4文字以上）",
+  "hint_password_min8": "パスワード（8文字以上）",
   "nav_chats": "チャット",
   "nav_contacts": "連絡先",
   "nav_channels": "チャンネル",

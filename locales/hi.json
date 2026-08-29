@@ -85,7 +85,7 @@
   "hint_description_optional": "विवरण (वैकल्पिक)",
   "hint_6digit_code": "6 अंकों का कोड",
   "hint_enter_6digit": "6 अंकों का कोड दर्ज करें",
-  "hint_password_min4": "पासवर्ड (न्यूनतम 4 अक्षर)",
+  "hint_password_min8": "पासवर्ड (न्यूनतम 8 अक्षर)",
   "nav_chats": "चैट",
   "nav_contacts": "संपर्क",
   "nav_channels": "चैनल",

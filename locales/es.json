@@ -85,7 +85,7 @@
   "hint_description_optional": "Descripción (opcional)",
   "hint_6digit_code": "Código de 6 dígitos",
   "hint_enter_6digit": "Introduce el código de 6 dígitos",
-  "hint_password_min4": "Contraseña (mín. 4 caracteres)",
+  "hint_password_min8": "Contraseña (mín. 8 caracteres)",
   "nav_chats": "Chats",
   "nav_contacts": "Contactos",
   "nav_channels": "Canales",

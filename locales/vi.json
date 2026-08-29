@@ -85,7 +85,7 @@
   "hint_description_optional": "Mô tả (tùy chọn)",
   "hint_6digit_code": "Mã 6 chữ số",
   "hint_enter_6digit": "Nhập mã 6 chữ số",
-  "hint_password_min4": "Mật khẩu (tối thiểu 4 ký tự)",
+  "hint_password_min8": "Mật khẩu (tối thiểu 8 ký tự)",
   "nav_chats": "Trò chuyện",
   "nav_contacts": "Liên hệ",
   "nav_channels": "Kênh",

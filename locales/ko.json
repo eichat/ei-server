@@ -85,7 +85,7 @@
   "hint_description_optional": "설명 (선택)",
   "hint_6digit_code": "6자리 코드",
   "hint_enter_6digit": "6자리 코드 입력",
-  "hint_password_min4": "비밀번호 (최소 4자)",
+  "hint_password_min8": "비밀번호 (최소 8자)",
   "nav_chats": "채팅",
   "nav_contacts": "연락처",
   "nav_channels": "채널",

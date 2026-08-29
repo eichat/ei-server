@@ -85,7 +85,7 @@
   "hint_description_optional": "Beschrijving (optioneel)",
   "hint_6digit_code": "6-cijferige code",
   "hint_enter_6digit": "Voer 6-cijferige code in",
-  "hint_password_min4": "Wachtwoord (min. 4 tekens)",
+  "hint_password_min8": "Wachtwoord (min. 8 tekens)",
   "nav_chats": "Chats",
   "nav_contacts": "Contacten",
   "nav_channels": "Kanalen",

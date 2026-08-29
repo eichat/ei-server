@@ -85,7 +85,7 @@
   "hint_description_optional": "বিবরণ (ঐচ্ছিক)",
   "hint_6digit_code": "৬-সংখ্যার কোড",
   "hint_enter_6digit": "৬-সংখ্যার কোড লিখুন",
-  "hint_password_min4": "পাসওয়ার্ড (সর্বনিম্ন ৪ অক্ষর)",
+  "hint_password_min8": "পাসওয়ার্ড (সর্বনিম্ন ৮ অক্ষর)",
   "nav_chats": "চ্যাট",
   "nav_contacts": "পরিচিতি",
   "nav_channels": "চ্যানেল",

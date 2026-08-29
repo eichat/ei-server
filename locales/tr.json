@@ -85,7 +85,7 @@
   "hint_description_optional": "Açıklama (isteğe bağlı)",
   "hint_6digit_code": "6 haneli kod",
   "hint_enter_6digit": "6 haneli kodu girin",
-  "hint_password_min4": "Şifre (en az 4 karakter)",
+  "hint_password_min8": "Şifre (en az 8 karakter)",
   "nav_chats": "Sohbetler",
   "nav_contacts": "Kişiler",
   "nav_channels": "Kanallar",

@@ -85,7 +85,7 @@
   "hint_description_optional": "คำอธิบาย (ไม่บังคับ)",
   "hint_6digit_code": "รหัส 6 หลัก",
   "hint_enter_6digit": "ป้อนรหัส 6 หลัก",
-  "hint_password_min4": "รหัสผ่าน (อย่างน้อย 4 ตัวอักษร)",
+  "hint_password_min8": "รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)",
   "nav_chats": "แชท",
   "nav_contacts": "รายชื่อติดต่อ",
   "nav_channels": "ช่อง",

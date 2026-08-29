@@ -85,7 +85,7 @@
   "hint_description_optional": "Deskripsi (opsional)",
   "hint_6digit_code": "Kode 6 digit",
   "hint_enter_6digit": "Masukkan kode 6 digit",
-  "hint_password_min4": "Kata sandi (min. 4 karakter)",
+  "hint_password_min8": "Kata sandi (min. 8 karakter)",
   "nav_chats": "Obrolan",
   "nav_contacts": "Kontak",
   "nav_channels": "Saluran",

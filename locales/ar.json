@@ -85,7 +85,7 @@
   "hint_description_optional": "الوصف (اختياري)",
   "hint_6digit_code": "رمز مكوّن من 6 أرقام",
   "hint_enter_6digit": "أدخل الرمز المكوّن من 6 أرقام",
-  "hint_password_min4": "كلمة المرور (4 أحرف على الأقل)",
+  "hint_password_min8": "كلمة المرور (8 أحرف على الأقل)",
   "nav_chats": "المحادثات",
   "nav_contacts": "جهات الاتصال",
   "nav_channels": "القنوات",
