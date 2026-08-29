@@ -848,7 +848,35 @@ function cacheEligible(messages) {
 function cacheKeyFor(elig, nick) {
   const template = elig.sysTemplate.split(nick).join('');
   const fp = crypto.createHash('sha1').update(template).digest('hex').slice(0, 8);
-  return `${fp}:${crypto.createHash('sha1').update(elig.norm).digest('hex')}`;
+  return { fp, key: `${fp}:${crypto.createHash('sha1').update(elig.norm).digest('hex')}` };
+}
+
+// ── База знань: наш шар відповідей перед провайдером ──────────────────────
+// Поріг ПРЯМОЇ видачі високий: віддати збережену відповідь на схоже, але інше
+// питання — гірше, ніж спитати модель. Середні збіги йдуть лише в контекст.
+const KB_SERVE_SIM = 0.72;     // дослівно, без виклику моделі
+const KB_CONTEXT_SIM = 0.35;   // підмішати як довідку
+
+async function kbSearch(fp, question) {
+  const { data, error } = await supabase.rpc('ai_kb_search', { p_fp: fp, p_query: question, p_limit: 4 });
+  if (error) {
+    // Не ковтати: без бази знань асистент просто дорожчає, і це має бути видно.
+    console.error('[ai-kb] пошук:', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+/// Знайдене підмішується як ДОВІДКА, а не як готова відповідь: модель має
+/// відповісти нашими фактами, але мовою користувача й на його питання.
+function kbContextPrompt(rows) {
+  let out = 'Known answers from the EION knowledge base. Prefer these facts over your own guesses; answer in the user language.';
+  for (const r of rows) {
+    const block = `\n\nQ: ${r.question}\nA: ${r.answer}`;
+    if (out.length + block.length > 4000) break;
+    out += block;
+  }
+  return out;
 }
 
 async function cacheLookup(key) {
@@ -867,13 +895,15 @@ async function cacheLookup(key) {
   return row.answer;
 }
 
-async function cacheStore(key, question, answer, model, nick) {
+async function cacheStore(key, fp, question, answer, model, nick) {
   const a = String(answer || '').trim();
   if (a.length < 4 || a.length > 4000) return;
   if (nick && a.toLowerCase().includes(String(nick).toLowerCase())) return;   // умова 4
   const now = Date.now();
-  const { error } = await supabase.from('ai_cache')
-    .upsert({ key, question, answer: a, model, hits: 0, created_at: now, last_used: now }, { onConflict: 'key' });
+  const { error } = await supabase.from('ai_cache').upsert({
+    key, question, answer: a, model, hits: 0, created_at: now, last_used: now,
+    lang_fp: fp, source: 'model', enabled: true,
+  }, { onConflict: 'key' });
   if (error) console.error('[ai-cache] запис:', error.message);
 }
 
@@ -1139,6 +1169,58 @@ app.get('/admin/ai-cache', async (req, res) => {
   res.json({ ok: true, count: (data || []).length, ttlDays: Math.round(AI_CACHE_TTL_MS / 86400000), top: data || [] });
 });
 
+// ── База знань: наші власні відповіді ─────────────────────────────────────
+// Пишуться руками й ніколи не віддаються дослівно — підмішуються в контекст,
+// щоб модель відповіла нашими фактами, але мовою користувача. Саме це робить
+// асистента «своїм»: він знає те, чого немає в жодній моделі.
+app.get('/admin/ai-kb', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const { data, error } = await supabase.from('ai_cache')
+    .select('key, question, answer, hits, enabled, created_at')
+    .eq('source', 'curated').order('created_at', { ascending: false }).limit(200);
+  if (error) return res.json({ ok: false, error: error.message });
+  res.json({ ok: true, count: (data || []).length, entries: data || [] });
+});
+
+app.post('/admin/ai-kb', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
+  const answer = typeof req.body?.answer === 'string' ? req.body.answer.trim() : '';
+  if (question.length < 4 || answer.length < 2) return res.json({ ok: false, error: 'Потрібні question і answer' });
+  if (question.length > 300 || answer.length > 4000) return res.json({ ok: false, error: 'Задовге' });
+  const norm = normalizeQuestion(question);
+  const key = `curated:${crypto.createHash('sha1').update(norm).digest('hex')}`;
+  const now = Date.now();
+  const { error } = await supabase.from('ai_cache').upsert({
+    key, question, answer, model: null, hits: 0, created_at: now, last_used: now,
+    // lang_fp порожній: наш запис не привʼязаний до мови інтерфейсу, бо
+    // дослівно він не віддається — лише як довідка для моделі.
+    lang_fp: '', source: 'curated', enabled: req.body.enabled !== false,
+  }, { onConflict: 'key' });
+  if (error) return res.json({ ok: false, error: error.message });
+  res.json({ ok: true, key });
+});
+
+app.post('/admin/ai-kb/delete', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const key = typeof req.body?.key === 'string' ? req.body.key : '';
+  if (!key) return res.json({ ok: false, error: 'Потрібен key' });
+  const { error } = await supabase.from('ai_cache').delete().eq('key', key);
+  res.json({ ok: !error, error: error ? error.message : null });
+});
+
+// Перевірити, що знайде база знань на конкретне питання — без виклику моделі.
+app.get('/admin/ai-kb/search', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (!q) return res.json({ ok: false, error: 'Потрібен ?q=' });
+  const rows = await kbSearch(typeof req.query.fp === 'string' ? req.query.fp : '', q);
+  res.json({
+    ok: true, serveThreshold: KB_SERVE_SIM, contextThreshold: KB_CONTEXT_SIM,
+    rows: rows.map(r => ({ question: r.question, source: r.source, sameLang: r.same_lang, sim: Number(r.sim).toFixed(3) })),
+  });
+});
+
 app.post('/ai/chat', async (req, res) => {
   const raw = Array.isArray(req.body && req.body.messages) ? req.body.messages : null;
   if (!raw || raw.length === 0) return res.status(400).json({ error: { message: 'messages обовʼязкові' } });
@@ -1152,22 +1234,38 @@ app.post('/ai/chat', async (req, res) => {
   // Памʼять відповідей — ДО списання норми: якщо відповідь уже знаємо, вона
   // не коштує нам виклику моделі, а отже не має коштувати нічого й користувачу.
   const elig = cacheEligible(messages);
-  const cacheKey = elig ? cacheKeyFor(elig, req.nick) : null;
+  const ck = elig ? cacheKeyFor(elig, req.nick) : null;
+  const cacheKey = ck && ck.key;
+
+  /// Віддати готову відповідь без звернення до моделі.
+  const serveKnown = (text, how) => {
+    res.set('X-AI-Cache', how);
+    if (req.body.stream === true) {
+      res.status(200);
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    }
+    return res.json({ choices: [{ message: { role: 'assistant', content: text }, finish_reason: 'stop' }], cached: true });
+  };
+
+  // Рівень 1: те саме питання слово в слово.
   if (cacheKey) {
     const cached = await cacheLookup(cacheKey);
-    if (cached) {
-      res.set('X-AI-Cache', 'hit');
-      if (req.body.stream === true) {
-        res.status(200);
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('X-Accel-Buffering', 'no');
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: cached } }] })}\n\n`);
-        res.write('data: [DONE]\n\n');
-        return res.end();
-      }
-      return res.json({ choices: [{ message: { role: 'assistant', content: cached }, finish_reason: 'stop' }], cached: true });
-    }
+    if (cached) return serveKnown(cached, 'hit');
+  }
+
+  // Рівні 2–3: схоже питання і наша база знань.
+  let kbContext = null;
+  if (elig) {
+    const rows = await kbSearch(ck.fp, elig.question);
+    const strong = rows.find(r => r.source === 'model' && r.same_lang && Number(r.sim) >= KB_SERVE_SIM);
+    if (strong) return serveKnown(strong.answer, 'similar');
+    const ctx = rows.filter(r => Number(r.sim) >= KB_CONTEXT_SIM).slice(0, 3);
+    if (ctx.length) kbContext = kbContextPrompt(ctx);
   }
 
   // Кожен запит коштує нам грошей у постачальника, тож понад денну норму — за
@@ -1184,6 +1282,7 @@ app.post('/ai/chat', async (req, res) => {
   const firstUser = messages.findIndex(m => m.role !== 'system');
   const at = firstUser === -1 ? messages.length : firstUser;
   messages.splice(at, 0, { role: 'system', content: eionFactsPrompt() });
+  if (kbContext) messages.splice(at + 1, 0, { role: 'system', content: kbContext });
   const stream = req.body.stream === true;
   const tier = charge.isPremium ? 'pro' : 'base';   // преміуму — сильніша модель
   // 1024 різало довші відповіді на півслові (модель впиралась у стелю й
@@ -1273,7 +1372,7 @@ app.post('/ai/chat', async (req, res) => {
     // Запамʼятовуємо лише відповідь, дану БЕЗ інструментів: саме вони
     // приносять у розмову особисті дані.
     if (cacheKey && !usedTools && !aborted && answerText.trim()) {
-      await cacheStore(cacheKey, elig.question, answerText, provider && aiModels[provider.id][tier], req.nick);
+      await cacheStore(cacheKey, ck.fp, elig.question, answerText, provider && aiModels[provider.id][tier], req.nick);
     }
     return;
   }
@@ -1286,7 +1385,7 @@ app.post('/ai/chat', async (req, res) => {
       const calls = (msg && msg.tool_calls) || [];
       if (calls.length === 0) {
         if (cacheKey && !usedTools && msg && typeof msg.content === 'string' && msg.content.trim()) {
-          await cacheStore(cacheKey, elig.question, msg.content, aiModels[provider.id][tier], req.nick);
+          await cacheStore(cacheKey, ck.fp, elig.question, msg.content, aiModels[provider.id][tier], req.nick);
         }
         return res.type('application/json').send(r.body);
       }
