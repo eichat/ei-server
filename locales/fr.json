@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Seul le créateur peut nommer des modérateurs",
   "err_not_youtube_url": "Cela ne ressemble pas à un lien YouTube",
   "err_user_blocked_in_channel": "Cet utilisateur est bloqué dans le canal",
-  "err_catalog_failed": "Impossible de charger le catalogue"
+  "err_catalog_failed": "Impossible de charger le catalogue",
+  "err_quota_no_coins": "Quota quotidien épuisé et pas assez de pièces"
 }

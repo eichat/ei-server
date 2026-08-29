@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Solo il creatore può nominare moderatori",
   "err_not_youtube_url": "Non sembra un link di YouTube",
   "err_user_blocked_in_channel": "Questo utente è bloccato nel canale",
-  "err_catalog_failed": "Impossibile caricare il catalogo"
+  "err_catalog_failed": "Impossibile caricare il catalogo",
+  "err_quota_no_coins": "Limite giornaliero esaurito e monete insufficienti"
 }

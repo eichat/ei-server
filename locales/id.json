@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Hanya pembuat yang bisa menunjuk moderator",
   "err_not_youtube_url": "Itu sepertinya bukan tautan YouTube",
   "err_user_blocked_in_channel": "Pengguna ini diblokir di saluran",
-  "err_catalog_failed": "Gagal memuat katalog"
+  "err_catalog_failed": "Gagal memuat katalog",
+  "err_quota_no_coins": "Kuota harian habis dan koin tidak cukup"
 }

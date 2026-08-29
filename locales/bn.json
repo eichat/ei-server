@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "শুধু নির্মাতা মডারেটর নিয়োগ করতে পারেন",
   "err_not_youtube_url": "এটি YouTube লিংক বলে মনে হচ্ছে না",
   "err_user_blocked_in_channel": "এই ব্যবহারকারী চ্যানেলে ব্লক",
-  "err_catalog_failed": "ক্যাটালগ লোড করা যায়নি"
+  "err_catalog_failed": "ক্যাটালগ লোড করা যায়নি",
+  "err_quota_no_coins": "দৈনিক সীমা শেষ এবং পর্যাপ্ত কয়েন নেই"
 }

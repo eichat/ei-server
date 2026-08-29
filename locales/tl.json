@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Creator lang ang makakapagtalaga ng moderator",
   "err_not_youtube_url": "Mukhang hindi ito YouTube link",
   "err_user_blocked_in_channel": "Naka-block ang user na ito sa channel",
-  "err_catalog_failed": "Hindi na-load ang katalogo"
+  "err_catalog_failed": "Hindi na-load ang katalogo",
+  "err_quota_no_coins": "Naubos na ang pang-araw-araw na limitasyon at kulang ang barya"
 }

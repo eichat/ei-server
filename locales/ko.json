@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "개설자만 운영자를 지정할 수 있습니다",
   "err_not_youtube_url": "YouTube 링크가 아닌 것 같습니다",
   "err_user_blocked_in_channel": "이 사용자는 채널에서 차단되었습니다",
-  "err_catalog_failed": "카탈로그를 불러오지 못했습니다"
+  "err_catalog_failed": "카탈로그를 불러오지 못했습니다",
+  "err_quota_no_coins": "일일 한도를 모두 쓰셨고 코인도 부족합니다"
 }

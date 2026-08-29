@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Призначати модераторів може лише творець",
   "err_not_youtube_url": "Це не схоже на посилання YouTube",
   "err_user_blocked_in_channel": "Цього користувача заблоковано в каналі",
-  "err_catalog_failed": "Не вдалося завантажити каталог"
+  "err_catalog_failed": "Не вдалося завантажити каталог",
+  "err_quota_no_coins": "Денна норма вичерпана, а монет не вистачає"
 }

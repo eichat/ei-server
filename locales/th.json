@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "เฉพาะผู้สร้างเท่านั้นที่ตั้งผู้ควบคุมได้",
   "err_not_youtube_url": "ดูเหมือนไม่ใช่ลิงก์ YouTube",
   "err_user_blocked_in_channel": "ผู้ใช้นี้ถูกบล็อกในช่อง",
-  "err_catalog_failed": "โหลดแคตตาล็อกไม่สำเร็จ"
+  "err_catalog_failed": "โหลดแคตตาล็อกไม่สำเร็จ",
+  "err_quota_no_coins": "ใช้โควตารายวันหมดแล้วและเหรียญไม่พอ"
 }

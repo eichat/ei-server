@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "केवल निर्माता मॉडरेटर नियुक्त कर सकता है",
   "err_not_youtube_url": "यह YouTube लिंक नहीं लगता",
   "err_user_blocked_in_channel": "यह उपयोगकर्ता चैनल में अवरोधित है",
-  "err_catalog_failed": "कैटलॉग लोड नहीं हो सका"
+  "err_catalog_failed": "कैटलॉग लोड नहीं हो सका",
+  "err_quota_no_coins": "दैनिक सीमा समाप्त और पर्याप्त सिक्के नहीं"
 }

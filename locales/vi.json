@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Chỉ người tạo mới bổ nhiệm được người kiểm duyệt",
   "err_not_youtube_url": "Đây không giống liên kết YouTube",
   "err_user_blocked_in_channel": "Người dùng này bị chặn trong kênh",
-  "err_catalog_failed": "Không tải được danh mục"
+  "err_catalog_failed": "Không tải được danh mục",
+  "err_quota_no_coins": "Đã hết hạn mức trong ngày và không đủ xu"
 }

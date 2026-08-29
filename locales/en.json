@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Only the creator can assign moderators",
   "err_not_youtube_url": "That doesn’t look like a YouTube link",
   "err_user_blocked_in_channel": "This user is blocked in the channel",
-  "err_catalog_failed": "Could not load the catalog"
+  "err_catalog_failed": "Could not load the catalog",
+  "err_quota_no_coins": "Daily allowance used up and you don’t have enough coins"
 }

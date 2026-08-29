@@ -15623,6 +15623,29 @@
       "uk": "Не вдалося завантажити каталог",
       "vi": "Không tải được danh mục",
       "zh": "无法加载目录"
+    },
+    "err_quota_no_coins": {
+      "ar": "انتهت حصتك اليومية ولا تملك عملات كافية",
+      "bn": "দৈনিক সীমা শেষ এবং পর্যাপ্ত কয়েন নেই",
+      "de": "Tageslimit aufgebraucht und zu wenige Coins",
+      "en": "Daily allowance used up and you don’t have enough coins",
+      "es": "Has agotado el límite diario y no tienes monedas suficientes",
+      "fr": "Quota quotidien épuisé et pas assez de pièces",
+      "hi": "दैनिक सीमा समाप्त और पर्याप्त सिक्के नहीं",
+      "id": "Kuota harian habis dan koin tidak cukup",
+      "it": "Limite giornaliero esaurito e monete insufficienti",
+      "ja": "1日の上限に達し、コインも足りません",
+      "ko": "일일 한도를 모두 쓰셨고 코인도 부족합니다",
+      "nl": "Daglimiet op en niet genoeg munten",
+      "pl": "Dzienny limit wyczerpany, a monet za mało",
+      "pt": "Limite diário esgotado e moedas insuficientes",
+      "ru": "Дневная норма исчерпана, а монет не хватает",
+      "th": "ใช้โควตารายวันหมดแล้วและเหรียญไม่พอ",
+      "tl": "Naubos na ang pang-araw-araw na limitasyon at kulang ang barya",
+      "tr": "Günlük hak doldu ve yeterli jeton yok",
+      "uk": "Денна норма вичерпана, а монет не вистачає",
+      "vi": "Đã hết hạn mức trong ngày và không đủ xu",
+      "zh": "今日额度已用完，且金币不足"
     }
   }
 }

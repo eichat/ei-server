@@ -140,13 +140,31 @@ const PUBLIC_PATHS = new Set([
   '/phone/request-code', '/phone/verify-code',
 ]);
 app.use((req, res, next) => {
-  if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/') || req.path.startsWith('/locales/')) return next();
+  if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/') || req.path.startsWith('/locales/') || req.path === '/coin/supply') return next();
   const auth = req.headers['authorization'] || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   const nick = resolveSession(token);
   if (!nick) return res.status(401).json({ ok: false, error: 'Не авторизовано', code: 'err_unauthorized' });
   req.nick = nick;
   next();
+});
+
+// Публічний стан монети: скільки видано з фондів і скільки спалено назавжди.
+// Токеноміка вимагає прозорого burn-дашборда; це його джерело даних.
+app.get('/coin/supply', async (req, res) => {
+  try {
+    const { data } = await supabase.from('coin_supply').select('minted, burned, updated_at').eq('id', 1).single();
+    const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
+    res.json({
+      ok: true,
+      minted: Number(data?.minted || 0),
+      burned: Number(data?.burned || 0),
+      treasury: Number(company?.coins || 0),
+      updatedAt: data?.updated_at || null,
+    });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 // ── Локалі ─────────────────────────────────────────────────────────────────
@@ -473,11 +491,20 @@ function parseOpenGraph(html, url) {
 // не в PUBLIC_PATHS, тож req.nick є), ключ лишається на сервері. Модель і ліміти
 // ФОРСУЮТЬСЯ тут (клієнт не обере дорожчу модель / більший max_tokens), а відповідь
 // GROQ (SSE-стрім або JSON) пайпиться клієнту байт-у-байт — його парсер незмінний.
-app.post('/ai/chat', (req, res) => {
+app.post('/ai/chat', async (req, res) => {
   const key = process.env.GROQ_API_KEY;
   if (!key) return res.status(503).json({ error: { message: 'AI недоступний' } });
   const raw = Array.isArray(req.body && req.body.messages) ? req.body.messages : null;
   if (!raw || raw.length === 0) return res.status(400).json({ error: { message: 'messages обовʼязкові' } });
+  // Кожен запит коштує нам грошей у Groq, тож понад денну норму — за монети.
+  // Це сінк, що покриває реальні витрати (токеноміка §4-A): саме такі створюють
+  // справжній попит на монету, на відміну від суто косметичних.
+  const charge = await chargeSink(req.nick, 'ai');
+  if (!charge.ok) {
+    return res.status(402).json({ error: { message: charge.error }, code: charge.code });
+  }
+  res.set('X-AI-Free-Left', String(charge.free ?? 0));
+  res.set('X-AI-Paid', String(charge.paid ?? 0));
   // Санітизація + ліміти проти абʼюзу: лише валідні role/content-рядки, останні 40, обрізка довжини.
   const messages = raw
     .filter(m => m && typeof m.role === 'string' && typeof m.content === 'string')
@@ -725,13 +752,99 @@ async function logTx({ fromNick = null, toNick = null, amount, kind, ref = null 
 // Нарахування доходу компанії (EION): атомарний add_coins + live-нотифікація,
 // якщо EION зараз онлайн (раніше баланс оновлювався лише після перезаходу),
 // + запис у журнал. amount<=0 або сам EION як платник — пропускаємо.
+// Частка кожного платежу, що СПАЛЮЄТЬСЯ (токеноміка §5). Решта — у скарбницю.
+// Платежі без контрагента палимо сильніше: там немає кому віддавати, і саме
+// вони мали б інакше накопичуватись на службовому рахунку без межі.
+// P2P (канали, контакт власника) майже не палимо — 90% і так іде автору.
+const BURN_PCT = {
+  premium: 50,
+  pack: 40,
+  ai: 40,             // покриває реальні витрати на Groq
+  storage: 30,        // покриває Supabase Storage
+  turn: 30,           // покриває релей дзвінків
+  transfer_fee: 50,
+  contact_fee: 50,
+  paid_sub_fee: 50,
+};
+
+/// Дохід платформи: частина спалюється, решта йде на службовий рахунок.
+///
+/// Спалене НЕ потрапляє на жоден рахунок — воно просто зникає з обігу, а
+/// лічильник у coin_supply дозволяє це показати публічно. Дохід від цього не
+/// зникає: більша частина утиліті-платежів лишається в скарбниці.
 async function creditCompany(amount, kind, { fromNick = null, ref = null } = {}) {
   if (!amount || amount <= 0 || fromNick === COMPANY_NICK) return;
-  const { data: newTotal } = await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: amount });
-  if (newTotal != null) {
-    sendToUser(COMPANY_NICK, { type: 'coins_received', fromNick: fromNick || 'system', amount, total: newTotal });
+  const burnPct = BURN_PCT[kind] || 0;
+  const burn = Math.floor(amount * burnPct / 100);
+  const keep = amount - burn;
+  if (burn > 0) {
+    try {
+      await supabase.rpc('burn_coins', { p_amount: burn });
+      await logTx({ fromNick, toNick: null, amount: burn, kind: `${kind}_burn`, ref });
+    } catch (e) { console.log('[burn] error:', e.message); }
   }
-  await logTx({ fromNick, toNick: COMPANY_NICK, amount, kind, ref });
+  if (keep <= 0) return;
+  const { data: newTotal } = await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: keep });
+  if (newTotal != null) {
+    sendToUser(COMPANY_NICK, { type: 'coins_received', fromNick: fromNick || 'system', amount: keep, total: newTotal });
+  }
+  await logTx({ fromNick, toNick: COMPANY_NICK, amount: keep, kind, ref });
+}
+
+// ── Денні квоти на дорогі операції ────────────────────────────────────────
+// Безкоштовна норма, далі — за монети. Саме такі сінки створюють справжній
+// попит: вони покривають витрати, які ми й так несемо.
+// Одиниці різні: для AI — запит, для сховища — мегабайт, для дзвінків — виклик
+// через релей. Норма щодня оновлюється; преміум має ширшу.
+const FREE_QUOTA = {
+  ai: 15,          ai_premium: 100,      // запитів на добу
+  storage: 200,    storage_premium: 1000, // МБ вивантажень на добу
+  turn: 10,        turn_premium: 50,      // дзвінків через релей на добу
+};
+const SINK_PRICE = { ai: 3, storage: 1, turn: 2 }; // монет за одиницю понад норму
+
+/// Скільки одиниць `kind` користувач витратив сьогодні.
+async function usageToday(nick, kind) {
+  const day = new Date().toISOString().slice(0, 10);
+  const { data } = await supabase.from('usage_counters')
+    .select('used').eq('nick', nick).eq('kind', kind).eq('day', day).limit(1);
+  return (data && data[0] ? data[0].used : 0);
+}
+
+async function bumpUsage(nick, kind, by = 1) {
+  const day = new Date().toISOString().slice(0, 10);
+  const used = await usageToday(nick, kind);
+  await supabase.from('usage_counters')
+    .upsert({ nick, kind, day, used: used + by }, { onConflict: 'nick,kind,day' });
+  return used + by;
+}
+
+/// Дозволити дорогу операцію: у межах норми — безкоштовно, понад — за монети.
+/// Повертає { ok, paid, error, code }.
+async function chargeSink(nick, kind, units = 1) {
+  if (!nick) return { ok: false, error: 'Не авторизовано', code: 'err_unauthorized' };
+  units = Math.max(1, Math.ceil(units));
+  const { data: user } = await supabase.from('users')
+    .select('premium_expires_at').eq('nick', nick).single();
+  const isPremium = user && user.premium_expires_at && new Date(user.premium_expires_at) > new Date();
+  const free = isPremium ? (FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind]) : FREE_QUOTA[kind];
+  const used = await usageToday(nick, kind);
+
+  // Частина одиниць може ще влізти в безкоштовну норму — платимо лише за решту.
+  const freeUnits = Math.max(0, Math.min(units, free - used));
+  const paidUnits = units - freeUnits;
+  const price = (SINK_PRICE[kind] || 0) * paidUnits;
+
+  if (price > 0) {
+    const { data: balance } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
+    if (balance === -1) {
+      return { ok: false, error: 'Денна норма вичерпана, монет не вистачає', code: 'err_quota_no_coins' };
+    }
+    await creditCompany(price, kind, { fromNick: nick, ref: kind });
+    sendToUser(nick, { type: 'coins_update', amount: -price, total: balance });
+  }
+  await bumpUsage(nick, kind, units);
+  return { ok: true, paid: price, free: Math.max(0, free - used - units) };
 }
 
 async function notifyChannelSubscribers(channelId, payload, excludeNick = null) {
@@ -1212,7 +1325,12 @@ app.post('/update-email', async (req, res) => {
 // Видача ICE-серверів клієнту. Креди TURN живуть у env сервера, а не в APK —
 // інакше їх витягують із застосунку й крадуть relay-трафік. STUN — публічний,
 // віддаємо завжди; TURN — лише якщо налаштовані змінні оточення.
-app.get('/turn-credentials', (req, res) => {
+app.get('/turn-credentials', async (req, res) => {
+  // Релей — платний трафік, тож понад норму дзвінків на добу беремо монети.
+  // STUN лишається безкоштовним завжди: він майже нічого не коштує і без нього
+  // не працюватиме навіть прямий звʼязок.
+  const charge = await chargeSink(req.nick, 'turn');
+  const relayAllowed = charge.ok;
   const iceServers = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -1220,7 +1338,7 @@ app.get('/turn-credentials', (req, res) => {
   const user = process.env.TURN_USERNAME;
   const cred = process.env.TURN_CREDENTIAL;
   const host = process.env.TURN_HOST || 'global.relay.metered.ca';
-  if (user && cred) {
+  if (user && cred && relayAllowed) {
     iceServers.push(
       { urls: `stun:${host}:80` },
       { urls: `turn:${host}:80`, username: user, credential: cred },
@@ -1229,7 +1347,11 @@ app.get('/turn-credentials', (req, res) => {
       { urls: `turns:${host}:443?transport=tcp`, username: user, credential: cred },
     );
   }
-  res.json({ ok: true, iceServers, ttl: 3600 });
+  res.json({
+    ok: true, iceServers, ttl: 3600,
+    relay: relayAllowed,
+    ...(relayAllowed ? {} : { relayError: charge.error, relayCode: charge.code }),
+  });
 });
 
 app.post('/delete-account', async (req, res) => {
@@ -1394,13 +1516,20 @@ app.delete('/call-logs', async (req, res) => {
 // ключем видає одноразовий підписаний URL, клієнт заливає по ньому. Після переходу
 // всіх клієнтів прибираємо anon INSERT-політики (migrations/storage_lockdown_2_2.sql).
 app.post('/storage/signed-upload', async (req, res) => {
-  const { bucket, path, upsert } = req.body;
+  const { bucket, path, upsert, size } = req.body;
   if (!bucket || !path || !STORAGE_BUCKETS_SET.has(bucket)) {
     return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   }
   // Санітизація шляху: без обходу вгору й провідного слеша, розумна довжина.
   if (typeof path !== 'string' || path.includes('..') || path.startsWith('/') || path.length > 300) {
     return res.json({ ok: false, error: 'Невірний шлях', code: 'err_invalid_path' });
+  }
+  // Сховище коштує грошей щомісяця, тож понад денну норму вивантажень платимо
+  // монетами. Аватари не рахуємо — вони дрібні й міняються рідко.
+  if (bucket === 'files' && Number(size) > 0) {
+    const mb = Math.max(1, Math.ceil(Number(size) / (1024 * 1024)));
+    const charge = await chargeSink(req.nick, 'storage', mb);
+    if (!charge.ok) return res.json({ ok: false, error: charge.error, code: charge.code });
   }
   try {
     const { data, error } = await supabase.storage.from(bucket)

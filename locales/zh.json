@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "只有创建者可以任命版主",
   "err_not_youtube_url": "这看起来不是 YouTube 链接",
   "err_user_blocked_in_channel": "该用户在频道中被封禁",
-  "err_catalog_failed": "无法加载目录"
+  "err_catalog_failed": "无法加载目录",
+  "err_quota_no_coins": "今日额度已用完，且金币不足"
 }

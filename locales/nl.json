@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Alleen de maker kan moderators aanwijzen",
   "err_not_youtube_url": "Dat lijkt geen YouTube-link",
   "err_user_blocked_in_channel": "Deze gebruiker is geblokkeerd in het kanaal",
-  "err_catalog_failed": "Catalogus laden mislukt"
+  "err_catalog_failed": "Catalogus laden mislukt",
+  "err_quota_no_coins": "Daglimiet op en niet genoeg munten"
 }

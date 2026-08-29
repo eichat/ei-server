@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "モデレーターを任命できるのは作成者のみです",
   "err_not_youtube_url": "YouTube のリンクではないようです",
   "err_user_blocked_in_channel": "このユーザーはチャンネルでブロックされています",
-  "err_catalog_failed": "カタログを読み込めませんでした"
+  "err_catalog_failed": "カタログを読み込めませんでした",
+  "err_quota_no_coins": "1日の上限に達し、コインも足りません"
 }

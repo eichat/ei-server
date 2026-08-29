@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Moderatör atamayı yalnızca kurucu yapabilir",
   "err_not_youtube_url": "Bu bir YouTube bağlantısına benzemiyor",
   "err_user_blocked_in_channel": "Bu kullanıcı kanalda engelli",
-  "err_catalog_failed": "Katalog yüklenemedi"
+  "err_catalog_failed": "Katalog yüklenemedi",
+  "err_quota_no_coins": "Günlük hak doldu ve yeterli jeton yok"
 }

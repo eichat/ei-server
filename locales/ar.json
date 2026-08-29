@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "يمكن للمنشئ فقط تعيين المشرفين",
   "err_not_youtube_url": "لا يبدو هذا رابط YouTube",
   "err_user_blocked_in_channel": "هذا المستخدم محظور في القناة",
-  "err_catalog_failed": "تعذّر تحميل الكتالوج"
+  "err_catalog_failed": "تعذّر تحميل الكتالوج",
+  "err_quota_no_coins": "انتهت حصتك اليومية ولا تملك عملات كافية"
 }

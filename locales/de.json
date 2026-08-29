@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Nur der Ersteller kann Moderatoren ernennen",
   "err_not_youtube_url": "Das sieht nicht nach einem YouTube-Link aus",
   "err_user_blocked_in_channel": "Dieser Nutzer ist im Kanal blockiert",
-  "err_catalog_failed": "Katalog konnte nicht geladen werden"
+  "err_catalog_failed": "Katalog konnte nicht geladen werden",
+  "err_quota_no_coins": "Tageslimit aufgebraucht und zu wenige Coins"
 }

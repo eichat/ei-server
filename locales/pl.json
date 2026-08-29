@@ -676,5 +676,6 @@
   "err_only_creator_set_mod": "Tylko twórca może mianować moderatorów",
   "err_not_youtube_url": "To nie wygląda na link do YouTube",
   "err_user_blocked_in_channel": "Ten użytkownik ma blokadę na kanale",
-  "err_catalog_failed": "Nie udało się wczytać katalogu"
+  "err_catalog_failed": "Nie udało się wczytać katalogu",
+  "err_quota_no_coins": "Dzienny limit wyczerpany, a monet za mało"
 }
