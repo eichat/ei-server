@@ -519,11 +519,21 @@ const AI_MODEL_PREFS = [
   'qwen/qwen3.8-27b',
   'groq/compound-mini',
 ];
+// Преміум отримує сильнішу модель — це одна з його переваг (див. eion.network).
+// Список окремий і в тому самому порядку падіння: якщо 120b знімуть, преміум
+// поїде на наступну, а не залишиться без AI.
+const AI_MODEL_PRO_PREFS = [
+  'openai/gpt-oss-120b',
+  'qwen/qwen3.8-27b',
+  'openai/gpt-oss-20b',
+];
 let AI_MODEL = process.env.AI_MODEL || AI_MODEL_PREFS[0];
+let AI_MODEL_PRO = process.env.AI_MODEL_PRO || AI_MODEL_PRO_PREFS[0];
 
 function refreshAiModel() {
   const key = process.env.GROQ_API_KEY;
-  if (!key || process.env.AI_MODEL) return;   // явно задану в env не чіпаємо
+  if (!key) return;
+  if (process.env.AI_MODEL && process.env.AI_MODEL_PRO) return;  // обидві задані в env — не чіпаємо
   const req = https.request({
     method: 'GET', hostname: 'api.groq.com', path: '/openai/v1/models',
     headers: { Authorization: `Bearer ${key}` }, timeout: 15000,
@@ -533,13 +543,18 @@ function refreshAiModel() {
     up.on('end', () => {
       try {
         const ids = new Set((JSON.parse(body).data || []).map(m => m.id));
-        const pick = AI_MODEL_PREFS.find(m => ids.has(m));
-        if (pick && pick !== AI_MODEL) {
-          console.log(`[ai] модель: ${AI_MODEL} → ${pick}`);
-          AI_MODEL = pick;
-        } else if (!pick) {
-          console.error('[ai] жодна з переваг недоступна, лишаю', AI_MODEL, '— перевір /admin/ai-models');
-        }
+        const choose = (prefs, current, label, envName) => {
+          if (process.env[envName]) return current;
+          const pick = prefs.find(m => ids.has(m));
+          if (!pick) {
+            console.error(`[ai] ${label}: жодна з переваг недоступна, лишаю ${current} — перевір /admin/ai-models`);
+            return current;
+          }
+          if (pick !== current) console.log(`[ai] ${label}: ${current} → ${pick}`);
+          return pick;
+        };
+        AI_MODEL = choose(AI_MODEL_PREFS, AI_MODEL, 'базова', 'AI_MODEL');
+        AI_MODEL_PRO = choose(AI_MODEL_PRO_PREFS, AI_MODEL_PRO, 'преміум', 'AI_MODEL_PRO');
       } catch (e) { console.error('[ai] список моделей:', e.message); }
     });
   });
@@ -591,7 +606,7 @@ function eionFactsPrompt() {
     `- EION coins are an in-app unit, not money and not cryptocurrency. New accounts get ${NEW_USER_COINS}.`,
     `- Premium costs ${PREMIUM_PRICES.monthly} coins per month or ${PREMIUM_PRICES.yearly} per year.`,
     `- Free daily allowance: ${FREE_QUOTA.ai} AI requests, ${FREE_QUOTA.storage} MB of uploads, ${FREE_QUOTA.turn} relayed calls, ${FREE_QUOTA.translate} translations.`,
-    `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5.`,
+    `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5, and a stronger AI model.`,
     `- Beyond the allowance the user pays coins: ${SINK_PRICE.ai} per AI request, ${SINK_PRICE.storage} per MB, ${SINK_PRICE.turn} per relayed call.`,
     `- Transfers between users carry a ${TRANSFER_FEE_PCT}% fee. Paid channels give 70% to the author.`,
     '- If you do not know something about EION, say so instead of guessing.',
@@ -625,7 +640,9 @@ app.post('/ai/chat', async (req, res) => {
   messages.splice(at, 0, { role: 'system', content: eionFactsPrompt() });
   const stream = req.body.stream === true;
   const payload = JSON.stringify({
-    model: AI_MODEL,   // форсуємо модель — клієнт не обирає (див. refreshAiModel)
+    // Модель форсує сервер — клієнт не обирає (див. refreshAiModel). Преміум
+    // отримує сильнішу: це одна з оголошених його переваг.
+    model: charge.isPremium ? AI_MODEL_PRO : AI_MODEL,
     messages,
     // 1024 різало довші відповіді на півслові (модель просто впиралась у стелю
     // й зупинялась). 2048 при ціні gpt-oss-20b нічого помітного не коштує.
@@ -1056,7 +1073,7 @@ async function chargeSink(nick, kind, units = 1) {
     sendToUser(nick, { type: 'coins_update', amount: -price, total: balance });
   }
   await bumpUsage(nick, kind, units);
-  return { ok: true, paid: price, free: Math.max(0, free - used - units) };
+  return { ok: true, paid: price, free: Math.max(0, free - used - units), isPremium };
 }
 
 async function notifyChannelSubscribers(channelId, payload, excludeNick = null) {
