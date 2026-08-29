@@ -910,6 +910,10 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 -- збіги йдуть лише в контекст. Смисловий пошук — це ембединги + pgvector,
 -- окремий крок.
 create extension if not exists pg_trgm;
+-- ⚠️ Supabase ставить розширення в схему `extensions`, а не в `public`. Без
+-- цього рядка `gin_trgm_ops` і оператор `%` можуть не знайтись при створенні
+-- індексу — помилка була б на рівному місці.
+set search_path = public, extensions;
 
 alter table public.ai_cache add column if not exists lang_fp text not null default '';
 alter table public.ai_cache add column if not exists source  text not null default 'model';
@@ -922,7 +926,9 @@ create index if not exists ai_cache_source_idx on public.ai_cache (source);
 -- але лише тієї самої мови інтерфейсу, бо їх можна віддати дослівно.
 create or replace function public.ai_kb_search(p_fp text, p_query text, p_limit int default 4)
 returns table (key text, question text, answer text, source text, same_lang boolean, sim real)
-language sql stable as $$
+language sql stable
+set search_path = public, extensions
+as $$
   select c.key, c.question, c.answer, c.source,
          (c.lang_fp = p_fp) as same_lang,
          similarity(c.question, p_query) as sim
