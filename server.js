@@ -707,7 +707,8 @@ app.get('/admin/ai-models', async (req, res) => {
       dailyCap: Number.isFinite(cap) && cap > 0 ? cap : null,
     });
   }
-  res.json({ ok: true, queue, providers });
+  const ep = embedProvider();
+  res.json({ ok: true, queue, providers, embeddings: ep ? { provider: ep.id, model: process.env.EMBED_MODEL || ep.model, dims: EMBED_DIMS } : null });
 });
 
 /// Коротка довідка про EION, яку сервер підкладає асистенту.
@@ -851,21 +852,105 @@ function cacheKeyFor(elig, nick) {
   return { fp, key: `${fp}:${crypto.createHash('sha1').update(elig.norm).digest('hex')}` };
 }
 
+// ── Ембединги: смисловий пошук по базі знань ──────────────────────────────
+// Триграми порівнюють літери, тож «стерти профіль» і «видалити акаунт» вони
+// не зіставлять. Ембединг перетворює речення на вектор змісту — і такі пари
+// стають близькими. Але для цього потрібен постачальник ембедингів: Groq їх
+// не віддає, безкоштовна норма є в Gemini.
+//
+// Без ключа нічого не ламається: `embedText` віддає null, пошук лишається
+// триграмним. Тому увімкнення — це просто ключ у env, без деплою.
+const EMBED_DIMS = 768;   // має збігатися з vector(768) у міграції
+const EMBED_PROVIDERS = [
+  {
+    id: 'gemini', env: 'GEMINI_API_KEY',
+    host: 'generativelanguage.googleapis.com', path: '/v1beta/openai/embeddings',
+    model: 'text-embedding-004',   // рівно 768 вимірів
+  },
+  {
+    id: 'openai', env: 'OPENAI_API_KEY',
+    host: 'api.openai.com', path: '/v1/embeddings',
+    model: 'text-embedding-3-small', dimensions: EMBED_DIMS,   // 1536 → урізаємо до 768
+  },
+];
+
+function embedProvider() {
+  const forced = process.env.EMBED_PROVIDER;
+  const list = forced ? EMBED_PROVIDERS.filter(p => p.id === forced) : EMBED_PROVIDERS;
+  return list.find(p => process.env[p.env]) || null;
+}
+
+/// Вектор змісту речення або null (немає ключа / збій — не привід ламати чат).
+async function embedText(text) {
+  const p = embedProvider();
+  if (!p) return null;
+  const body = JSON.stringify({
+    model: process.env.EMBED_MODEL || p.model,
+    input: String(text || '').slice(0, 2000),
+    ...(p.dimensions ? { dimensions: p.dimensions } : {}),
+  });
+  const r = await httpJson({
+    method: 'POST', host: p.host, path: p.path,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env[p.env]}`,
+      'Content-Length': Buffer.byteLength(body),
+    },
+    body, timeout: 20000,
+  });
+  if (r.status !== 200 || !r.json) {
+    console.error('[embed]', p.id, r.status, String(r.body || '').slice(0, 200));
+    return null;
+  }
+  const vec = r.json.data && r.json.data[0] && r.json.data[0].embedding;
+  if (!Array.isArray(vec)) { console.error('[embed] несподівана відповідь', p.id); return null; }
+  if (vec.length !== EMBED_DIMS) {
+    // Мовчазна невідповідність розмірності зіпсувала б таблицю: половина
+    // записів була б непорівнянна з іншою половиною.
+    console.error(`[embed] ${p.id}: ${vec.length} вимірів замість ${EMBED_DIMS} — пропускаю`);
+    return null;
+  }
+  return vec;
+}
+
+const vecToSql = (v) => `[${v.join(',')}]`;
+
 // ── База знань: наш шар відповідей перед провайдером ──────────────────────
 // Поріг ПРЯМОЇ видачі високий: віддати збережену відповідь на схоже, але інше
 // питання — гірше, ніж спитати модель. Середні збіги йдуть лише в контекст.
 const KB_SERVE_SIM = 0.72;     // дослівно, без виклику моделі
 const KB_CONTEXT_SIM = 0.35;   // підмішати як довідку
+// Косинусна близькість живе в іншій шкалі, ніж схожість триграм: у неї навіть
+// геть різні речення однієї мови дають 0.5–0.6. Тому пороги окремі й вищі.
+const KB_VEC_SERVE_SIM = 0.88;
+const KB_VEC_CONTEXT_SIM = 0.70;
 
+/// Пошук по базі знань. Два шляхи, і вони доповнюють один одного:
+/// вектор ловить зміст іншими словами, триграми — точні збіги й терміни,
+/// яких у навчанні ембедингів могло не бути (назви, коди, «libmpv»).
+/// Кожен рядок несе `via` і свій поріг: шкали в них різні.
 async function kbSearch(fp, question) {
+  const rows = [];
+  const vec = await embedText(question);
+  if (vec) {
+    const { data, error } = await supabase.rpc('ai_kb_search_vec',
+      { p_fp: fp, p_vec: vecToSql(vec), p_limit: 4 });
+    if (error) console.error('[ai-kb] векторний пошук:', error.message);
+    for (const r of data || []) rows.push({ ...r, via: 'vec' });
+  }
   const { data, error } = await supabase.rpc('ai_kb_search', { p_fp: fp, p_query: question, p_limit: 4 });
   if (error) {
     // Не ковтати: без бази знань асистент просто дорожчає, і це має бути видно.
     console.error('[ai-kb] пошук:', error.message);
-    return [];
   }
-  return data || [];
+  for (const r of data || []) {
+    if (!rows.some(x => x.key === r.key)) rows.push({ ...r, via: 'trgm' });
+  }
+  return rows;
 }
+
+const kbServeOk = (r) => Number(r.sim) >= (r.via === 'vec' ? KB_VEC_SERVE_SIM : KB_SERVE_SIM);
+const kbContextOk = (r) => Number(r.sim) >= (r.via === 'vec' ? KB_VEC_CONTEXT_SIM : KB_CONTEXT_SIM);
 
 /// Знайдене підмішується як ДОВІДКА, а не як готова відповідь: модель має
 /// відповісти нашими фактами, але мовою користувача й на його питання.
@@ -906,9 +991,13 @@ async function cacheStore(key, fp, question, answer, model, nick) {
   if (a.length < 4 || a.length > 4000) return;
   if (nick && a.toLowerCase().includes(String(nick).toLowerCase())) return;   // умова 4
   const now = Date.now();
+  // Вектор рахуємо для ПИТАННЯ: шукати ми будемо саме по ньому.
+  const vec = await embedText(question);
   const { error } = await supabase.from('ai_cache').upsert({
     key, question, answer: a, model, hits: 0, created_at: now, last_used: now,
     lang_fp: fp, source: 'model', enabled: true,
+    // ⚠️ Вектор передається ТЕКСТОМ: масив чисел PostgREST до `vector` не приводить.
+    ...(vec ? { embedding: vecToSql(vec) } : {}),
   }, { onConflict: 'key' });
   if (error) console.error('[ai-cache] запис:', error.message);
 }
@@ -1202,13 +1291,18 @@ app.post('/admin/ai-kb', async (req, res) => {
   if (!questions.length || answer.length < 2) return res.json({ ok: false, error: 'Потрібні question(s) і answer' });
   if (answer.length > 4000) return res.json({ ok: false, error: 'Відповідь задовга' });
   const now = Date.now();
-  const rows = questions.map(question => ({
-    key: `curated:${crypto.createHash('sha1').update(normalizeQuestion(question)).digest('hex')}`,
-    question, answer, model: null, hits: 0, created_at: now, last_used: now,
-    // lang_fp порожній: наш запис не привʼязаний до мови інтерфейсу, бо
-    // дослівно він не віддається — лише як довідка для моделі.
-    lang_fp: '', source: 'curated', enabled: req.body.enabled !== false,
-  }));
+  const rows = [];
+  for (const question of questions) {
+    const vec = await embedText(question);
+    rows.push({
+      key: `curated:${crypto.createHash('sha1').update(normalizeQuestion(question)).digest('hex')}`,
+      question, answer, model: null, hits: 0, created_at: now, last_used: now,
+      // lang_fp порожній: наш запис не привʼязаний до мови інтерфейсу, бо
+      // дослівно він не віддається — лише як довідка для моделі.
+      lang_fp: '', source: 'curated', enabled: req.body.enabled !== false,
+      ...(vec ? { embedding: vecToSql(vec) } : {}),
+    });
+  }
   const { error } = await supabase.from('ai_cache').upsert(rows, { onConflict: 'key' });
   if (error) return res.json({ ok: false, error: error.message });
   res.json({ ok: true, added: rows.length, keys: rows.map(r => r.key) });
@@ -1222,6 +1316,28 @@ app.post('/admin/ai-kb/delete', async (req, res) => {
   res.json({ ok: !error, error: error ? error.message : null });
 });
 
+// Дозаповнити вектори для записів, доданих до появи ключа ембедингів.
+// Порціями: кожен запис — це мережевий виклик, а Render рубає довгі запити.
+app.post('/admin/ai-kb/embed', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  if (!embedProvider()) return res.json({ ok: false, error: 'Немає ключа ембедингів (GEMINI_API_KEY)' });
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit || '25', 10) || 25));
+  const { data, error } = await supabase.from('ai_cache')
+    .select('key, question').is('embedding', null).limit(limit);
+  if (error) return res.json({ ok: false, error: error.message });
+  let done = 0, failed = 0;
+  for (const row of data || []) {
+    const vec = await embedText(row.question);
+    if (!vec) { failed++; continue; }
+    const { error: e2 } = await supabase.from('ai_cache')
+      .update({ embedding: vecToSql(vec) }).eq('key', row.key);
+    if (e2) { console.error('[ai-kb] запис вектора:', e2.message); failed++; } else done++;
+  }
+  const { count } = await supabase.from('ai_cache')
+    .select('key', { count: 'exact', head: true }).is('embedding', null);
+  res.json({ ok: true, done, failed, left: count ?? null });
+});
+
 // Перевірити, що знайде база знань на конкретне питання — без виклику моделі.
 app.get('/admin/ai-kb/search', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
@@ -1230,7 +1346,12 @@ app.get('/admin/ai-kb/search', async (req, res) => {
   const rows = await kbSearch(typeof req.query.fp === 'string' ? req.query.fp : '', q);
   res.json({
     ok: true, serveThreshold: KB_SERVE_SIM, contextThreshold: KB_CONTEXT_SIM,
-    rows: rows.map(r => ({ question: r.question, source: r.source, sameLang: r.same_lang, sim: Number(r.sim).toFixed(3) })),
+    vecServeThreshold: KB_VEC_SERVE_SIM, vecContextThreshold: KB_VEC_CONTEXT_SIM,
+    embedProvider: embedProvider() ? embedProvider().id : null,
+    rows: rows.map(r => ({
+      question: r.question, source: r.source, via: r.via, sameLang: r.same_lang,
+      sim: Number(r.sim).toFixed(3), wouldServe: kbServeOk(r), wouldContext: kbContextOk(r),
+    })),
   });
 });
 
@@ -1275,9 +1396,9 @@ app.post('/ai/chat', async (req, res) => {
   let kbContext = null;
   if (elig) {
     const rows = await kbSearch(ck.fp, elig.question);
-    const strong = rows.find(r => r.source === 'model' && r.same_lang && Number(r.sim) >= KB_SERVE_SIM);
-    if (strong) return serveKnown(strong.answer, 'similar');
-    const ctx = rows.filter(r => Number(r.sim) >= KB_CONTEXT_SIM).slice(0, 3);
+    const strong = rows.find(r => r.source === 'model' && r.same_lang && kbServeOk(r));
+    if (strong) return serveKnown(strong.answer, `similar:${strong.via}`);
+    const ctx = rows.filter(kbContextOk).slice(0, 3);
     if (ctx.length) kbContext = kbContextPrompt(ctx);
   }
 
