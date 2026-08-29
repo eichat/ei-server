@@ -870,7 +870,13 @@ async function kbSearch(fp, question) {
 /// Знайдене підмішується як ДОВІДКА, а не як готова відповідь: модель має
 /// відповісти нашими фактами, але мовою користувача й на його питання.
 function kbContextPrompt(rows) {
-  let out = 'Known answers from the EION knowledge base. Prefer these facts over your own guesses; answer in the user language.';
+  // «Не додавай кроків, яких тут немає» — не зайва обережність: на першому ж
+  // тесті модель дописала до нашої інструкції крок, якого в застосунку немає.
+  // Довідка має звужувати відповідь, а не бути приводом дофантазувати навколо.
+  let out = 'Known answers from the EION knowledge base. These are authoritative: '
+    + 'answer from them, in the user language, and do NOT invent extra steps, '
+    + 'buttons or settings that are not mentioned here. If the knowledge base does '
+    + 'not cover part of the question, say so plainly instead of guessing.';
   for (const r of rows) {
     const block = `\n\nQ: ${r.question}\nA: ${r.answer}`;
     if (out.length + block.length > 4000) break;
