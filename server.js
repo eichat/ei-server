@@ -10,6 +10,8 @@ const httpModule = require('http');
 const crypto = require('crypto');
 const net = require('net');
 const dnsp = require('dns').promises;
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 // Системний акаунт компанії — сюди надходить комісія з платних операцій
@@ -138,13 +140,41 @@ const PUBLIC_PATHS = new Set([
   '/phone/request-code', '/phone/verify-code',
 ]);
 app.use((req, res, next) => {
-  if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/')) return next();
+  if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/') || req.path.startsWith('/locales/')) return next();
   const auth = req.headers['authorization'] || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   const nick = resolveSession(token);
   if (!nick) return res.status(401).json({ ok: false, error: 'Не авторизовано', code: 'err_unauthorized' });
   req.nick = nick;
   next();
+});
+
+// ── Локалі ─────────────────────────────────────────────────────────────────
+// Роздаємо переклади самі, а не з GitHub raw: той не є CDN (без гарантій
+// доступності, з лімітами, і в частині країн заблокований), а клієнт ходить
+// сюди й так. ETag дозволяє не пересилати незмінений файл — 45 КБ на кожен
+// старт застосунку перетворюються на 304 без тіла.
+const LOCALES_DIR = path.join(__dirname, 'locales');
+const _localeCache = new Map(); // lang → { body, etag }
+
+app.get('/locales/:lang.json', (req, res) => {
+  const lang = String(req.params.lang || '').toLowerCase();
+  if (!/^[a-z]{2}$/.test(lang)) return res.status(400).json({ ok: false, error: 'bad lang' });
+  try {
+    let entry = _localeCache.get(lang);
+    if (!entry) {
+      const body = fs.readFileSync(path.join(LOCALES_DIR, `${lang}.json`), 'utf8');
+      const etag = '"' + crypto.createHash('sha1').update(body).digest('hex').slice(0, 16) + '"';
+      entry = { body, etag };
+      _localeCache.set(lang, entry);
+    }
+    res.set('ETag', entry.etag);
+    res.set('Cache-Control', 'public, max-age=300');
+    if (req.headers['if-none-match'] === entry.etag) return res.status(304).end();
+    res.type('application/json').send(entry.body);
+  } catch (e) {
+    res.status(404).json({ ok: false, error: 'locale not found' });
+  }
 });
 
 // ── Моніторинг ────────────────────────────────────────────────────────────
