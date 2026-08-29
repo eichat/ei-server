@@ -1,0 +1,26 @@
+name: Локалі
+# Ловить найчастішу помилку з перекладами: правку згенерованого файла без
+# джерела (або навпаки) — тоді застосунок показав би сирий ключ.
+on:
+  push:
+    paths: ['locales/**', 'locales-source.json', 'tools/build-locales.js']
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Перевірити повноту й плейсхолдери
+        run: node tools/build-locales.js
+      - name: Переконатись, що locales/ відповідають джерелу
+        run: |
+          if [ -n "$(git status --porcelain locales/)" ]; then
+            echo "✗ locales/ розійшлись із locales-source.json — запусти:"
+            echo "   node tools/build-locales.js"
+            git --no-pager diff --stat locales/
+            exit 1
+          fi
+          echo "✓ locales/ відповідають джерелу"
