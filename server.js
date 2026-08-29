@@ -827,6 +827,33 @@ function groqJsonOnce(payload, holder) {
   });
 }
 
+// Чи вміє поточна модель викликати інструменти. Без цього «асистент не
+// покликав інструмент» не відрізнити від «Groq їх не прийняв»: відкат на
+// роботу без інструментів навмисно тихий для користувача.
+app.get('/admin/ai-tools-check', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const out = {};
+  for (const [label, m] of [['base', AI_MODEL], ['pro', AI_MODEL_PRO]]) {
+    const r = await groqJsonOnce(JSON.stringify({
+      model: m,
+      messages: [
+        { role: 'system', content: 'Use the tools when asked about the user data.' },
+        { role: 'user', content: 'How many coins do I have?' },
+      ],
+      tools: AI_TOOLS, tool_choice: 'auto', max_tokens: 256, temperature: 0,
+    }));
+    const msg = r.json && r.json.choices && r.json.choices[0] && r.json.choices[0].message;
+    out[label] = {
+      model: m,
+      status: r.status,
+      toolCalls: (msg && msg.tool_calls || []).map(c => c.function && c.function.name),
+      content: msg && typeof msg.content === 'string' ? msg.content.slice(0, 200) : null,
+      error: r.status === 200 ? null : String(r.body || '').slice(0, 400),
+    };
+  }
+  res.json({ ok: true, ...out });
+});
+
 app.post('/ai/chat', async (req, res) => {
   const key = process.env.GROQ_API_KEY;
   if (!key) return res.status(503).json({ error: { message: 'AI недоступний' } });
@@ -903,7 +930,10 @@ app.post('/ai/chat', async (req, res) => {
     for (let step = 0; step < MAX_STEPS && !aborted; step++) {
       const r = await groqStreamOnce(build(withTools), send, holder);
       if (r.status !== 200) {
-        if (withTools && r.status === 400) { withTools = false; step--; continue; }
+        if (withTools && r.status === 400) {
+          console.error('[ai/chat] модель відхилила інструменти, повторюю без них:', model, String(r.errorBody || '').slice(0, 300));
+          withTools = false; step--; continue;
+        }
         if (!started) {
           const msg = r.status === 504 ? 'AI таймаут' : 'AI помилка';
           console.error('[ai/chat]', r.status, String(r.errorBody || '').slice(0, 200));
@@ -922,7 +952,10 @@ app.post('/ai/chat', async (req, res) => {
   for (let step = 0; step < MAX_STEPS; step++) {
     const r = await groqJsonOnce(build(withTools), holder);
     if (r.status !== 200) {
-      if (withTools && r.status === 400) { withTools = false; step--; continue; }
+      if (withTools && r.status === 400) {
+        console.error('[ai/chat] модель відхилила інструменти, повторюю без них:', model, String(r.body || '').slice(0, 300));
+        withTools = false; step--; continue;
+      }
       console.error('[ai/chat]', r.status, String(r.body || '').slice(0, 200));
       return res.status(r.status === 504 ? 504 : 502).json({
         error: { message: r.status === 504 ? 'AI таймаут' : 'AI помилка' },
