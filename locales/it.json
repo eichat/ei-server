@@ -682,5 +682,6 @@
   "err_ai_unavailable": "L'assistente IA non è disponibile",
   "err_ai_failed": "L'assistente IA non ha risposto",
   "ai_free_left": "Richieste gratuite rimaste oggi: {n}",
-  "ai_paid": "Quota giornaliera esaurita — monete addebitate: {n}"
+  "ai_paid": "Quota giornaliera esaurita — monete addebitate: {n}",
+  "err_ai_timeout": "L'assistente IA ha impiegato troppo tempo"
 }

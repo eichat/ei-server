@@ -682,5 +682,6 @@
   "err_ai_unavailable": "El asistente de IA no está disponible",
   "err_ai_failed": "El asistente de IA no respondió",
   "ai_free_left": "Consultas gratuitas que quedan hoy: {n}",
-  "ai_paid": "Cuota diaria agotada: monedas cobradas: {n}"
+  "ai_paid": "Cuota diaria agotada: monedas cobradas: {n}",
+  "err_ai_timeout": "El asistente de IA tardó demasiado"
 }

@@ -682,5 +682,6 @@
   "err_ai_unavailable": "De AI-assistent is niet beschikbaar",
   "err_ai_failed": "De AI-assistent heeft niet geantwoord",
   "ai_free_left": "Gratis verzoeken over vandaag: {n}",
-  "ai_paid": "Daglimiet op — afgeschreven munten: {n}"
+  "ai_paid": "Daglimiet op — afgeschreven munten: {n}",
+  "err_ai_timeout": "De AI-assistent reageerde te traag"
 }

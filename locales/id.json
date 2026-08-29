@@ -682,5 +682,6 @@
   "err_ai_unavailable": "Asisten AI tidak tersedia",
   "err_ai_failed": "Asisten AI tidak menjawab",
   "ai_free_left": "Sisa permintaan gratis hari ini: {n}",
-  "ai_paid": "Jatah harian habis — koin terpakai: {n}"
+  "ai_paid": "Jatah harian habis — koin terpakai: {n}",
+  "err_ai_timeout": "Asisten AI tidak menjawab tepat waktu"
 }

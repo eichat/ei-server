@@ -682,5 +682,6 @@
   "err_ai_unavailable": "Hindi available ang AI assistant",
   "err_ai_failed": "Hindi tumugon ang AI assistant",
   "ai_free_left": "Natitirang libreng kahilingan ngayon: {n}",
-  "ai_paid": "Naubos na ang arawang alawans — nabawas na barya: {n}"
+  "ai_paid": "Naubos na ang arawang alawans — nabawas na barya: {n}",
+  "err_ai_timeout": "Hindi umabot sa oras ang AI assistant"
 }

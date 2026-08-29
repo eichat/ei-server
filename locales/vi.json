@@ -682,5 +682,6 @@
   "err_ai_unavailable": "Trợ lý AI không khả dụng",
   "err_ai_failed": "Trợ lý AI không phản hồi",
   "ai_free_left": "Số yêu cầu miễn phí còn lại hôm nay: {n}",
-  "ai_paid": "Đã hết hạn mức ngày — số xu đã trừ: {n}"
+  "ai_paid": "Đã hết hạn mức ngày — số xu đã trừ: {n}",
+  "err_ai_timeout": "Trợ lý AI phản hồi quá chậm"
 }

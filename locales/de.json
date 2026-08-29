@@ -682,5 +682,6 @@
   "err_ai_unavailable": "Der KI-Assistent ist nicht verfügbar",
   "err_ai_failed": "Der KI-Assistent hat nicht geantwortet",
   "ai_free_left": "Heute noch kostenlose Anfragen: {n}",
-  "ai_paid": "Tageskontingent aufgebraucht — abgebuchte Coins: {n}"
+  "ai_paid": "Tageskontingent aufgebraucht — abgebuchte Coins: {n}",
+  "err_ai_timeout": "Zeitüberschreitung beim KI-Assistenten"
 }

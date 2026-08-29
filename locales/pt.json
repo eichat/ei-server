@@ -682,5 +682,6 @@
   "err_ai_unavailable": "O assistente de IA está indisponível",
   "err_ai_failed": "O assistente de IA não respondeu",
   "ai_free_left": "Pedidos gratuitos restantes hoje: {n}",
-  "ai_paid": "Quota diária esgotada — moedas debitadas: {n}"
+  "ai_paid": "Quota diária esgotada — moedas debitadas: {n}",
+  "err_ai_timeout": "O assistente de IA demorou demasiado"
 }

@@ -15761,6 +15761,29 @@
       "uk": "Денна норма вичерпана — списано монет: {n}",
       "vi": "Đã hết hạn mức ngày — số xu đã trừ: {n}",
       "zh": "每日额度已用完 — 扣除金币：{n}"
+    },
+    "err_ai_timeout": {
+      "ar": "انتهت مهلة انتظار مساعد الذكاء الاصطناعي",
+      "bn": "AI সহকারী সময়মতো সাড়া দেয়নি",
+      "de": "Zeitüberschreitung beim KI-Assistenten",
+      "en": "The AI assistant timed out",
+      "es": "El asistente de IA tardó demasiado",
+      "fr": "L'assistant IA a mis trop de temps",
+      "hi": "AI सहायक ने समय पर जवाब नहीं दिया",
+      "id": "Asisten AI tidak menjawab tepat waktu",
+      "it": "L'assistente IA ha impiegato troppo tempo",
+      "ja": "AIアシスタントの応答がタイムアウトしました",
+      "ko": "AI 어시스턴트 응답이 시간 초과되었습니다",
+      "nl": "De AI-assistent reageerde te traag",
+      "pl": "Asystent AI nie odpowiedział na czas",
+      "pt": "O assistente de IA demorou demasiado",
+      "ru": "AI-ассистент не ответил вовремя",
+      "th": "ผู้ช่วย AI ตอบไม่ทันเวลา",
+      "tl": "Hindi umabot sa oras ang AI assistant",
+      "tr": "Yapay zekâ asistanı zamanında yanıt vermedi",
+      "uk": "AI-асистент не відповів вчасно",
+      "vi": "Trợ lý AI phản hồi quá chậm",
+      "zh": "AI 助手响应超时"
     }
   }
 }

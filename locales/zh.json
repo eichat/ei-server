@@ -682,5 +682,6 @@
   "err_ai_unavailable": "AI 助手不可用",
   "err_ai_failed": "AI 助手没有响应",
   "ai_free_left": "今天剩余免费请求：{n}",
-  "ai_paid": "每日额度已用完 — 扣除金币：{n}"
+  "ai_paid": "每日额度已用完 — 扣除金币：{n}",
+  "err_ai_timeout": "AI 助手响应超时"
 }

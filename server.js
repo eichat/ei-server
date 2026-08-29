@@ -609,8 +609,222 @@ function eionFactsPrompt() {
     `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5, and a stronger AI model.`,
     `- Beyond the allowance the user pays coins: ${SINK_PRICE.ai} per AI request, ${SINK_PRICE.storage} per MB, ${SINK_PRICE.turn} per relayed call.`,
     `- Transfers between users carry a ${TRANSFER_FEE_PCT}% fee. Paid channels give 70% to the author.`,
+    '- You have tools for the current user: balance, today\'s usage against the daily allowance, sticker packs, coin supply. Call them instead of guessing or asking the user to check.',
     '- If you do not know something about EION, say so instead of guessing.',
   ].join('\n');
+}
+
+// ── Інструменти асистента ─────────────────────────────────────────────────
+// Асистент знає ФАКТИ про EION (eionFactsPrompt), але не бачив ДАНИХ
+// користувача: на «скільки в мене монет» чи «чому списались монети» він міг
+// лише переказати правила. Інструменти дають йому дивитись у базу.
+//
+// Цикл виконується НА СЕРВЕРІ, а не в клієнті. Три причини:
+//  1. Актор — `req.nick` із сесії. Клієнт не може попросити чужий баланс:
+//     нік у інструменти взагалі не передається, він береться з токена.
+//  2. Новий інструмент не потребує збірки застосунку.
+//  3. Дані й так серверні — гнати їх у клієнт, щоб той відправив назад
+//     моделі, означало б зайвий круг і зайве світло приватних даних.
+//
+// ⚠️ Усі інструменти — ТІЛЬКИ ЧИТАННЯ. Дію, що змінює світ (надіслати
+// повідомлення, переказати монети), інструментом робити не можна без
+// підтвердження в інтерфейсі: помилкове спрацювання моделі написало б живій
+// людині або витратило гроші, і скасувати це вже не можна.
+const AI_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_balance',
+      description: 'Баланс монет і стан преміуму того, хто зараз питає.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_usage_today',
+      description: 'Скільки денної норми витрачено сьогодні (AI, вивантаження, дзвінки через релей, переклади) і скільки коштує одиниця понад норму.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'find_user',
+      description: 'Знайти користувача EION за ніком або його частиною.',
+      parameters: {
+        type: 'object',
+        properties: { nick: { type: 'string', description: 'Нік або його частина, мінімум 2 символи' } },
+        required: ['nick'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'list_sticker_packs',
+      description: 'Набори наліпок у магазині: назва, ціна в монетах і чи вже куплений.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_coin_supply',
+      description: 'Публічний стан монети EION: видано з фондів, спалено назавжди, у скарбниці.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+];
+
+/// Виконати інструмент. `nick` завжди з сесії — аргументом він не приходить.
+async function runAiTool(name, rawArgs, nick) {
+  let args = {};
+  try { if (rawArgs) args = JSON.parse(rawArgs); } catch (_) { /* модель дала не-JSON — працюємо без аргументів */ }
+  try {
+    if (name === 'get_balance') {
+      const { data: u } = await supabase.from('users').select('coins, premium_expires_at, premium_plan').eq('nick', nick).single();
+      if (!u) return { error: 'user not found' };
+      const premium = !!(u.premium_expires_at && new Date(u.premium_expires_at) > new Date());
+      return { coins: u.coins || 0, premium, premium_until: premium ? u.premium_expires_at : null, premium_plan: premium ? u.premium_plan : null };
+    }
+    if (name === 'get_usage_today') {
+      const { data: u } = await supabase.from('users').select('premium_expires_at').eq('nick', nick).single();
+      const premium = !!(u && u.premium_expires_at && new Date(u.premium_expires_at) > new Date());
+      const out = { premium, kinds: {} };
+      for (const kind of ['ai', 'storage', 'turn', 'translate']) {
+        const limit = premium ? (FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind]) : FREE_QUOTA[kind];
+        const used = await usageToday(nick, kind);
+        out.kinds[kind] = {
+          used: used === null ? 'unknown' : used,
+          free_per_day: limit,
+          left: used === null ? 'unknown' : Math.max(0, limit - used),
+          coins_per_unit_over: SINK_PRICE[kind] || 0,
+        };
+      }
+      out.units = { ai: 'requests', storage: 'megabytes uploaded', turn: 'relayed calls', translate: 'translated messages' };
+      return out;
+    }
+    if (name === 'find_user') {
+      const q = typeof args.nick === 'string' ? args.nick.trim() : '';
+      if (q.length < 2) return { error: 'need at least 2 characters' };
+      // Невидимі не показуються — той самий фільтр, що і в /search-user.
+      const { data } = await supabase.from('users').select('nick')
+        .ilike('nick_lower', `%${q.toLowerCase()}%`).neq('invisible', true).limit(10);
+      return { found: (data || []).length, users: (data || []).map(u => ({ nick: u.nick, online: isLive(u.nick) })) };
+    }
+    if (name === 'list_sticker_packs') {
+      const { data: packs } = await supabase.from('sticker_packs')
+        .select('id, title, price').eq('is_active', true).order('sort_order', { ascending: true });
+      const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
+      const ownedSet = new Set((owned || []).map(o => o.pack_id));
+      return { packs: (packs || []).map(p => ({ id: p.id, title: p.title, price: p.price, owned: ownedSet.has(p.id) })) };
+    }
+    if (name === 'get_coin_supply') {
+      const { data } = await supabase.from('coin_supply').select('minted, burned').eq('id', 1).single();
+      const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
+      return { minted: Number(data?.minted || 0), burned: Number(data?.burned || 0), treasury: Number(company?.coins || 0) };
+    }
+  } catch (e) {
+    console.error('[ai-tool]', name, e.message);
+    return { error: 'tool failed' };
+  }
+  return { error: 'unknown tool' };
+}
+
+/// Один потоковий виклик Groq.
+///
+/// Рядки з текстом віддаємо назовні одразу (`onData`), а tool_calls
+/// накопичуємо: вони приходять шматками, як і текст, тому ім'я і аргументи
+/// доводиться склеювати по індексу.
+/// Розбір ОДНОГО рядка SSE від Groq.
+///
+/// Винесено окремо навмисно: це найкрихкіше місце всього циклу — і текст, і
+/// виклики інструментів приходять шматками, тож ім'я функції та її аргументи
+/// доводиться склеювати по `index`. Окрема функція дає перевірити це тестом,
+/// не ганяючи прод.
+/// `calls` мутується; рядки з текстом ідуть у `onData` як є.
+function parseGroqSseLine(line, calls, onData) {
+  const s = line.trim();
+  if (!s.startsWith('data:')) return;
+  const body = s.slice(5).trim();
+  if (body === '[DONE]') return;   // своє [DONE] надішлемо в кінці, одне на всю відповідь
+  try {
+    const d = JSON.parse(body);
+    const delta = (d.choices && d.choices[0] && d.choices[0].delta) || {};
+    if (Array.isArray(delta.tool_calls)) {
+      for (const tc of delta.tool_calls) {
+        const i = tc.index || 0;
+        if (!calls[i]) calls[i] = { id: '', name: '', args: '' };
+        if (tc.id) calls[i].id = tc.id;
+        if (tc.function && tc.function.name) calls[i].name += tc.function.name;
+        if (tc.function && tc.function.arguments) calls[i].args += tc.function.arguments;
+      }
+    }
+    if (typeof delta.content === 'string' && delta.content.length) onData(`${line}\n\n`);
+  } catch (_) { /* не-JSON у потоці (коментар SSE) — пропускаємо */ }
+}
+
+function groqStreamOnce(payload, onData, holder) {
+  return new Promise((resolve) => {
+    const calls = [];
+    let buf = '';
+    const handleLine = (line) => parseGroqSseLine(line, calls, onData);
+    const up = https.request({
+      method: 'POST', hostname: 'api.groq.com', path: '/openai/v1/chat/completions',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Length': Buffer.byteLength(payload),
+      },
+      timeout: 60000,
+    }, (r) => {
+      const status = r.statusCode || 500;
+      if (status !== 200) {
+        let b = '';
+        r.on('data', (c) => { b += c; });
+        r.on('end', () => resolve({ status, errorBody: b }));
+        return;
+      }
+      r.on('data', (chunk) => {
+        buf += chunk.toString('utf8');
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) { handleLine(buf.slice(0, i)); buf = buf.slice(i + 1); }
+      });
+      r.on('end', () => { if (buf) handleLine(buf); resolve({ status: 200, toolCalls: calls.filter(Boolean) }); });
+    });
+    if (holder) holder.req = up;
+    up.on('timeout', () => { up.destroy(); resolve({ status: 504 }); });
+    up.on('error', (e) => resolve({ status: 502, errorBody: e.message }));
+    up.write(payload); up.end();
+  });
+}
+
+/// Один непотоковий виклик. Повертає сире тіло — клієнт розбирає його сам.
+function groqJsonOnce(payload, holder) {
+  return new Promise((resolve) => {
+    const up = https.request({
+      method: 'POST', hostname: 'api.groq.com', path: '/openai/v1/chat/completions',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Length': Buffer.byteLength(payload),
+      },
+      timeout: 60000,
+    }, (r) => {
+      let b = '';
+      r.on('data', (c) => { b += c; });
+      r.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(b); } catch (_) {}
+        resolve({ status: r.statusCode || 500, body: b, json });
+      });
+    });
+    if (holder) holder.req = up;
+    up.on('timeout', () => { up.destroy(); resolve({ status: 504, body: '' }); });
+    up.on('error', (e) => resolve({ status: 502, body: e.message }));
+    up.write(payload); up.end();
+  });
 }
 
 app.post('/ai/chat', async (req, res) => {
@@ -639,39 +853,88 @@ app.post('/ai/chat', async (req, res) => {
   const at = firstUser === -1 ? messages.length : firstUser;
   messages.splice(at, 0, { role: 'system', content: eionFactsPrompt() });
   const stream = req.body.stream === true;
-  const payload = JSON.stringify({
-    // Модель форсує сервер — клієнт не обирає (див. refreshAiModel). Преміум
-    // отримує сильнішу: це одна з оголошених його переваг.
-    model: charge.isPremium ? AI_MODEL_PRO : AI_MODEL,
-    messages,
-    // 1024 різало довші відповіді на півслові (модель просто впиралась у стелю
-    // й зупинялась). 2048 при ціні gpt-oss-20b нічого помітного не коштує.
-    max_tokens: 2048,
-    temperature: 0.7,
-    stream,
+  // Модель форсує сервер — клієнт не обирає (див. refreshAiModel). Преміум
+  // отримує сильнішу: це одна з оголошених його переваг.
+  const model = charge.isPremium ? AI_MODEL_PRO : AI_MODEL;
+  // 1024 різало довші відповіді на півслові (модель впиралась у стелю й
+  // зупинялась). 2048 при ціні gpt-oss-20b нічого помітного не коштує.
+  const build = (withTools) => JSON.stringify({
+    model, messages, max_tokens: 2048, temperature: 0.7, stream,
+    ...(withTools ? { tools: AI_TOOLS, tool_choice: 'auto' } : {}),
   });
-  const upstream = https.request({
-    method: 'POST',
-    hostname: 'api.groq.com',
-    path: '/openai/v1/chat/completions',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${key}`,
-      'Content-Length': Buffer.byteLength(payload),
-    },
-    timeout: 30000,
-  }, (up) => {
-    res.status(up.statusCode || 200);
-    res.setHeader('Content-Type', up.headers['content-type'] || (stream ? 'text/event-stream' : 'application/json'));
-    if (stream) { res.setHeader('Cache-Control', 'no-cache'); res.setHeader('X-Accel-Buffering', 'no'); }
-    up.pipe(res);
-  });
-  upstream.on('timeout', () => { upstream.destroy(); if (!res.headersSent) res.status(504).json({ error: { message: 'AI таймаут' } }); else res.end(); });
-  upstream.on('error', () => { if (!res.headersSent) res.status(502).json({ error: { message: 'AI помилка' } }); else res.end(); });
-  // Клієнт закрив зʼєднання (скасував) — не тримаємо висячий запит до GROQ.
-  res.on('close', () => upstream.destroy());
-  upstream.write(payload);
-  upstream.end();
+
+  // Клієнт закрив зʼєднання (скасував) — не тримаємо висячий запит до Groq.
+  const holder = { req: null };
+  let aborted = false;
+  res.on('close', () => { aborted = true; if (holder.req) holder.req.destroy(); });
+
+  // Модель може не підтримувати інструменти (Groq міняє склад моделей без
+  // попередження — 29.08 зняли зашиту llama). Тоді Groq відповідає 400 і без
+  // цього відкату асистент був би повністю зламаний.
+  let withTools = true;
+  const MAX_STEPS = 4;   // стеля циклу: інакше модель могла б ганяти інструменти без кінця
+
+  /// Дописати в розмову виклики інструментів і їх результати.
+  async function applyToolCalls(calls) {
+    messages.push({
+      role: 'assistant',
+      content: '',
+      tool_calls: calls.map(c => ({ id: c.id, type: 'function', function: { name: c.name, arguments: c.args || '{}' } })),
+    });
+    for (const c of calls) {
+      const result = await runAiTool(c.name, c.args, req.nick);
+      messages.push({ role: 'tool', tool_call_id: c.id, name: c.name, content: JSON.stringify(result) });
+    }
+  }
+
+  if (stream) {
+    let started = false;
+    const send = (chunk) => {
+      if (aborted || res.writableEnded) return;
+      if (!started) {
+        started = true;
+        res.status(200);
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('X-Accel-Buffering', 'no');
+      }
+      res.write(chunk);
+    };
+    for (let step = 0; step < MAX_STEPS && !aborted; step++) {
+      const r = await groqStreamOnce(build(withTools), send, holder);
+      if (r.status !== 200) {
+        if (withTools && r.status === 400) { withTools = false; step--; continue; }
+        if (!started) {
+          const msg = r.status === 504 ? 'AI таймаут' : 'AI помилка';
+          console.error('[ai/chat]', r.status, String(r.errorBody || '').slice(0, 200));
+          return res.status(r.status === 504 ? 504 : 502).json({ error: { message: msg }, code: r.status === 504 ? 'err_ai_timeout' : 'err_ai_failed' });
+        }
+        break;   // частину відповіді вже віддали — просто завершуємо потік
+      }
+      if (!r.toolCalls || r.toolCalls.length === 0) break;
+      await applyToolCalls(r.toolCalls);
+    }
+    send('data: [DONE]\n\n');
+    if (!res.writableEnded) res.end();
+    return;
+  }
+
+  for (let step = 0; step < MAX_STEPS; step++) {
+    const r = await groqJsonOnce(build(withTools), holder);
+    if (r.status !== 200) {
+      if (withTools && r.status === 400) { withTools = false; step--; continue; }
+      console.error('[ai/chat]', r.status, String(r.body || '').slice(0, 200));
+      return res.status(r.status === 504 ? 504 : 502).json({
+        error: { message: r.status === 504 ? 'AI таймаут' : 'AI помилка' },
+        code: r.status === 504 ? 'err_ai_timeout' : 'err_ai_failed',
+      });
+    }
+    const msg = r.json && r.json.choices && r.json.choices[0] && r.json.choices[0].message;
+    const calls = (msg && msg.tool_calls) || [];
+    if (calls.length === 0) return res.type('application/json').send(r.body);
+    await applyToolCalls(calls.map(c => ({ id: c.id, name: c.function && c.function.name, args: c.function && c.function.arguments })));
+  }
+  res.status(502).json({ error: { message: 'AI помилка' }, code: 'err_ai_failed' });
 });
 
 // ── Переклад повідомлень ──────────────────────────────────────────────────

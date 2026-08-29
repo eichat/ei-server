@@ -682,5 +682,6 @@
   "err_ai_unavailable": "Asystent AI jest niedostępny",
   "err_ai_failed": "Asystent AI nie odpowiedział",
   "ai_free_left": "Bezpłatnych zapytań dziś zostało: {n}",
-  "ai_paid": "Limit dzienny wyczerpany — pobrane monety: {n}"
+  "ai_paid": "Limit dzienny wyczerpany — pobrane monety: {n}",
+  "err_ai_timeout": "Asystent AI nie odpowiedział na czas"
 }
