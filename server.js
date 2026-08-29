@@ -941,7 +941,11 @@ const KB_CONTEXT_SIM = 0.35;   // підмішати як довідку
 // Косинусна близькість живе в іншій шкалі, ніж схожість триграм: у неї навіть
 // геть різні речення однієї мови дають 0.5–0.6. Тому пороги окремі й вищі.
 const KB_VEC_SERVE_SIM = 0.88;
-const KB_VEC_CONTEXT_SIM = 0.70;
+// 0.70 було замало: «як створити ГРУПУ» підтягувало «як створити КАНАЛ» із
+// 0.738, а це різні речі в EION. Правильні збіги на тих самих даних дають
+// 0.81–0.83, тож 0.78 їх розділяє. Поріг усе одно лишається здогадкою — тому
+// друга лінія захисту в промпті: модель має право відкинути недоречне.
+const KB_VEC_CONTEXT_SIM = 0.78;
 
 /// Пошук по базі знань. Два шляхи, і вони доповнюють один одного:
 /// вектор ловить зміст іншими словами, триграми — точні збіги й терміни,
@@ -976,10 +980,12 @@ function kbContextPrompt(rows) {
   // «Не додавай кроків, яких тут немає» — не зайва обережність: на першому ж
   // тесті модель дописала до нашої інструкції крок, якого в застосунку немає.
   // Довідка має звужувати відповідь, а не бути приводом дофантазувати навколо.
-  let out = 'Known answers from the EION knowledge base. These are authoritative: '
-    + 'answer from them, in the user language, and do NOT invent extra steps, '
-    + 'buttons or settings that are not mentioned here. If the knowledge base does '
-    + 'not cover part of the question, say so plainly instead of guessing.';
+  let out = 'Entries from the EION knowledge base, retrieved by similarity. '
+    + 'They may cover a DIFFERENT feature than the one asked about (channels vs groups, for example) — '
+    + 'use only the entries that actually answer the question and ignore the rest. '
+    + 'What you do use is authoritative: follow it exactly, answer in the user language, and do NOT invent '
+    + 'extra steps, buttons or settings that are not mentioned. If nothing here covers the question, '
+    + 'say plainly that you are not sure instead of guessing.';
   for (const r of rows) {
     const block = `\n\nQ: ${r.question}\nA: ${r.answer}`;
     if (out.length + block.length > 4000) break;
