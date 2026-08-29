@@ -554,9 +554,11 @@ const AI_PROVIDERS = [
     id: 'gemini', env: 'GEMINI_API_KEY',
     host: 'generativelanguage.googleapis.com',
     path: '/v1beta/openai/chat/completions', modelsPath: '/v1beta/openai/models',
+    // Аліаси `-latest` навмисно перші: Google перейменовує моделі частіше,
+    // ніж ми деплоїмо, а аліас переживає перейменування.
     prefs: {
-      base: ['gemini-2.5-flash', 'gemini-2.0-flash'],
-      pro: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+      base: ['gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'],
+      pro: ['gemini-pro-latest', 'gemini-2.5-pro', 'gemini-flash-latest'],
     },
   },
   {
@@ -619,7 +621,11 @@ async function refreshProviderModels(p) {
     console.error(`[ai] ${p.id}: не вдалось отримати список моделей —`, r.status);
     return;
   }
-  const ids = (r.json.data || r.json.models || []).map(m => m.id || m.name).filter(Boolean);
+  // ⚠️ Google віддає id з префіксом `models/…` — без зрізання жодна перевага
+  // не збігалась, і провайдер мовчки не потрапляв у чергу.
+  const ids = (r.json.data || r.json.models || [])
+    .map(m => m.id || m.name).filter(Boolean)
+    .map(id => String(id).replace(/^models\//, ''));
   const idSet = new Set(ids);
   const pick = (tier) => {
     const env = aiEnvModel(p, tier);
@@ -865,7 +871,11 @@ const EMBED_PROVIDERS = [
   {
     id: 'gemini', env: 'GEMINI_API_KEY',
     host: 'generativelanguage.googleapis.com', path: '/v1beta/openai/embeddings',
-    model: 'text-embedding-004',   // рівно 768 вимірів
+    // ⚠️ `text-embedding-004` у списку ключа НЕМАЄ — перша спроба дала 8 із 8
+    // помилок саме через це. Питати список моделей, а не покладатись на памʼять.
+    // gemini-embedding-001 рідно віддає 3072 виміри, тож просимо 768 явно;
+    // для косинусної відстані нормалізація не потрібна — `<=>` робить її сам.
+    model: 'gemini-embedding-001', dimensions: EMBED_DIMS,
   },
   {
     id: 'openai', env: 'OPENAI_API_KEY',
@@ -879,6 +889,8 @@ function embedProvider() {
   const list = forced ? EMBED_PROVIDERS.filter(p => p.id === forced) : EMBED_PROVIDERS;
   return list.find(p => process.env[p.env]) || null;
 }
+
+let lastEmbedError = null;   // для /admin/ai-embed-test: причина має бути видима
 
 /// Вектор змісту речення або null (немає ключа / збій — не привід ламати чат).
 async function embedText(text) {
@@ -899,17 +911,23 @@ async function embedText(text) {
     body, timeout: 20000,
   });
   if (r.status !== 200 || !r.json) {
-    console.error('[embed]', p.id, r.status, String(r.body || '').slice(0, 200));
+    lastEmbedError = `${p.id} ${r.status} ${String(r.body || '').slice(0, 300)}`;
+    console.error('[embed]', lastEmbedError);
     return null;
   }
   const vec = r.json.data && r.json.data[0] && r.json.data[0].embedding;
-  if (!Array.isArray(vec)) { console.error('[embed] несподівана відповідь', p.id); return null; }
+  if (!Array.isArray(vec)) {
+    lastEmbedError = `${p.id}: несподівана відповідь ${String(r.body || '').slice(0, 200)}`;
+    console.error('[embed]', lastEmbedError); return null;
+  }
   if (vec.length !== EMBED_DIMS) {
     // Мовчазна невідповідність розмірності зіпсувала б таблицю: половина
     // записів була б непорівнянна з іншою половиною.
-    console.error(`[embed] ${p.id}: ${vec.length} вимірів замість ${EMBED_DIMS} — пропускаю`);
+    lastEmbedError = `${p.id}: ${vec.length} вимірів замість ${EMBED_DIMS}`;
+    console.error('[embed]', lastEmbedError);
     return null;
   }
+  lastEmbedError = null;
   return vec;
 }
 
@@ -1314,6 +1332,20 @@ app.post('/admin/ai-kb/delete', async (req, res) => {
   if (!key) return res.json({ ok: false, error: 'Потрібен key' });
   const { error } = await supabase.from('ai_cache').delete().eq('key', key);
   res.json({ ok: !error, error: error ? error.message : null });
+});
+
+// Перевірити ембединги одним запитом: що саме відповів постачальник.
+// Без цього «done:0, failed:8» не відрізнити від «немає ключа», «немає такої
+// моделі» й «не та розмірність» — а це три різні дії.
+app.get('/admin/ai-embed-test', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  const p = embedProvider();
+  if (!p) return res.json({ ok: false, error: 'Немає ключа ембедингів' });
+  const vec = await embedText(typeof req.query.q === 'string' && req.query.q ? req.query.q : 'тестове речення');
+  res.json({
+    ok: !!vec, provider: p.id, model: process.env.EMBED_MODEL || p.model,
+    dims: vec ? vec.length : null, expected: EMBED_DIMS, error: vec ? null : lastEmbedError,
+  });
 });
 
 // Дозаповнити вектори для записів, доданих до появи ключа ембедингів.
