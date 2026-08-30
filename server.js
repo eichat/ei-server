@@ -4535,8 +4535,15 @@ ${card('Сервер', [
 </body></html>`;
 }
 
+// Окремий ключ ЛИШЕ для читання огляду: у браузері з телефона заголовок
+// X-Admin-Secret не задаси, а тягти туди адмінський секрет через ?key= не можна —
+// він відмикає бан і розбан, а URL осідає в історії браузера й логах Render.
+// OVERVIEW_KEY не відмикає нічого, крім цієї сторінки; немає змінної — лишається
+// тільки заголовок.
+const OVERVIEW_KEY = process.env.OVERVIEW_KEY || '';
 app.get('/admin/overview', async (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ ok: false });
+  const byKey = OVERVIEW_KEY && req.query.key === OVERVIEW_KEY;
+  if (!byKey && !isAdmin(req)) return res.status(403).json({ ok: false });
   try {
     const o = await collectOverview();
     if (req.query.format === 'html') return res.type('html').send(overviewHtml(o));
