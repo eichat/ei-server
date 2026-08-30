@@ -705,5 +705,11 @@
   "update_required_body": "Questa versione non è più supportata. Aggiorna l’app per continuare.",
   "btn_update": "Aggiorna",
   "btn_later": "Più tardi",
-  "err_otp_unavailable": "La verifica del numero non è momentaneamente disponibile"
+  "err_otp_unavailable": "La verifica del numero non è momentaneamente disponibile",
+  "solana_section": "Wallet Solana",
+  "solana_hint": "Solo l’indirizzo: non conserviamo le tue chiavi né firmiamo nulla. Lascia vuoto per scollegare.",
+  "solana_testnet_note": "Il token è sulla rete di test devnet: nessun valore, non è vendibile.",
+  "err_invalid_solana_address": "Indirizzo Solana non valido",
+  "err_token_disabled": "Il token non è ancora stato emesso",
+  "err_token_balance": "Impossibile leggere il saldo"
 }

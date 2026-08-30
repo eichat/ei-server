@@ -705,5 +705,11 @@
   "update_required_body": "Phiên bản này không còn được hỗ trợ. Hãy cập nhật ứng dụng để tiếp tục.",
   "btn_update": "Cập nhật",
   "btn_later": "Để sau",
-  "err_otp_unavailable": "Xác minh số điện thoại tạm thời không khả dụng"
+  "err_otp_unavailable": "Xác minh số điện thoại tạm thời không khả dụng",
+  "solana_section": "Ví Solana",
+  "solana_hint": "Chỉ địa chỉ — chúng tôi không giữ khoá của bạn và không ký bất cứ giao dịch nào. Để trống để huỷ liên kết.",
+  "solana_testnet_note": "Token nằm trên mạng thử nghiệm devnet: không có giá trị và không thể bán.",
+  "err_invalid_solana_address": "Địa chỉ Solana không hợp lệ",
+  "err_token_disabled": "Token chưa được phát hành",
+  "err_token_balance": "Không đọc được số dư"
 }

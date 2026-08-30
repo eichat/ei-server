@@ -705,5 +705,11 @@
   "update_required_body": "এই সংস্করণটি আর সমর্থিত নয়। চালিয়ে যেতে অ্যাপ আপডেট করুন।",
   "btn_update": "আপডেট",
   "btn_later": "পরে",
-  "err_otp_unavailable": "ফোন নম্বর যাচাই এখন উপলব্ধ নয়"
+  "err_otp_unavailable": "ফোন নম্বর যাচাই এখন উপলব্ধ নয়",
+  "solana_section": "Solana ওয়ালেট",
+  "solana_hint": "শুধু ঠিকানা — আমরা আপনার কী রাখি না, লেনদেনও সই করি না। খালি রাখলে সংযোগ বাতিল হবে।",
+  "solana_testnet_note": "টোকেনটি devnet টেস্ট নেটওয়ার্কে — এর কোনো মূল্য নেই এবং বিক্রি করা যায় না।",
+  "err_invalid_solana_address": "ভুল Solana ঠিকানা",
+  "err_token_disabled": "টোকেন এখনো চালু হয়নি",
+  "err_token_balance": "ব্যালেন্স পড়া যায়নি"
 }

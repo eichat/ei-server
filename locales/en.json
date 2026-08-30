@@ -705,5 +705,11 @@
   "update_required_body": "This version is no longer supported. Update the app to continue.",
   "btn_update": "Update",
   "btn_later": "Later",
-  "err_otp_unavailable": "Phone verification is temporarily unavailable"
+  "err_otp_unavailable": "Phone verification is temporarily unavailable",
+  "solana_section": "Solana wallet",
+  "solana_hint": "The address only — we never hold your keys or sign anything. Leave empty to unlink.",
+  "solana_testnet_note": "The token runs on the devnet test network: no value, nothing to sell.",
+  "err_invalid_solana_address": "Invalid Solana address",
+  "err_token_disabled": "The token has not been issued yet",
+  "err_token_balance": "Couldn’t read the balance"
 }

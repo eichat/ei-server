@@ -705,5 +705,11 @@
   "update_required_body": "Hindi na suportado ang bersyong ito. I-update ang app para magpatuloy.",
   "btn_update": "I-update",
   "btn_later": "Mamaya",
-  "err_otp_unavailable": "Pansamantalang hindi available ang phone verification"
+  "err_otp_unavailable": "Pansamantalang hindi available ang phone verification",
+  "solana_section": "Solana wallet",
+  "solana_hint": "Address lang — hindi namin hawak ang iyong keys at wala kaming pinipirmahan. Iwang blangko para i-unlink.",
+  "solana_testnet_note": "Nasa devnet test network ang token: walang halaga at hindi maibebenta.",
+  "err_invalid_solana_address": "Hindi wastong Solana address",
+  "err_token_disabled": "Hindi pa naibibigay ang token",
+  "err_token_balance": "Hindi mabasa ang balanse"
 }

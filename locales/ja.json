@@ -705,5 +705,11 @@
   "update_required_body": "このバージョンはサポートされていません。続けるにはアプリを更新してください。",
   "btn_update": "更新",
   "btn_later": "あとで",
-  "err_otp_unavailable": "電話番号の確認は現在ご利用いただけません"
+  "err_otp_unavailable": "電話番号の確認は現在ご利用いただけません",
+  "solana_section": "Solana ウォレット",
+  "solana_hint": "アドレスのみ。鍵は預からず、署名も行いません。解除するには空にしてください。",
+  "solana_testnet_note": "トークンはテストネット devnet 上です。価値はなく、売買もできません。",
+  "err_invalid_solana_address": "Solana アドレスが正しくありません",
+  "err_token_disabled": "トークンはまだ発行されていません",
+  "err_token_balance": "残高を取得できませんでした"
 }

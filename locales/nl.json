@@ -705,5 +705,11 @@
   "update_required_body": "Deze versie wordt niet meer ondersteund. Werk de app bij om door te gaan.",
   "btn_update": "Bijwerken",
   "btn_later": "Later",
-  "err_otp_unavailable": "Telefoonverificatie is tijdelijk niet beschikbaar"
+  "err_otp_unavailable": "Telefoonverificatie is tijdelijk niet beschikbaar",
+  "solana_section": "Solana-wallet",
+  "solana_hint": "Alleen het adres — we bewaren geen sleutels en ondertekenen niets. Laat leeg om te ontkoppelen.",
+  "solana_testnet_note": "De token draait op het testnetwerk devnet: geen waarde, niet verhandelbaar.",
+  "err_invalid_solana_address": "Ongeldig Solana-adres",
+  "err_token_disabled": "De token is nog niet uitgegeven",
+  "err_token_balance": "Saldo kon niet worden gelezen"
 }

@@ -705,5 +705,11 @@
   "update_required_body": "Esta versión ya no es compatible. Actualiza la aplicación para continuar.",
   "btn_update": "Actualizar",
   "btn_later": "Más tarde",
-  "err_otp_unavailable": "La verificación del número no está disponible por ahora"
+  "err_otp_unavailable": "La verificación del número no está disponible por ahora",
+  "solana_section": "Cartera Solana",
+  "solana_hint": "Solo la dirección: no guardamos tus claves ni firmamos nada. Déjalo vacío para desvincular.",
+  "solana_testnet_note": "El token está en la red de pruebas devnet: sin valor y no se puede vender.",
+  "err_invalid_solana_address": "Dirección de Solana no válida",
+  "err_token_disabled": "El token aún no se ha emitido",
+  "err_token_balance": "No se pudo leer el saldo"
 }

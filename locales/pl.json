@@ -705,5 +705,11 @@
   "update_required_body": "Ta wersja nie jest już wspierana. Zaktualizuj aplikację, aby kontynuować.",
   "btn_update": "Zaktualizuj",
   "btn_later": "Później",
-  "err_otp_unavailable": "Weryfikacja numeru jest chwilowo niedostępna"
+  "err_otp_unavailable": "Weryfikacja numeru jest chwilowo niedostępna",
+  "solana_section": "Portfel Solana",
+  "solana_hint": "Tylko adres — nie przechowujemy Twoich kluczy ani niczego nie podpisujemy. Zostaw puste, aby odłączyć.",
+  "solana_testnet_note": "Token działa w sieci testowej devnet: nie ma wartości i nie da się go sprzedać.",
+  "err_invalid_solana_address": "Nieprawidłowy adres Solana",
+  "err_token_disabled": "Token nie został jeszcze wydany",
+  "err_token_balance": "Nie udało się odczytać salda"
 }

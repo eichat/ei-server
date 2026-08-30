@@ -2732,9 +2732,79 @@ app.post('/online-users', (req, res) => {
 
 app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий', code: 'err_param_nick' });
-  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming, invisible').eq('nick', nick).single();
+  const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming, invisible, solana_address').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true });
+  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true, solana_address: user.solana_address || null });
+});
+
+// ── Гаманець Solana: тільки АДРЕСА, без ключів ───────────────────────────
+// Ми не зберігаємо приватних ключів і не підписуємо транзакцій: людина каже,
+// КУДИ надсилати токени, підписує її власний гаманець. Зберігання чужих активів
+// зробило б сервіс постачальником послуг з віртуальними активами (Україна —
+// закон про віртуальні активи, ЄС — MiCA) і поклало б на нас відповідальність
+// за кожен злам.
+const SOLANA_RPC = process.env.SOLANA_RPC || 'https://api.devnet.solana.com';
+const SOLANA_TOKEN_MINT = process.env.SOLANA_TOKEN_MINT || '';
+const SOLANA_CLUSTER = process.env.SOLANA_CLUSTER || 'devnet';
+
+// Base58 без залежностей: перевіряємо, що адреса декодується рівно в 32 байти.
+// Самої регулярки мало — під неї підходять і рядки, які не є ключем.
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function base58Len(str) {
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(str)) return -1;
+  // Масив починається ПОРОЖНІМ: із початковим [0] адреса з самих одиниць
+  // (наприклад system program) давала б на байт більше і не проходила перевірку.
+  const bytes = [];
+  for (const ch of str) {
+    let carry = B58.indexOf(ch);
+    if (carry < 0) return -1;
+    for (let i = 0; i < bytes.length; i++) { carry += bytes[i] * 58; bytes[i] = carry & 0xff; carry >>= 8; }
+    while (carry) { bytes.push(carry & 0xff); carry >>= 8; }
+  }
+  // Провідні '1' у base58 — це нульові байти, у циклі вище вони не зʼявляються.
+  for (const ch of str) { if (ch !== '1') break; bytes.push(0); }
+  return bytes.length;
+}
+
+app.post('/profile/solana-address', async (req, res) => {
+  const address = typeof req.body.address === 'string' ? req.body.address.trim() : '';
+  // Порожній рядок = відвʼязати гаманець. Це має бути можливо завжди.
+  if (address && base58Len(address) !== 32) {
+    return res.json({ ok: false, error: 'Невірна адреса Solana', code: 'err_invalid_solana_address' });
+  }
+  const { error } = await supabase.from('users')
+    .update({ solana_address: address || null }).eq('nick', req.nick);
+  if (error) return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  res.json({ ok: true, address: address || null });
+});
+
+// Баланс токена читаємо НА СЕРВЕРІ: так адресу RPC (і платний ключ, якщо він
+// зʼявиться) можна змінити без нової збірки застосунку, а мережа й mint не
+// зашиті в клієнті — при переході devnet → mainnet міняється лише env.
+app.get('/token/balance', async (req, res) => {
+  if (!SOLANA_TOKEN_MINT) return res.json({ ok: false, error: 'Токен ще не випущено', code: 'err_token_disabled' });
+  const { data: user } = await supabase.from('users').select('solana_address').eq('nick', req.nick).single();
+  const owner = user && user.solana_address;
+  if (!owner) return res.json({ ok: true, address: null, amount: null, cluster: SOLANA_CLUSTER });
+  const r = await httpPostJson(SOLANA_RPC, {}, {
+    jsonrpc: '2.0', id: 1, method: 'getTokenAccountsByOwner',
+    params: [owner, { mint: SOLANA_TOKEN_MINT }, { encoding: 'jsonParsed' }],
+  });
+  try {
+    const body = JSON.parse(r.body || '{}');
+    if (body.error) throw new Error(body.error.message || 'RPC error');
+    // Токен-акаунтів на один mint може бути кілька — сумуємо, інакше показали б
+    // менше, ніж людина насправді має.
+    let total = 0;
+    for (const acc of body.result?.value || []) {
+      const ui = acc.account?.data?.parsed?.info?.tokenAmount?.uiAmount;
+      if (typeof ui === 'number') total += ui;
+    }
+    res.json({ ok: true, address: owner, amount: total, mint: SOLANA_TOKEN_MINT, cluster: SOLANA_CLUSTER });
+  } catch (e) {
+    console.error('[solana] balance:', e.message);
+    res.json({ ok: false, error: 'Не вдалося прочитати баланс', code: 'err_token_balance' });
+  }
 });
 
 app.get('/search-user', async (req, res) => {

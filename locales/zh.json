@@ -705,5 +705,11 @@
   "update_required_body": "此版本已不再支持。请更新应用后继续。",
   "btn_update": "更新",
   "btn_later": "稍后",
-  "err_otp_unavailable": "手机号验证暂时不可用"
+  "err_otp_unavailable": "手机号验证暂时不可用",
+  "solana_section": "Solana 钱包",
+  "solana_hint": "仅保存地址——我们不保管你的私钥，也不签署任何交易。留空即可解除绑定。",
+  "solana_testnet_note": "该代币运行在测试网 devnet：没有价值，也无法出售。",
+  "err_invalid_solana_address": "Solana 地址无效",
+  "err_token_disabled": "代币尚未发行",
+  "err_token_balance": "无法读取余额"
 }

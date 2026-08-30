@@ -705,5 +705,11 @@
   "update_required_body": "لم يعد هذا الإصدار مدعومًا. حدّث التطبيق للمتابعة.",
   "btn_update": "تحديث",
   "btn_later": "لاحقًا",
-  "err_otp_unavailable": "تأكيد رقم الهاتف غير متاح مؤقتًا"
+  "err_otp_unavailable": "تأكيد رقم الهاتف غير متاح مؤقتًا",
+  "solana_section": "محفظة Solana",
+  "solana_hint": "العنوان فقط — لا نحتفظ بمفاتيحك ولا نوقّع أي معاملة. اتركه فارغًا لإلغاء الربط.",
+  "solana_testnet_note": "التوكن في شبكة اختبار devnet: لا قيمة له ولا يمكن بيعه.",
+  "err_invalid_solana_address": "عنوان Solana غير صالح",
+  "err_token_disabled": "لم يُطلق التوكن بعد",
+  "err_token_balance": "تعذّر قراءة الرصيد"
 }

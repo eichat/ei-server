@@ -705,5 +705,11 @@
   "update_required_body": "Cette version n’est plus prise en charge. Mettez l’application à jour pour continuer.",
   "btn_update": "Mettre à jour",
   "btn_later": "Plus tard",
-  "err_otp_unavailable": "La vérification du numéro est temporairement indisponible"
+  "err_otp_unavailable": "La vérification du numéro est temporairement indisponible",
+  "solana_section": "Portefeuille Solana",
+  "solana_hint": "Uniquement l’adresse — nous ne détenons aucune clé et ne signons rien. Laissez vide pour dissocier.",
+  "solana_testnet_note": "Le jeton est sur le réseau de test devnet : sans valeur, invendable.",
+  "err_invalid_solana_address": "Adresse Solana invalide",
+  "err_token_disabled": "Le jeton n’est pas encore émis",
+  "err_token_balance": "Impossible de lire le solde"
 }

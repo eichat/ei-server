@@ -705,5 +705,11 @@
   "update_required_body": "이 버전은 더 이상 지원되지 않습니다. 계속하려면 앱을 업데이트하세요.",
   "btn_update": "업데이트",
   "btn_later": "나중에",
-  "err_otp_unavailable": "전화번호 인증을 현재 사용할 수 없습니다"
+  "err_otp_unavailable": "전화번호 인증을 현재 사용할 수 없습니다",
+  "solana_section": "Solana 지갑",
+  "solana_hint": "주소만 저장합니다. 키를 보관하거나 서명하지 않습니다. 연결을 해제하려면 비워 두세요.",
+  "solana_testnet_note": "토큰은 테스트 네트워크 devnet에 있습니다. 가치가 없고 판매할 수 없습니다.",
+  "err_invalid_solana_address": "올바르지 않은 Solana 주소",
+  "err_token_disabled": "토큰이 아직 발행되지 않았습니다",
+  "err_token_balance": "잔액을 불러오지 못했습니다"
 }

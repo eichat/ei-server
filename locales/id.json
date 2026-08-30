@@ -705,5 +705,11 @@
   "update_required_body": "Versi ini tidak didukung lagi. Perbarui aplikasi untuk melanjutkan.",
   "btn_update": "Perbarui",
   "btn_later": "Nanti",
-  "err_otp_unavailable": "Verifikasi nomor sementara tidak tersedia"
+  "err_otp_unavailable": "Verifikasi nomor sementara tidak tersedia",
+  "solana_section": "Dompet Solana",
+  "solana_hint": "Hanya alamatnya — kami tidak menyimpan kunci Anda dan tidak menandatangani apa pun. Kosongkan untuk melepas tautan.",
+  "solana_testnet_note": "Token berjalan di jaringan uji devnet: tanpa nilai dan tidak bisa dijual.",
+  "err_invalid_solana_address": "Alamat Solana tidak valid",
+  "err_token_disabled": "Token belum diterbitkan",
+  "err_token_balance": "Gagal membaca saldo"
 }

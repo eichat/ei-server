@@ -705,5 +705,11 @@
   "update_required_body": "Diese Version wird nicht mehr unterstützt. Aktualisiere die App, um fortzufahren.",
   "btn_update": "Aktualisieren",
   "btn_later": "Später",
-  "err_otp_unavailable": "Telefonbestätigung ist vorübergehend nicht verfügbar"
+  "err_otp_unavailable": "Telefonbestätigung ist vorübergehend nicht verfügbar",
+  "solana_section": "Solana-Wallet",
+  "solana_hint": "Nur die Adresse — wir speichern keine Schlüssel und signieren nichts. Leer lassen, um zu trennen.",
+  "solana_testnet_note": "Der Token läuft im Testnetz devnet: kein Wert, kein Verkauf.",
+  "err_invalid_solana_address": "Ungültige Solana-Adresse",
+  "err_token_disabled": "Der Token ist noch nicht ausgegeben",
+  "err_token_balance": "Guthaben konnte nicht gelesen werden"
 }

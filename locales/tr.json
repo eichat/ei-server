@@ -705,5 +705,11 @@
   "update_required_body": "Bu sürüm artık desteklenmiyor. Devam etmek için uygulamayı güncelleyin.",
   "btn_update": "Güncelle",
   "btn_later": "Sonra",
-  "err_otp_unavailable": "Telefon doğrulaması şu anda kullanılamıyor"
+  "err_otp_unavailable": "Telefon doğrulaması şu anda kullanılamıyor",
+  "solana_section": "Solana cüzdanı",
+  "solana_hint": "Yalnızca adres — anahtarlarınızı saklamıyor, hiçbir şey imzalamıyoruz. Bağlantıyı kaldırmak için boş bırakın.",
+  "solana_testnet_note": "Token, devnet test ağında: değeri yok ve satılamaz.",
+  "err_invalid_solana_address": "Geçersiz Solana adresi",
+  "err_token_disabled": "Token henüz çıkarılmadı",
+  "err_token_balance": "Bakiye okunamadı"
 }
