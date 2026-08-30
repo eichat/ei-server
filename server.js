@@ -2396,7 +2396,7 @@ app.post('/reset', async (req, res) => {
   // власник зараз на екрані входу, тож тут ми виганяємо саме чужий пристрій.
   const kickWs = onlineUsers.get(reset.nick);
   if (kickWs) {
-    try { kickWs.ws.send(JSON.stringify({ type: 'kicked', reason: 'Пароль змінено, увійдіть знову' })); kickWs.ws.close(); }
+    try { kickWs.ws.send(JSON.stringify({ type: 'kicked', reason: 'Пароль змінено, увійдіть знову', code: 'err_kick_password_changed' })); kickWs.ws.close(); }
     catch (e) { console.log('[reset] kick:', e.message); }
   }
   await supabase.from('email_codes').delete().eq('email', email);
@@ -4276,7 +4276,7 @@ app.post('/admin/ban', async (req, res) => {
   if (!isAdmin(req)) return res.json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
   const { targetNick, reason } = req.body;
   await supabase.from('platform_bans').upsert({ nick: targetNick, reason: reason || null, banned_at: Date.now(), banned_by: COMPANY_NICK });
-  const t = onlineUsers.get(targetNick); if (t) { t.ws.send(JSON.stringify({ type: 'kicked', reason: 'Акаунт заблоковано' })); t.ws.close(); }
+  const t = onlineUsers.get(targetNick); if (t) { t.ws.send(JSON.stringify({ type: 'kicked', reason: 'Акаунт заблоковано', code: 'err_kick_banned' })); t.ws.close(); }
   await destroySessionsForNick(targetNick); // забанений не має лишатись автентифікованим
   res.json({ ok: true });
 });
@@ -4323,10 +4323,10 @@ wss.on('connection', (ws) => {
         // Автентифікація WS (Фаза 1): нік беремо з ТОКЕНА, не з msg.nick.
         // Невалідний токен → close (жорсткий режим).
         userNick = resolveSession(msg.token);
-        if (!userNick) { ws.send(JSON.stringify({ type: 'kicked', reason: 'Сесія недійсна, увійдіть знову' })); ws.close(); return; }
+        if (!userNick) { ws.send(JSON.stringify({ type: 'kicked', reason: 'Сесія недійсна, увійдіть знову', code: 'err_kick_session_invalid' })); ws.close(); return; }
         const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', userNick).single();
-        if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` })); ws.close(); return; }
-        if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився' })); old.ws.close(); }
+        if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}`, ...(ban.reason ? { code: 'err_kick_banned_reason', banReason: ban.reason } : { code: 'err_kick_banned' }) })); ws.close(); return; }
+        if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився', code: 'err_kick_new_device' })); old.ws.close(); }
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
         busPublish({ t: 'up', nick: userNick });
         // nickDevices має відображати, де нік ЗАРАЗ, а не де колись був.
@@ -4440,7 +4440,7 @@ wss.on('connection', (ws) => {
 
       if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { if (msg.deviceId) ws.deviceId = msg.deviceId; await saveFcmToken(userNick, msg.token, msg.deviceId); } }
       if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
-      if (msg.type === 'connect_request') { if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі` })); }
+      if (msg.type === 'connect_request') { if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі`, code: 'err_user_offline', nick: msg.to })); }
       if (msg.type === 'connect_response') { sendToUser(msg.to, { type: 'connect_response', from: userNick, accepted: msg.accepted }); }
 
       if (msg.type === 'chat_message') {
@@ -4716,7 +4716,7 @@ wss.on('connection', (ws) => {
           if (hasToken) {
             await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
           } else {
-            ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі` }));
+            ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі`, code: 'err_callee_offline' }));
           }
         }
       }
