@@ -699,5 +699,10 @@
   "quota_translate": "Automatische vertaling",
   "quota_exhausted": "op — daarna {price} munten per eenheid",
   "err_quota_unavailable": "Limieten konden niet worden geladen",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "Er is een nieuwe versie",
+  "update_body": "Je hebt {current}, {latest} is beschikbaar. Downloaden?",
+  "update_required_body": "Deze versie wordt niet meer ondersteund. Werk de app bij om door te gaan.",
+  "btn_update": "Bijwerken",
+  "btn_later": "Later"
 }

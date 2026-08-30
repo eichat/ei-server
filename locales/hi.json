@@ -699,5 +699,10 @@
   "quota_translate": "स्वचालित अनुवाद",
   "quota_exhausted": "समाप्त — इसके बाद प्रति इकाई {price} सिक्के",
   "err_quota_unavailable": "सीमाएँ लोड नहीं हो सकीं",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "नया वर्शन उपलब्ध है",
+  "update_body": "आपके पास {current} है, {latest} उपलब्ध है। डाउनलोड करें?",
+  "update_required_body": "यह वर्शन अब समर्थित नहीं है। जारी रखने के लिए ऐप अपडेट करें।",
+  "btn_update": "अपडेट करें",
+  "btn_later": "बाद में"
 }

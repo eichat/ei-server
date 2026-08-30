@@ -699,5 +699,10 @@
   "quota_translate": "Awtomatikong pagsasalin",
   "quota_exhausted": "naubos na — {price} barya kada unit pagkatapos",
   "err_quota_unavailable": "Hindi makuha ang limitasyon",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "May bagong bersyon",
+  "update_body": "Nasa {current} ka, available na ang {latest}. I-download?",
+  "update_required_body": "Hindi na suportado ang bersyong ito. I-update ang app para magpatuloy.",
+  "btn_update": "I-update",
+  "btn_later": "Mamaya"
 }

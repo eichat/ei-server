@@ -699,5 +699,10 @@
   "quota_translate": "স্বয়ংক্রিয় অনুবাদ",
   "quota_exhausted": "শেষ — এরপর প্রতি ইউনিটে {price} কয়েন",
   "err_quota_unavailable": "সীমা আনা যায়নি",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "নতুন সংস্করণ এসেছে",
+  "update_body": "আপনার আছে {current}, নতুন এসেছে {latest}। ডাউনলোড করবেন?",
+  "update_required_body": "এই সংস্করণটি আর সমর্থিত নয়। চালিয়ে যেতে অ্যাপ আপডেট করুন।",
+  "btn_update": "আপডেট",
+  "btn_later": "পরে"
 }

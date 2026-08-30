@@ -699,5 +699,10 @@
   "quota_translate": "Traduzione automatica",
   "quota_exhausted": "esaurito — poi {price} monete per unità",
   "err_quota_unavailable": "Impossibile caricare i limiti",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "È disponibile una nuova versione",
+  "update_body": "Hai la {current}, è disponibile la {latest}. Scaricare?",
+  "update_required_body": "Questa versione non è più supportata. Aggiorna l’app per continuare.",
+  "btn_update": "Aggiorna",
+  "btn_later": "Più tardi"
 }

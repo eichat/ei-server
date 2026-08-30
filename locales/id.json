@@ -699,5 +699,10 @@
   "quota_translate": "Terjemahan otomatis",
   "quota_exhausted": "habis — selanjutnya {price} koin per unit",
   "err_quota_unavailable": "Gagal memuat kuota",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "Versi baru tersedia",
+  "update_body": "Anda memakai {current}, tersedia {latest}. Unduh?",
+  "update_required_body": "Versi ini tidak didukung lagi. Perbarui aplikasi untuk melanjutkan.",
+  "btn_update": "Perbarui",
+  "btn_later": "Nanti"
 }

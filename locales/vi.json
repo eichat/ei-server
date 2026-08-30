@@ -699,5 +699,10 @@
   "quota_translate": "Dịch tự động",
   "quota_exhausted": "đã hết — sau đó {price} xu mỗi đơn vị",
   "err_quota_unavailable": "Không tải được hạn mức",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "Đã có phiên bản mới",
+  "update_body": "Bạn đang dùng {current}, đã có {latest}. Tải về?",
+  "update_required_body": "Phiên bản này không còn được hỗ trợ. Hãy cập nhật ứng dụng để tiếp tục.",
+  "btn_update": "Cập nhật",
+  "btn_later": "Để sau"
 }

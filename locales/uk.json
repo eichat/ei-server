@@ -699,5 +699,10 @@
   "quota_translate": "Автопереклад",
   "quota_exhausted": "вичерпано — далі {price} монет за одиницю",
   "err_quota_unavailable": "Не вдалося отримати норми",
-  "unit_mb": "МБ"
+  "unit_mb": "МБ",
+  "update_title": "Є нова версія",
+  "update_body": "У вас {current}, доступна {latest}. Завантажити?",
+  "update_required_body": "Ця версія більше не підтримується. Щоб продовжити, оновіть застосунок.",
+  "btn_update": "Оновити",
+  "btn_later": "Пізніше"
 }

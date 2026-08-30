@@ -699,5 +699,10 @@
   "quota_translate": "自动翻译",
   "quota_exhausted": "已用完 — 之后每单位 {price} 金币",
   "err_quota_unavailable": "无法获取额度",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "有新版本",
+  "update_body": "当前版本 {current}，最新版本 {latest}。要下载吗？",
+  "update_required_body": "此版本已不再支持。请更新应用后继续。",
+  "btn_update": "更新",
+  "btn_later": "稍后"
 }

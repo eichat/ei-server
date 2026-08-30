@@ -699,5 +699,10 @@
   "quota_translate": "自動翻訳",
   "quota_exhausted": "上限到達 — 以降は1件あたり{price}コイン",
   "err_quota_unavailable": "上限を取得できませんでした",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "新しいバージョンがあります",
+  "update_body": "お使いのバージョンは {current}、最新は {latest} です。ダウンロードしますか？",
+  "update_required_body": "このバージョンはサポートされていません。続けるにはアプリを更新してください。",
+  "btn_update": "更新",
+  "btn_later": "あとで"
 }

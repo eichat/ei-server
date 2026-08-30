@@ -699,5 +699,10 @@
   "quota_translate": "Traducción automática",
   "quota_exhausted": "agotado — luego {price} monedas por unidad",
   "err_quota_unavailable": "No se pudo cargar el límite",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "Hay una versión nueva",
+  "update_body": "Tienes {current} y está disponible {latest}. ¿Descargar?",
+  "update_required_body": "Esta versión ya no es compatible. Actualiza la aplicación para continuar.",
+  "btn_update": "Actualizar",
+  "btn_later": "Más tarde"
 }

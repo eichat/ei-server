@@ -699,5 +699,10 @@
   "quota_translate": "Tłumaczenie automatyczne",
   "quota_exhausted": "wyczerpano — dalej {price} monet za jednostkę",
   "err_quota_unavailable": "Nie udało się pobrać limitów",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "Dostępna jest nowa wersja",
+  "update_body": "Masz {current}, dostępna jest {latest}. Pobrać?",
+  "update_required_body": "Ta wersja nie jest już wspierana. Zaktualizuj aplikację, aby kontynuować.",
+  "btn_update": "Zaktualizuj",
+  "btn_later": "Później"
 }

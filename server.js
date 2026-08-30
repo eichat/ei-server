@@ -145,7 +145,7 @@ const PUBLIC_PATHS = new Set([
   '/health', '/stats', '/ping', '/keepalive',
   '/login', '/register', '/forgot', '/reset', '/verify-email',
   '/phone/request-code', '/phone/verify-code',
-  '/download-ping',
+  '/download-ping', '/app/version',
 ]);
 app.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/') || req.path.startsWith('/locales/') || req.path === '/coin/supply') return next();
@@ -170,6 +170,30 @@ app.get('/usage/today', async (req, res) => {
     console.error('[usage/today]', e.message);
     res.status(500).json({ ok: false, error: 'Не вдалося отримати норми', code: 'err_quota_unavailable' });
   }
+});
+
+// Яка збірка застосунку зараз актуальна. Публічний шлях навмисно: перевірка
+// має працювати й до входу (застаріла збірка може не вміти залогінитись).
+//
+// Навіщо взагалі: APK роздається з сайту, магазину немає, автооновлення теж —
+// тобто без цієї перевірки кожна встановлена збірка лишається назавжди тією,
+// якою була. Виправлення, зроблені після неї, до людини не доїжджають ніколи,
+// і вона про це не дізнається.
+//
+// ⚠️ ОНОВЛЮВАТИ РАЗОМ ІЗ ЗАЛИВКОЮ РЕЛІЗУ. `code` — це `+N` з pubspec.yaml
+// клієнта; він і порівнюється (назва версії лише для показу людині).
+// `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
+// із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
+const APP_RELEASE = {
+  version: '0.9.1',
+  code: 2,
+  minCode: 0,
+  android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
+  linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
+};
+app.get('/app/version', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.json({ ok: true, ...APP_RELEASE });
 });
 
 // Лічильник завантажень. Кнопки на сайті ведуть ПРЯМО на GitHub, а сюди летить

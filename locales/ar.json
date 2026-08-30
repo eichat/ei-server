@@ -699,5 +699,10 @@
   "quota_translate": "الترجمة التلقائية",
   "quota_exhausted": "انتهت — بعدها {price} عملة للوحدة",
   "err_quota_unavailable": "تعذّر جلب الحدود",
-  "unit_mb": "ميغابايت"
+  "unit_mb": "ميغابايت",
+  "update_title": "إصدار جديد متاح",
+  "update_body": "لديك {current}، والمتاح {latest}. هل تريد التنزيل؟",
+  "update_required_body": "لم يعد هذا الإصدار مدعومًا. حدّث التطبيق للمتابعة.",
+  "btn_update": "تحديث",
+  "btn_later": "لاحقًا"
 }

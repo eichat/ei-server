@@ -699,5 +699,10 @@
   "quota_translate": "แปลอัตโนมัติ",
   "quota_exhausted": "ใช้หมดแล้ว — ต่อไปหน่วยละ {price} เหรียญ",
   "err_quota_unavailable": "โหลดโควตาไม่สำเร็จ",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "มีเวอร์ชันใหม่",
+  "update_body": "คุณใช้ {current} มีเวอร์ชัน {latest} แล้ว ดาวน์โหลดไหม",
+  "update_required_body": "เวอร์ชันนี้ไม่รองรับแล้ว กรุณาอัปเดตแอปเพื่อใช้งานต่อ",
+  "btn_update": "อัปเดต",
+  "btn_later": "ไว้ก่อน"
 }

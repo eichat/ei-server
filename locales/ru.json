@@ -699,5 +699,10 @@
   "quota_translate": "Автоперевод",
   "quota_exhausted": "исчерпано — далее {price} монет за единицу",
   "err_quota_unavailable": "Не удалось получить нормы",
-  "unit_mb": "МБ"
+  "unit_mb": "МБ",
+  "update_title": "Доступна новая версия",
+  "update_body": "У вас {current}, доступна {latest}. Скачать?",
+  "update_required_body": "Эта версия больше не поддерживается. Обновите приложение, чтобы продолжить.",
+  "btn_update": "Обновить",
+  "btn_later": "Позже"
 }

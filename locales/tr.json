@@ -699,5 +699,10 @@
   "quota_translate": "Otomatik çeviri",
   "quota_exhausted": "tükendi — sonrası birim başına {price} coin",
   "err_quota_unavailable": "Kotalar alınamadı",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "Yeni sürüm mevcut",
+  "update_body": "Sürümünüz {current}, {latest} mevcut. İndirilsin mi?",
+  "update_required_body": "Bu sürüm artık desteklenmiyor. Devam etmek için uygulamayı güncelleyin.",
+  "btn_update": "Güncelle",
+  "btn_later": "Sonra"
 }

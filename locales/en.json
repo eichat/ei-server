@@ -699,5 +699,10 @@
   "quota_translate": "Auto-translation",
   "quota_exhausted": "used up — {price} coins per unit after that",
   "err_quota_unavailable": "Couldn’t load the allowance",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "A new version is available",
+  "update_body": "You have {current}, {latest} is available. Download it?",
+  "update_required_body": "This version is no longer supported. Update the app to continue.",
+  "btn_update": "Update",
+  "btn_later": "Later"
 }

@@ -699,5 +699,10 @@
   "quota_translate": "자동 번역",
   "quota_exhausted": "모두 사용 — 이후 단위당 {price}코인",
   "err_quota_unavailable": "한도를 불러오지 못했습니다",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "새 버전이 있습니다",
+  "update_body": "현재 {current}, 최신 버전은 {latest}입니다. 내려받을까요?",
+  "update_required_body": "이 버전은 더 이상 지원되지 않습니다. 계속하려면 앱을 업데이트하세요.",
+  "btn_update": "업데이트",
+  "btn_later": "나중에"
 }

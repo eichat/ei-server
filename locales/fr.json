@@ -699,5 +699,10 @@
   "quota_translate": "Traduction automatique",
   "quota_exhausted": "épuisé — ensuite {price} pièces par unité",
   "err_quota_unavailable": "Impossible de charger les quotas",
-  "unit_mb": "Mo"
+  "unit_mb": "Mo",
+  "update_title": "Une nouvelle version est disponible",
+  "update_body": "Vous avez {current}, la version {latest} est disponible. Télécharger ?",
+  "update_required_body": "Cette version n’est plus prise en charge. Mettez l’application à jour pour continuer.",
+  "btn_update": "Mettre à jour",
+  "btn_later": "Plus tard"
 }

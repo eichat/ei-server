@@ -699,5 +699,10 @@
   "quota_translate": "Automatische Übersetzung",
   "quota_exhausted": "aufgebraucht — danach {price} Coins pro Einheit",
   "err_quota_unavailable": "Limits konnten nicht geladen werden",
-  "unit_mb": "MB"
+  "unit_mb": "MB",
+  "update_title": "Neue Version verfügbar",
+  "update_body": "Du hast {current}, verfügbar ist {latest}. Herunterladen?",
+  "update_required_body": "Diese Version wird nicht mehr unterstützt. Aktualisiere die App, um fortzufahren.",
+  "btn_update": "Aktualisieren",
+  "btn_later": "Später"
 }
