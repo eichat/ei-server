@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Nie możesz przelać sobie",
   "err_unknown_plan": "Nieznany plan",
   "err_invalid_path": "Nieprawidłowa ścieżka",
-  "err_not_enough_coins_100": "Za mało monet (potrzeba 100 EION)",
   "err_not_enough_coins": "Za mało monet",
   "err_not_enough_rights": "Za mało uprawnień",
   "err_unavailable": "Niedostępne",
@@ -683,5 +682,7 @@
   "err_ai_failed": "Asystent AI nie odpowiedział",
   "ai_free_left": "Bezpłatnych zapytań dziś zostało: {n}",
   "ai_paid": "Limit dzienny wyczerpany — pobrane monety: {n}",
-  "err_ai_timeout": "Asystent AI nie odpowiedział na czas"
+  "err_ai_timeout": "Asystent AI nie odpowiedział na czas",
+  "err_email_send": "Nie udało się wysłać e-maila",
+  "err_wait_before_retry": "Odczekaj chwilę przed ponownym żądaniem"
 }

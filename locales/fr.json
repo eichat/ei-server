@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Vous ne pouvez pas transférer à vous-même",
   "err_unknown_plan": "Forfait inconnu",
   "err_invalid_path": "Chemin invalide",
-  "err_not_enough_coins_100": "Pas assez de pièces (100 EION requis)",
   "err_not_enough_coins": "Pas assez de pièces",
   "err_not_enough_rights": "Droits insuffisants",
   "err_unavailable": "Indisponible",
@@ -683,5 +682,7 @@
   "err_ai_failed": "L'assistant IA n'a pas répondu",
   "ai_free_left": "Requêtes gratuites restantes aujourd'hui : {n}",
   "ai_paid": "Quota quotidien épuisé — pièces débitées : {n}",
-  "err_ai_timeout": "L'assistant IA a mis trop de temps"
+  "err_ai_timeout": "L'assistant IA a mis trop de temps",
+  "err_email_send": "Impossible d’envoyer l’e-mail",
+  "err_wait_before_retry": "Patientez un instant avant de redemander"
 }

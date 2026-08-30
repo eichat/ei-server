@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "You can’t transfer to yourself",
   "err_unknown_plan": "Unknown plan",
   "err_invalid_path": "Invalid path",
-  "err_not_enough_coins_100": "Not enough coins (100 EION required)",
   "err_not_enough_coins": "Not enough coins",
   "err_not_enough_rights": "Not enough permissions",
   "err_unavailable": "Unavailable",
@@ -683,5 +682,7 @@
   "err_ai_failed": "The AI assistant did not respond",
   "ai_free_left": "Free requests left today: {n}",
   "ai_paid": "Daily allowance used up — coins spent: {n}",
-  "err_ai_timeout": "The AI assistant timed out"
+  "err_ai_timeout": "The AI assistant timed out",
+  "err_email_send": "Could not send the email",
+  "err_wait_before_retry": "Please wait a moment before requesting again"
 }

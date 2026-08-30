@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "নিজেকে পাঠানো যায় না",
   "err_unknown_plan": "অজানা প্ল্যান",
   "err_invalid_path": "পথ সঠিক নয়",
-  "err_not_enough_coins_100": "পর্যাপ্ত কয়েন নেই (১০০ EION দরকার)",
   "err_not_enough_coins": "পর্যাপ্ত কয়েন নেই",
   "err_not_enough_rights": "পর্যাপ্ত অনুমতি নেই",
   "err_unavailable": "উপলব্ধ নয়",
@@ -683,5 +682,7 @@
   "err_ai_failed": "AI সহকারী সাড়া দেয়নি",
   "ai_free_left": "আজ বাকি বিনামূল্যের অনুরোধ: {n}",
   "ai_paid": "দৈনিক সীমা শেষ — কাটা কয়েন: {n}",
-  "err_ai_timeout": "AI সহকারী সময়মতো সাড়া দেয়নি"
+  "err_ai_timeout": "AI সহকারী সময়মতো সাড়া দেয়নি",
+  "err_email_send": "ইমেল পাঠানো যায়নি",
+  "err_wait_before_retry": "আবার অনুরোধ করার আগে একটু অপেক্ষা করুন"
 }

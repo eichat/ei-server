@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Non puoi trasferire a te stesso",
   "err_unknown_plan": "Piano sconosciuto",
   "err_invalid_path": "Percorso non valido",
-  "err_not_enough_coins_100": "Monete insufficienti (servono 100 EION)",
   "err_not_enough_coins": "Monete insufficienti",
   "err_not_enough_rights": "Permessi insufficienti",
   "err_unavailable": "Non disponibile",
@@ -683,5 +682,7 @@
   "err_ai_failed": "L'assistente IA non ha risposto",
   "ai_free_left": "Richieste gratuite rimaste oggi: {n}",
   "ai_paid": "Quota giornaliera esaurita — monete addebitate: {n}",
-  "err_ai_timeout": "L'assistente IA ha impiegato troppo tempo"
+  "err_ai_timeout": "L'assistente IA ha impiegato troppo tempo",
+  "err_email_send": "Impossibile inviare l’email",
+  "err_wait_before_retry": "Attendi un momento prima di richiederlo di nuovo"
 }

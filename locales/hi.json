@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "आप स्वयं को नहीं भेज सकते",
   "err_unknown_plan": "अज्ञात योजना",
   "err_invalid_path": "अमान्य पथ",
-  "err_not_enough_coins_100": "पर्याप्त सिक्के नहीं (100 EION चाहिए)",
   "err_not_enough_coins": "पर्याप्त सिक्के नहीं",
   "err_not_enough_rights": "पर्याप्त अनुमति नहीं",
   "err_unavailable": "उपलब्ध नहीं",
@@ -683,5 +682,7 @@
   "err_ai_failed": "AI सहायक ने जवाब नहीं दिया",
   "ai_free_left": "आज बची मुफ़्त विनतियाँ: {n}",
   "ai_paid": "दैनिक सीमा समाप्त — काटे गए सिक्के: {n}",
-  "err_ai_timeout": "AI सहायक ने समय पर जवाब नहीं दिया"
+  "err_ai_timeout": "AI सहायक ने समय पर जवाब नहीं दिया",
+  "err_email_send": "ईमेल नहीं भेजा जा सका",
+  "err_wait_before_retry": "दोबारा अनुरोध करने से पहले थोड़ा प्रतीक्षा करें"
 }

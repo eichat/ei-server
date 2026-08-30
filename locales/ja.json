@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "自分に送金することはできません",
   "err_unknown_plan": "不明なプランです",
   "err_invalid_path": "パスが正しくありません",
-  "err_not_enough_coins_100": "コインが足りません（100 EION 必要）",
   "err_not_enough_coins": "コインが足りません",
   "err_not_enough_rights": "権限が足りません",
   "err_unavailable": "利用できません",
@@ -683,5 +682,7 @@
   "err_ai_failed": "AIアシスタントから応答がありませんでした",
   "ai_free_left": "本日の無料リクエスト残り: {n}",
   "ai_paid": "1日の無料枠を使い切りました — 差し引いたコイン: {n}",
-  "err_ai_timeout": "AIアシスタントの応答がタイムアウトしました"
+  "err_ai_timeout": "AIアシスタントの応答がタイムアウトしました",
+  "err_email_send": "メールを送信できませんでした",
+  "err_wait_before_retry": "再送信まで少しお待ちください"
 }

@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "لا يمكنك التحويل إلى نفسك",
   "err_unknown_plan": "خطة غير معروفة",
   "err_invalid_path": "مسار غير صالح",
-  "err_not_enough_coins_100": "العملات غير كافية (مطلوب 100 EION)",
   "err_not_enough_coins": "العملات غير كافية",
   "err_not_enough_rights": "الصلاحيات غير كافية",
   "err_unavailable": "غير متاح",
@@ -683,5 +682,7 @@
   "err_ai_failed": "لم يستجب مساعد الذكاء الاصطناعي",
   "ai_free_left": "الطلبات المجانية المتبقية اليوم: {n}",
   "ai_paid": "انتهت الحصة اليومية — العملات المخصومة: {n}",
-  "err_ai_timeout": "انتهت مهلة انتظار مساعد الذكاء الاصطناعي"
+  "err_ai_timeout": "انتهت مهلة انتظار مساعد الذكاء الاصطناعي",
+  "err_email_send": "تعذّر إرسال الرسالة",
+  "err_wait_before_retry": "انتظر قليلاً قبل طلب رمز جديد"
 }

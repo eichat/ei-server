@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Hindi ka maaaring maglipat sa sarili mo",
   "err_unknown_plan": "Hindi kilalang plano",
   "err_invalid_path": "Di-wastong path",
-  "err_not_enough_coins_100": "Kulang ang barya (kailangan ng 100 EION)",
   "err_not_enough_coins": "Kulang ang barya",
   "err_not_enough_rights": "Kulang ang pahintulot",
   "err_unavailable": "Hindi available",
@@ -683,5 +682,7 @@
   "err_ai_failed": "Hindi tumugon ang AI assistant",
   "ai_free_left": "Natitirang libreng kahilingan ngayon: {n}",
   "ai_paid": "Naubos na ang arawang alawans — nabawas na barya: {n}",
-  "err_ai_timeout": "Hindi umabot sa oras ang AI assistant"
+  "err_ai_timeout": "Hindi umabot sa oras ang AI assistant",
+  "err_email_send": "Hindi naipadala ang email",
+  "err_wait_before_retry": "Maghintay sandali bago muling humiling"
 }

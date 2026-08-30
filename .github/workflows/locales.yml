@@ -3,7 +3,7 @@ name: Локалі
 # джерела (або навпаки) — тоді застосунок показав би сирий ключ.
 on:
   push:
-    paths: ['locales/**', 'locales-source.json', 'tools/build-locales.js']
+    paths: ['locales/**', 'locales-source.json', 'tools/*.js', 'server.js']
   workflow_dispatch:
 
 jobs:
@@ -15,6 +15,9 @@ jobs:
         with: { node-version: '22' }
       - name: Перевірити повноту й плейсхолдери
         run: node tools/build-locales.js
+      - name: Звірити коди помилок сервера з локалями
+        run: node tools/check-error-codes.js
+
       - name: Переконатись, що locales/ відповідають джерелу
         run: |
           if [ -n "$(git status --porcelain locales/)" ]; then

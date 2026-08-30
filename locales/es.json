@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "No puedes transferirte a ti mismo",
   "err_unknown_plan": "Plan desconocido",
   "err_invalid_path": "Ruta no válida",
-  "err_not_enough_coins_100": "No tienes monedas suficientes (hacen falta 100 EION)",
   "err_not_enough_coins": "No tienes monedas suficientes",
   "err_not_enough_rights": "Permisos insuficientes",
   "err_unavailable": "No disponible",
@@ -683,5 +682,7 @@
   "err_ai_failed": "El asistente de IA no respondió",
   "ai_free_left": "Consultas gratuitas que quedan hoy: {n}",
   "ai_paid": "Cuota diaria agotada: monedas cobradas: {n}",
-  "err_ai_timeout": "El asistente de IA tardó demasiado"
+  "err_ai_timeout": "El asistente de IA tardó demasiado",
+  "err_email_send": "No se pudo enviar el correo",
+  "err_wait_before_retry": "Espera un momento antes de volver a solicitarlo"
 }

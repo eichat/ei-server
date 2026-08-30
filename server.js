@@ -2353,7 +2353,7 @@ app.post('/forgot', async (req, res) => {
   const { data: existing } = await supabase.from('email_codes').select('last_sent_at').eq('email', email).single();
   if (existing && existing.last_sent_at) {
     const elapsed = Date.now() - new Date(existing.last_sent_at).getTime();
-    if (elapsed < 60000) return res.json({ ok: false, error: `Зачекайте ${Math.ceil((60000 - elapsed) / 1000)} с` });
+    if (elapsed < 60000) return res.json({ ok: false, error: `Зачекайте ${Math.ceil((60000 - elapsed) / 1000)} с`, code: 'err_wait_before_retry' });
   }
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const { error } = await supabase.from('email_codes').upsert({
@@ -2486,7 +2486,7 @@ app.post('/phone/request-code', async (req, res) => {
   const { data: existing } = await supabase.from('phone_codes').select('last_sent_at').eq('phone', phoneNormalized).single();
   if (existing && existing.last_sent_at) {
     const elapsed = Date.now() - new Date(existing.last_sent_at).getTime();
-    if (elapsed < 60000) return res.json({ ok: false, error: `Зачекайте ${Math.ceil((60000 - elapsed) / 1000)} с` });
+    if (elapsed < 60000) return res.json({ ok: false, error: `Зачекайте ${Math.ceil((60000 - elapsed) / 1000)} с`, code: 'err_wait_before_retry' });
   }
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const { error } = await supabase.from('phone_codes').upsert({
@@ -3146,7 +3146,7 @@ app.post('/shop/buy-premium', async (req, res) => {
   // Атомарне списання: spend_coins повертає новий баланс або -1 (недостатньо).
   const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})`, code: 'err_not_enough_coins' });
   // Дохід від преміуму → компанії (EION) з live-нотифікацією + журнал.
   await creditCompany(price, 'premium', { fromNick: nick, ref: plan });
   const now = new Date();
@@ -3297,7 +3297,7 @@ app.post('/shop/buy-pack', async (req, res) => {
   // Платний — атомарне списання.
   const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})`, code: 'err_not_enough_coins' });
   // Записуємо власність. Якщо провалилось — повертаємо коіни (щоб не списати даремно).
   const { error: ownErr } = await supabase.from('user_sticker_packs').insert({ nick, pack_id: packId });
   if (ownErr) {
@@ -3869,7 +3869,7 @@ app.post('/channel/contact-owner', async (req, res) => {
   // Атомарне списання у покупця.
   const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: CONTACT_PRICE });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (senderBalance === -1) return res.json({ ok: false, error: 'Недостатньо EION монет (потрібно 100)', code: 'err_not_enough_coins_100' });
+  if (senderBalance === -1) return res.json({ ok: false, error: `Недостатньо EION монет (потрібно ${CONTACT_PRICE})`, code: 'err_not_enough_coins' });
   // Розподіл: власнику (атомарно) + компанії (creditCompany з live+журнал).
   const { data: ownerBalance } = await supabase.rpc('add_coins', { p_nick: channel.owner_nick, p_amount: OWNER_SHARE });
   await logTx({ fromNick, toNick: channel.owner_nick, amount: OWNER_SHARE, kind: 'contact_owner', ref: String(channelId) });
@@ -3897,7 +3897,7 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   // Атомарне списання.
   const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})` });
+  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})`, code: 'err_not_enough_coins' });
   if (ch.owner_nick && ch.owner_nick !== nick) {
     const { data: ownerNew } = await supabase.rpc('add_coins', { p_nick: ch.owner_nick, p_amount: ownerShare });
     await logTx({ fromNick: nick, toNick: ch.owner_nick, amount: ownerShare, kind: 'paid_sub', ref: String(channelId) });

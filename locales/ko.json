@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "자신에게 송금할 수 없습니다",
   "err_unknown_plan": "알 수 없는 요금제입니다",
   "err_invalid_path": "경로가 올바르지 않습니다",
-  "err_not_enough_coins_100": "코인이 부족합니다 (100 EION 필요)",
   "err_not_enough_coins": "코인이 부족합니다",
   "err_not_enough_rights": "권한이 부족합니다",
   "err_unavailable": "사용할 수 없습니다",
@@ -683,5 +682,7 @@
   "err_ai_failed": "AI 어시스턴트가 응답하지 않았습니다",
   "ai_free_left": "오늘 남은 무료 요청: {n}",
   "ai_paid": "하루 무료 한도 소진 — 차감된 코인: {n}",
-  "err_ai_timeout": "AI 어시스턴트 응답이 시간 초과되었습니다"
+  "err_ai_timeout": "AI 어시스턴트 응답이 시간 초과되었습니다",
+  "err_email_send": "이메일을 보내지 못했습니다",
+  "err_wait_before_retry": "다시 요청하기 전에 잠시 기다려 주세요"
 }

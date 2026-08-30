@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "不能转给自己",
   "err_unknown_plan": "未知套餐",
   "err_invalid_path": "路径无效",
-  "err_not_enough_coins_100": "金币不足（需要 100 EION）",
   "err_not_enough_coins": "金币不足",
   "err_not_enough_rights": "权限不足",
   "err_unavailable": "不可用",
@@ -683,5 +682,7 @@
   "err_ai_failed": "AI 助手没有响应",
   "ai_free_left": "今天剩余免费请求：{n}",
   "ai_paid": "每日额度已用完 — 扣除金币：{n}",
-  "err_ai_timeout": "AI 助手响应超时"
+  "err_ai_timeout": "AI 助手响应超时",
+  "err_email_send": "无法发送邮件",
+  "err_wait_before_retry": "请稍候再重新请求"
 }

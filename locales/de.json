@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Du kannst nicht an dich selbst senden",
   "err_unknown_plan": "Unbekannter Tarif",
   "err_invalid_path": "Ungültiger Pfad",
-  "err_not_enough_coins_100": "Nicht genug Coins (100 EION nötig)",
   "err_not_enough_coins": "Nicht genug Coins",
   "err_not_enough_rights": "Nicht genug Rechte",
   "err_unavailable": "Nicht verfügbar",
@@ -683,5 +682,7 @@
   "err_ai_failed": "Der KI-Assistent hat nicht geantwortet",
   "ai_free_left": "Heute noch kostenlose Anfragen: {n}",
   "ai_paid": "Tageskontingent aufgebraucht — abgebuchte Coins: {n}",
-  "err_ai_timeout": "Zeitüberschreitung beim KI-Assistenten"
+  "err_ai_timeout": "Zeitüberschreitung beim KI-Assistenten",
+  "err_email_send": "E-Mail konnte nicht gesendet werden",
+  "err_wait_before_retry": "Bitte kurz warten, bevor du erneut anforderst"
 }

@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Bạn không thể chuyển cho chính mình",
   "err_unknown_plan": "Gói không xác định",
   "err_invalid_path": "Đường dẫn không hợp lệ",
-  "err_not_enough_coins_100": "Không đủ xu (cần 100 EION)",
   "err_not_enough_coins": "Không đủ xu",
   "err_not_enough_rights": "Không đủ quyền",
   "err_unavailable": "Không khả dụng",
@@ -683,5 +682,7 @@
   "err_ai_failed": "Trợ lý AI không phản hồi",
   "ai_free_left": "Số yêu cầu miễn phí còn lại hôm nay: {n}",
   "ai_paid": "Đã hết hạn mức ngày — số xu đã trừ: {n}",
-  "err_ai_timeout": "Trợ lý AI phản hồi quá chậm"
+  "err_ai_timeout": "Trợ lý AI phản hồi quá chậm",
+  "err_email_send": "Không gửi được email",
+  "err_wait_before_retry": "Vui lòng đợi một lát trước khi yêu cầu lại"
 }

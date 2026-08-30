@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Kendinize transfer yapamazsınız",
   "err_unknown_plan": "Bilinmeyen plan",
   "err_invalid_path": "Geçersiz yol",
-  "err_not_enough_coins_100": "Yeterli jeton yok (100 EION gerekli)",
   "err_not_enough_coins": "Yeterli jeton yok",
   "err_not_enough_rights": "Yetki yetersiz",
   "err_unavailable": "Kullanılamıyor",
@@ -683,5 +682,7 @@
   "err_ai_failed": "Yapay zekâ asistanı yanıt vermedi",
   "ai_free_left": "Bugün kalan ücretsiz istek: {n}",
   "ai_paid": "Günlük hak doldu — düşülen coin: {n}",
-  "err_ai_timeout": "Yapay zekâ asistanı zamanında yanıt vermedi"
+  "err_ai_timeout": "Yapay zekâ asistanı zamanında yanıt vermedi",
+  "err_email_send": "E-posta gönderilemedi",
+  "err_wait_before_retry": "Yeniden istemeden önce biraz bekleyin"
 }

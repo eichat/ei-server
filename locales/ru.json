@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Нельзя перевести самому себе",
   "err_unknown_plan": "Неизвестный тариф",
   "err_invalid_path": "Неверный путь",
-  "err_not_enough_coins_100": "Недостаточно монет (нужно 100 EION)",
   "err_not_enough_coins": "Недостаточно монет",
   "err_not_enough_rights": "Недостаточно прав",
   "err_unavailable": "Недоступно",
@@ -683,5 +682,7 @@
   "err_ai_failed": "AI-ассистент не ответил",
   "ai_free_left": "Бесплатных запросов сегодня осталось: {n}",
   "ai_paid": "Дневная норма исчерпана — списано монет: {n}",
-  "err_ai_timeout": "AI-ассистент не ответил вовремя"
+  "err_ai_timeout": "AI-ассистент не ответил вовремя",
+  "err_email_send": "Не удалось отправить письмо",
+  "err_wait_before_retry": "Подождите немного перед повторным запросом"
 }

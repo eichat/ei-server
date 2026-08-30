@@ -648,7 +648,6 @@
   "err_cannot_transfer_self": "Não pode transferir para si próprio",
   "err_unknown_plan": "Plano desconhecido",
   "err_invalid_path": "Caminho inválido",
-  "err_not_enough_coins_100": "Moedas insuficientes (são precisas 100 EION)",
   "err_not_enough_coins": "Moedas insuficientes",
   "err_not_enough_rights": "Permissões insuficientes",
   "err_unavailable": "Indisponível",
@@ -683,5 +682,7 @@
   "err_ai_failed": "O assistente de IA não respondeu",
   "ai_free_left": "Pedidos gratuitos restantes hoje: {n}",
   "ai_paid": "Quota diária esgotada — moedas debitadas: {n}",
-  "err_ai_timeout": "O assistente de IA demorou demasiado"
+  "err_ai_timeout": "O assistente de IA demorou demasiado",
+  "err_email_send": "Não foi possível enviar o e-mail",
+  "err_wait_before_retry": "Aguarde um momento antes de solicitar de novo"
 }
