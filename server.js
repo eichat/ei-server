@@ -1298,6 +1298,19 @@ app.get('/admin/ai-cache', async (req, res) => {
 // Пишуться руками й ніколи не віддаються дослівно — підмішуються в контекст,
 // щоб модель відповіла нашими фактами, але мовою користувача. Саме це робить
 // асистента «своїм»: він знає те, чого немає в жодній моделі.
+/// Забути відповіді, які модель дала ДО зміни бази знань.
+///
+/// 🔴 Інакше погана відповідь консервується: на «скільки мов підтримує
+/// застосунок» асистент один раз сказав «не знаю», це осіло в памʼяті — і
+/// віддавалось далі навіть після того, як відповідь у базу додали.
+/// Наші власні записи не чіпаємо, а модельні відновляться самі за копійки.
+async function forgetModelAnswers(reason) {
+  const { error, count } = await supabase.from('ai_cache')
+    .delete({ count: 'exact' }).eq('source', 'model');
+  if (error) console.error('[ai-cache] чистка:', error.message);
+  else console.log(`[ai-cache] забуто ${count ?? '?'} модельних відповідей — ${reason}`);
+}
+
 app.get('/admin/ai-kb', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
   const { data, error } = await supabase.from('ai_cache')
@@ -1335,6 +1348,7 @@ app.post('/admin/ai-kb', async (req, res) => {
   }
   const { error } = await supabase.from('ai_cache').upsert(rows, { onConflict: 'key' });
   if (error) return res.json({ ok: false, error: error.message });
+  await forgetModelAnswers('додано запис до бази знань');
   res.json({ ok: true, added: rows.length, keys: rows.map(r => r.key) });
 });
 
@@ -1343,6 +1357,7 @@ app.post('/admin/ai-kb/delete', async (req, res) => {
   const key = typeof req.body?.key === 'string' ? req.body.key : '';
   if (!key) return res.json({ ok: false, error: 'Потрібен key' });
   const { error } = await supabase.from('ai_cache').delete().eq('key', key);
+  if (!error) await forgetModelAnswers('запис бази знань видалено');
   res.json({ ok: !error, error: error ? error.message : null });
 });
 
