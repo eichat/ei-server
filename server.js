@@ -4431,6 +4431,21 @@ async function collectOverview() {
     else for (const r of all) downloads.total[r.kind] = (downloads.total[r.kind] || 0) + r.count;
   }
 
+  // Останні рухи монет: без них числа «спалено / у скарбниці» доводиться
+  // реконструювати в голові («200 за пак → 40% спалено → 80»), а журнал
+  // append-only і так є — просто ніде не показувався.
+  let recentTx = [];
+  {
+    const { data, error } = await supabase.from('coin_transactions')
+      .select('created_at, kind, amount, from_nick, to_nick')
+      .order('id', { ascending: false }).limit(15);
+    if (error) errors.push(`coin_transactions: ${error.message || 'запит не вдався'}`);
+    else recentTx = data.map(r => ({
+      at: r.created_at, kind: r.kind, amount: r.amount,
+      from: r.from_nick, to: r.to_nick,
+    }));
+  }
+
   const mem = process.memoryUsage();
   return {
     ok: true,
@@ -4449,6 +4464,7 @@ async function collectOverview() {
     },
     quotasToday: { ...quotas, users: quotaUsers },
     coins,
+    recentTransactions: recentTx,
     downloads,
     runtime: {
       onlineNow: onlineUsers.size,
@@ -4525,6 +4541,8 @@ ${card('Монета', [
     ['У скарбниці', o.coins.treasury],
     ['Транзакцій за тиждень', o.coins.transactionsWeek],
   ])}
+${o.recentTransactions.length ? `<section><h2>Останні рухи монет</h2><table>${
+    o.recentTransactions.map(t => `<tr><td>${t.at.slice(5, 16).replace('T', ' ')} · ${t.kind}<br><span style="color:#7d8f9d;font-size:12px">${t.from || '—'} → ${t.to || '—'}</span></td><td class="v">${n(t.amount)}</td></tr>`).join('')}</table></section>` : ''}
 ${card('Сервер', [
     ['Онлайн зараз', o.runtime.onlineNow],
     ['Аптайм, год', o.runtime.uptimeHours],
