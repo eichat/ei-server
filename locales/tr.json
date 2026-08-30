@@ -704,5 +704,6 @@
   "update_body": "Sürümünüz {current}, {latest} mevcut. İndirilsin mi?",
   "update_required_body": "Bu sürüm artık desteklenmiyor. Devam etmek için uygulamayı güncelleyin.",
   "btn_update": "Güncelle",
-  "btn_later": "Sonra"
+  "btn_later": "Sonra",
+  "err_otp_unavailable": "Telefon doğrulaması şu anda kullanılamıyor"
 }

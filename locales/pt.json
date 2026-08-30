@@ -704,5 +704,6 @@
   "update_body": "Você tem {current} e a {latest} está disponível. Baixar?",
   "update_required_body": "Esta versão não é mais compatível. Atualize o aplicativo para continuar.",
   "btn_update": "Atualizar",
-  "btn_later": "Mais tarde"
+  "btn_later": "Mais tarde",
+  "err_otp_unavailable": "A verificação do número está indisponível no momento"
 }

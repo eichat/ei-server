@@ -2289,7 +2289,15 @@ async function sendOtp(phoneE164, code, text) {
 
   // 2. SMS-шлюз (SMSGate) — резерв
   const url = process.env.SMS_GATEWAY_URL;
-  if (!url) { console.log(`[OTP dev] -> ${phoneE164}: ${text}`); return { ok: true, dev: true }; }
+  // 🔴 Немає жодного каналу доставки — це ПОМИЛКА, а не «ok, dev».
+  // Доти ця гілка вдавала успіх, і разом із OTP_DEV_RETURN_CODE=true код
+  // повертався прямо у відповіді. Обидва endpoint публічні, тож будь-хто міг
+  // попросити код на ЧУЖИЙ номер, тут же його прочитати й підтвердити цей
+  // номер на СВОЄМУ акаунті: у телефонній книзі друзі власника номера бачили б
+  // чужий акаунт як його, а справжній власник більше не міг би прив'язати свій
+  // номер («вже зареєстрований»). Тобто верифікація не просто не працювала —
+  // вона працювала на користь того, хто цим скористається.
+  if (!url) { console.error('[OTP] немає каналу доставки (TG_GATEWAY_TOKEN / SMS_GATEWAY_URL) — код не надіслано'); return { ok: false, unavailable: true }; }
   const headers = {};
   if (process.env.SMS_GATEWAY_TOKEN) headers['Authorization'] = `Bearer ${process.env.SMS_GATEWAY_TOKEN}`;
   else if (process.env.SMS_GATEWAY_BASIC) headers['Authorization'] = `Basic ${Buffer.from(process.env.SMS_GATEWAY_BASIC).toString('base64')}`;
@@ -2592,14 +2600,21 @@ app.post('/phone/request-code', async (req, res) => {
   });
   if (error) { console.error('[OTP] phone_codes upsert:', error); return res.json({ ok: false, error: 'Помилка збереження коду', code: 'err_code_save' }); }
   const sent = await sendOtp(phone, code, `EION код підтвердження: ${code}`);
-  if (!sent.ok) return res.json({ ok: false, error: 'Не вдалося надіслати код', code: 'err_code_send' });
-  // У dev-режимі (без шлюзу) можна повернути код для тесту, якщо явно дозволено env
-  const devCode = (sent.dev && process.env.OTP_DEV_RETURN_CODE === 'true') ? code : undefined;
-  res.json({ ok: true, ...(devCode ? { devCode } : {}) });
+  if (!sent.ok) {
+    // Код у відповідь НЕ повертаємо за жодних умов і жодним прапорцем env:
+    // endpoint публічний, тож це дорівнювало б «підтвердь будь-який номер».
+    // Для локальної перевірки код видно в таблиці phone_codes.
+    await supabase.from('phone_codes').delete().eq('phone', phoneNormalized);
+    return sent.unavailable
+      ? res.json({ ok: false, error: 'Підтвердження номера тимчасово недоступне', code: 'err_otp_unavailable' })
+      : res.json({ ok: false, error: 'Не вдалося надіслати код', code: 'err_code_send' });
+  }
+  res.json({ ok: true });
 });
 
 app.post('/phone/verify-code', async (req, res) => {
-  const { phone, phoneNormalized, code, nick } = req.body;
+  // `nick` із тіла свідомо НЕ читаємо: прив'язка йде лише за сесією (див. нижче).
+  const { phone, phoneNormalized, code } = req.body;
   if (!phoneNormalized || !code) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data: row } = await supabase.from('phone_codes').select('*').eq('phone', phoneNormalized).single();
   if (!row) return res.json({ ok: false, error: 'Код не знайдено. Запросіть новий', code: 'err_code_not_found' });
@@ -2616,8 +2631,14 @@ app.post('/phone/verify-code', async (req, res) => {
     return res.json({ ok: false, error: 'Невірний код', code: 'err_code_invalid' });
   }
   await supabase.from('phone_codes').delete().eq('phone', phoneNormalized); // успіх — код видаляємо
-  // Наявний користувач (зміна номера / discovery) — ставимо номер + phone_verified
-  if (nick) {
+  // Нік беремо з СЕСІЇ, коли запит автентифікований: інакше номер, підтверджений
+  // однією людиною, можна було б прив'язати до чужого акаунта. Без сесії
+  // лишається тільки реєстраційний шлях (verifiedPhones нижче) — саме заради
+  // нього endpoint і публічний.
+  const auth = req.headers['authorization'] || '';
+  const bindNick = auth.startsWith('Bearer ') ? resolveSession(auth.slice(7)) : null;
+  if (bindNick) {
+    const nick = bindNick;
     const { data: user } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
     if (user) {
       const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();

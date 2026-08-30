@@ -704,5 +704,6 @@
   "update_body": "Je hebt {current}, {latest} is beschikbaar. Downloaden?",
   "update_required_body": "Deze versie wordt niet meer ondersteund. Werk de app bij om door te gaan.",
   "btn_update": "Bijwerken",
-  "btn_later": "Later"
+  "btn_later": "Later",
+  "err_otp_unavailable": "Telefoonverificatie is tijdelijk niet beschikbaar"
 }

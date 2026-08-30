@@ -704,5 +704,6 @@
   "update_body": "لديك {current}، والمتاح {latest}. هل تريد التنزيل؟",
   "update_required_body": "لم يعد هذا الإصدار مدعومًا. حدّث التطبيق للمتابعة.",
   "btn_update": "تحديث",
-  "btn_later": "لاحقًا"
+  "btn_later": "لاحقًا",
+  "err_otp_unavailable": "تأكيد رقم الهاتف غير متاح مؤقتًا"
 }

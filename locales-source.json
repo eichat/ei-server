@@ -16267,6 +16267,29 @@
       "uk": "Пізніше",
       "vi": "Để sau",
       "zh": "稍后"
+    },
+    "err_otp_unavailable": {
+      "ar": "تأكيد رقم الهاتف غير متاح مؤقتًا",
+      "bn": "ফোন নম্বর যাচাই এখন উপলব্ধ নয়",
+      "de": "Telefonbestätigung ist vorübergehend nicht verfügbar",
+      "en": "Phone verification is temporarily unavailable",
+      "es": "La verificación del número no está disponible por ahora",
+      "fr": "La vérification du numéro est temporairement indisponible",
+      "hi": "फ़ोन नंबर की पुष्टि फ़िलहाल उपलब्ध नहीं है",
+      "id": "Verifikasi nomor sementara tidak tersedia",
+      "it": "La verifica del numero non è momentaneamente disponibile",
+      "ja": "電話番号の確認は現在ご利用いただけません",
+      "ko": "전화번호 인증을 현재 사용할 수 없습니다",
+      "nl": "Telefoonverificatie is tijdelijk niet beschikbaar",
+      "pl": "Weryfikacja numeru jest chwilowo niedostępna",
+      "pt": "A verificação do número está indisponível no momento",
+      "ru": "Подтверждение номера временно недоступно",
+      "th": "ยืนยันหมายเลขโทรศัพท์ไม่พร้อมใช้งานชั่วคราว",
+      "tl": "Pansamantalang hindi available ang phone verification",
+      "tr": "Telefon doğrulaması şu anda kullanılamıyor",
+      "uk": "Підтвердження номера тимчасово недоступне",
+      "vi": "Xác minh số điện thoại tạm thời không khả dụng",
+      "zh": "手机号验证暂时不可用"
     }
   }
 }

@@ -704,5 +704,6 @@
   "update_body": "আপনার আছে {current}, নতুন এসেছে {latest}। ডাউনলোড করবেন?",
   "update_required_body": "এই সংস্করণটি আর সমর্থিত নয়। চালিয়ে যেতে অ্যাপ আপডেট করুন।",
   "btn_update": "আপডেট",
-  "btn_later": "পরে"
+  "btn_later": "পরে",
+  "err_otp_unavailable": "ফোন নম্বর যাচাই এখন উপলব্ধ নয়"
 }

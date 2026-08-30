@@ -704,5 +704,6 @@
   "update_body": "Nasa {current} ka, available na ang {latest}. I-download?",
   "update_required_body": "Hindi na suportado ang bersyong ito. I-update ang app para magpatuloy.",
   "btn_update": "I-update",
-  "btn_later": "Mamaya"
+  "btn_later": "Mamaya",
+  "err_otp_unavailable": "Pansamantalang hindi available ang phone verification"
 }

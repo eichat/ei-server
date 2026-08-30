@@ -704,5 +704,6 @@
   "update_body": "当前版本 {current}，最新版本 {latest}。要下载吗？",
   "update_required_body": "此版本已不再支持。请更新应用后继续。",
   "btn_update": "更新",
-  "btn_later": "稍后"
+  "btn_later": "稍后",
+  "err_otp_unavailable": "手机号验证暂时不可用"
 }

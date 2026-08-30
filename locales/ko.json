@@ -704,5 +704,6 @@
   "update_body": "현재 {current}, 최신 버전은 {latest}입니다. 내려받을까요?",
   "update_required_body": "이 버전은 더 이상 지원되지 않습니다. 계속하려면 앱을 업데이트하세요.",
   "btn_update": "업데이트",
-  "btn_later": "나중에"
+  "btn_later": "나중에",
+  "err_otp_unavailable": "전화번호 인증을 현재 사용할 수 없습니다"
 }

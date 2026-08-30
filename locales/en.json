@@ -704,5 +704,6 @@
   "update_body": "You have {current}, {latest} is available. Download it?",
   "update_required_body": "This version is no longer supported. Update the app to continue.",
   "btn_update": "Update",
-  "btn_later": "Later"
+  "btn_later": "Later",
+  "err_otp_unavailable": "Phone verification is temporarily unavailable"
 }

@@ -704,5 +704,6 @@
   "update_body": "Anda memakai {current}, tersedia {latest}. Unduh?",
   "update_required_body": "Versi ini tidak didukung lagi. Perbarui aplikasi untuk melanjutkan.",
   "btn_update": "Perbarui",
-  "btn_later": "Nanti"
+  "btn_later": "Nanti",
+  "err_otp_unavailable": "Verifikasi nomor sementara tidak tersedia"
 }

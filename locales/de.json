@@ -704,5 +704,6 @@
   "update_body": "Du hast {current}, verfügbar ist {latest}. Herunterladen?",
   "update_required_body": "Diese Version wird nicht mehr unterstützt. Aktualisiere die App, um fortzufahren.",
   "btn_update": "Aktualisieren",
-  "btn_later": "Später"
+  "btn_later": "Später",
+  "err_otp_unavailable": "Telefonbestätigung ist vorübergehend nicht verfügbar"
 }

@@ -704,5 +704,6 @@
   "update_body": "お使いのバージョンは {current}、最新は {latest} です。ダウンロードしますか？",
   "update_required_body": "このバージョンはサポートされていません。続けるにはアプリを更新してください。",
   "btn_update": "更新",
-  "btn_later": "あとで"
+  "btn_later": "あとで",
+  "err_otp_unavailable": "電話番号の確認は現在ご利用いただけません"
 }

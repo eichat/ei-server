@@ -704,5 +704,6 @@
   "update_body": "Bạn đang dùng {current}, đã có {latest}. Tải về?",
   "update_required_body": "Phiên bản này không còn được hỗ trợ. Hãy cập nhật ứng dụng để tiếp tục.",
   "btn_update": "Cập nhật",
-  "btn_later": "Để sau"
+  "btn_later": "Để sau",
+  "err_otp_unavailable": "Xác minh số điện thoại tạm thời không khả dụng"
 }
