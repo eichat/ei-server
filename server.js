@@ -285,7 +285,7 @@ const pendingCallOffers = new Map();
 // потрібен пуш, за визначенням офлайн і залогінитись не може (27.08.2026).
 async function saveFcmToken(nick, token, deviceId) {
   fcmTokens.set(nick, token);
-  if (deviceId) nickDevices.set(nick, deviceId);
+  if (deviceId) { nickDevices.set(nick, deviceId); busPublish({ t: 'dev', nick, deviceId }); }
   try {
     const patch = { fcm_token: token };
     if (deviceId) patch.fcm_device_id = deviceId;
@@ -692,6 +692,27 @@ async function aiQueue() {
 // Стан усіх провайдерів AI: який ключ заданий, яка модель обрана, чи жива.
 // Потрібно, бо постачальники знімають моделі без попередження: 29.08.2026
 // Groq зняв зашиту llama-3.3, і кожен запит мовчки давав 404.
+// Стан кластера. Поки `REDIS_URL` не задано — enabled:false, і сервер
+// працює рівно як раніше, одним інстансом.
+app.get('/admin/cluster', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  let local = 0; const byInstance = {};
+  for (const [, u] of onlineUsers) {
+    if (u.remote) byInstance[u.inst] = (byInstance[u.inst] || 0) + 1;
+    else local++;
+  }
+  res.json({
+    ok: true,
+    enabled: busReady(),
+    redisConfigured: !!REDIS_URL,
+    instance: INSTANCE_ID,
+    onlineLocal: local,
+    onlineRemote: Object.values(byInstance).reduce((a, b) => a + b, 0),
+    byInstance,
+    hint: REDIS_URL ? undefined : 'Щоб увімкнути: задати REDIS_URL у Render. Без нього — один інстанс.',
+  });
+});
+
 app.get('/admin/ai-models', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
   if (req.query.refresh === '1') await refreshAiModels();
@@ -1612,7 +1633,9 @@ app.post('/ai/chat', async (req, res) => {
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   const token = await getFcmToken(toNick); if (!token) return;
   const callId = `${fromNick}_${toNick}_${Date.now()}`;
-  pendingCallOffers.set(callId, { fromNick, toNick, offer: typeof offer === 'string' ? offer : JSON.stringify(offer), hasVideo, expires: Date.now() + 60000 });
+  const offerRow = { fromNick, toNick, offer: typeof offer === 'string' ? offer : JSON.stringify(offer), hasVideo, expires: Date.now() + 60000 };
+  pendingCallOffers.set(callId, offerRow);
+  if (busReady()) { try { await busPub.set(`eion:offer:${callId}`, JSON.stringify(offerRow), 'EX', 90); } catch (e) { console.error('[cluster] offer:', e.message); } }
   try {
     await admin.messaging().send({ token, data: { type: 'call_offer', from_nick: fromNick, has_video: hasVideo ? 'true' : 'false', call_id: callId }, android: { priority: 'high', ttl: 30000 } });
     console.log(`FCM push відправлено до ${toNick}, callId=${callId}`);
@@ -1723,6 +1746,111 @@ async function signDeep(node) {
   }
   return node;
 }
+
+// ── Кластер: спільний стан між інстансами ─────────────────────────────────
+// 🔴 Причина існування. `onlineUsers`, `nickDevices`, `pendingCallOffers`,
+// `invisibleNicks` — це Map у памʼяті ОДНОГО процесу. Другий інстанс на Render
+// не побачить сокетів першого: користувач A на інстансі 1 напише B на
+// інстансі 2, і повідомлення ТИХО не дійде. Тобто масштабуватись горизонтально
+// зараз неможливо в принципі, і виявилось би це вже в проді.
+//
+// ⚠️ ВИМКНЕНО, доки не задано `REDIS_URL`. Без нього кожна функція нижче —
+// no-op, а поведінка бітово така сама, як була. Увімкнення = змінна в env.
+//
+// Ключове рішення: не переписувати 41 місце, що шле в сокет напряму, а
+// зробити кластерним САМ `onlineUsers`. Для користувача з іншого інстансу
+// кладемо запис-заглушку, чий `ws.send` публікує в шину замість сокета — і
+// весь наявний код (`t.ws.send`, `readyState`, `close`) працює без змін.
+// Дублювання при розсилках не виникає: запис на нік лише один, тож інстанс,
+// де сокет живий, доставляє локально, а решта — через шину.
+const REDIS_URL = process.env.REDIS_URL || '';
+const INSTANCE_ID = crypto.randomBytes(6).toString('hex');
+const CLUSTER_CH = 'eion:cluster';
+const REMOTE_TTL_MS = 70000;      // запис-заглушка живий, поки надходить sync
+let busPub = null, busSub = null;
+
+const busReady = () => !!(busPub && busSub);
+
+function busPublish(obj) {
+  if (!busReady()) return false;
+  try { busPub.publish(CLUSTER_CH, JSON.stringify({ ...obj, inst: INSTANCE_ID })); return true; }
+  catch (e) { console.error('[cluster] publish:', e.message); return false; }
+}
+
+/// Запис про користувача, чий сокет тримає ІНШИЙ інстанс.
+/// Реалізує рівно ту поверхню сокета, яку використовує код: send, close,
+/// readyState, isAlive, deviceId (звірено grep-ом, а не на око).
+function remoteEntry(nick, inst) {
+  const relay = (extra) => busPublish({ t: 'relay', to: nick, dest: inst, ...extra });
+  return {
+    remote: true, inst, lastSeen: Date.now(),
+    ws: {
+      readyState: 1, isAlive: true, deviceId: null,
+      send: (raw) => relay({ raw: typeof raw === 'string' ? raw : JSON.stringify(raw) }),
+      close: () => relay({ close: true }),
+      terminate: () => relay({ close: true }),
+    },
+  };
+}
+
+function onClusterMessage(msg) {
+  if (!msg || msg.inst === INSTANCE_ID) return;   // власні повідомлення не обробляємо
+  if (msg.t === 'up' || msg.t === 'sync') {
+    for (const nick of (msg.t === 'up' ? [msg.nick] : (msg.nicks || []))) {
+      const cur = onlineUsers.get(nick);
+      // Живий ЛОКАЛЬНИЙ сокет завжди пріоритетніший за чужий запис.
+      if (cur && !cur.remote) continue;
+      if (cur && cur.remote) { cur.lastSeen = Date.now(); cur.inst = msg.inst; }
+      else onlineUsers.set(nick, remoteEntry(nick, msg.inst));
+    }
+    return;
+  }
+  if (msg.t === 'down') {
+    const cur = onlineUsers.get(msg.nick);
+    if (cur && cur.remote && cur.inst === msg.inst) onlineUsers.delete(msg.nick);
+    return;
+  }
+  if (msg.t === 'relay') {
+    if (msg.dest !== INSTANCE_ID) return;
+    const u = onlineUsers.get(msg.to);
+    if (!u || u.remote || !u.ws || u.ws.readyState !== 1) return;
+    try { if (msg.close) u.ws.close(); else u.ws.send(msg.raw); } catch (_) {}
+    return;
+  }
+  if (msg.t === 'invis') {
+    if (msg.on) invisibleNicks.add(msg.nick); else invisibleNicks.delete(msg.nick);
+    return;
+  }
+  if (msg.t === 'dev') { nickDevices.set(msg.nick, msg.deviceId); }
+}
+
+function initCluster() {
+  if (!REDIS_URL) { console.log('[cluster] вимкнено (немає REDIS_URL) — працюємо одним інстансом'); return; }
+  let IORedis;
+  try { IORedis = require('ioredis'); }
+  catch (e) { console.error('[cluster] ioredis не встановлено:', e.message); return; }
+  busPub = new IORedis(REDIS_URL, { maxRetriesPerRequest: null, lazyConnect: false });
+  busSub = new IORedis(REDIS_URL, { maxRetriesPerRequest: null, lazyConnect: false });
+  busPub.on('error', (e) => console.error('[cluster] pub:', e.message));
+  busSub.on('error', (e) => console.error('[cluster] sub:', e.message));
+  busSub.subscribe(CLUSTER_CH, (err) => {
+    if (err) return console.error('[cluster] subscribe:', err.message);
+    console.log(`[cluster] увімкнено, інстанс ${INSTANCE_ID}`);
+  });
+  busSub.on('message', (_ch, raw) => {
+    try { onClusterMessage(JSON.parse(raw)); } catch (e) { console.error('[cluster] розбір:', e.message); }
+  });
+  // Періодична синхронізація: новий інстанс дізнається, хто вже онлайн, а
+  // застарілі заглушки вимирають за REMOTE_TTL_MS без оновлення.
+  setInterval(() => {
+    const local = [];
+    for (const [nick, u] of onlineUsers) if (!u.remote) local.push(nick);
+    busPublish({ t: 'sync', nicks: local });
+    const now = Date.now();
+    for (const [nick, u] of onlineUsers) if (u.remote && now - u.lastSeen > REMOTE_TTL_MS) onlineUsers.delete(nick);
+  }, 25000);
+}
+initCluster();
 
 function sendToUser(nick, payload) {
   const u = onlineUsers.get(nick);
@@ -1945,9 +2073,15 @@ async function notifyChannelSubscribers(channelId, payload, excludeNick = null) 
   }
 }
 
-app.get('/call-offer', (req, res) => {
+app.get('/call-offer', async (req, res) => {
   const { callId } = req.query; if (!callId) return res.json({ ok: false, error: 'callId обов\'язковий', code: 'err_param_call_id' });
-  const data = pendingCallOffers.get(callId); if (!data) return res.json({ ok: false, error: 'Offer не знайдено або застарів', code: 'err_offer_expired' });
+  let data = pendingCallOffers.get(callId);
+  // Дзвінок міг прийти на інший інстанс — беремо offer зі спільного сховища.
+  if (!data && busReady()) {
+    try { const raw = await busPub.get(`eion:offer:${callId}`); if (raw) data = JSON.parse(raw); }
+    catch (e) { console.error('[cluster] offer get:', e.message); }
+  }
+  if (!data) return res.json({ ok: false, error: 'Offer не знайдено або застарів', code: 'err_offer_expired' });
   res.json({ ok: true, fromNick: data.fromNick, offer: data.offer, hasVideo: data.hasVideo });
 });
 
@@ -2303,7 +2437,11 @@ app.post('/update-nick', async (req, res) => {
     supabase.from('pending_channel_invites').update({ inviter_nick: newNick }).eq('inviter_nick', oldNick),
   ]);
   const userWs = onlineUsers.get(oldNick);
-  if (userWs) { onlineUsers.delete(oldNick); onlineUsers.set(newNick, userWs); }
+  if (userWs) {
+    onlineUsers.delete(oldNick); onlineUsers.set(newNick, userWs);
+    busPublish({ t: 'down', nick: oldNick });
+    if (!userWs.remote) busPublish({ t: 'up', nick: newNick });
+  }
   for (const [n, u] of onlineUsers) if (n !== newNick) u.ws.send(JSON.stringify({ type: 'nick_changed', oldNick, newNick }));
   // Токен ніс старий нік — старі сесії гасимо, видаємо новий токен (клієнт зберігає).
   await destroySessionsForNick(oldNick);
@@ -2447,7 +2585,7 @@ app.post('/delete-account', async (req, res) => {
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
   await supabase.from('messages').delete().or(`from_nick.eq.${nick},to_nick.eq.${nick}`);
   await supabase.from('users').delete().eq('nick_lower', nick.toLowerCase());
-  onlineUsers.delete(nick); await clearFcmToken(nick);
+  onlineUsers.delete(nick); busPublish({ t: 'down', nick }); await clearFcmToken(nick);
   await destroySessionsForNick(nick);
   res.json({ ok: true });
 });
@@ -2503,7 +2641,7 @@ app.post('/users/by-phones', async (req, res) => {
   res.json({ ok: true, users: result });
 });
 
-app.post('/unregister', (req, res) => { const nick = req.nick; if (nick) onlineUsers.delete(nick); res.json({ ok: true }); });
+app.post('/unregister', (req, res) => { const nick = req.nick; if (nick) { onlineUsers.delete(nick); busPublish({ t: 'down', nick }); } res.json({ ok: true }); });
 app.post('/register-fcm-token', (req, res) => {
   const { token, deviceId } = req.body; // token тут = FCM-токен (не сесійний)
   const nick = req.nick; // Фаза 1/#14: FCM-токен реєструється ЛИШЕ на свій нік.
@@ -2898,6 +3036,7 @@ app.post('/settings/invisible', async (req, res) => {
   const { error } = await supabase.from('users').update({ invisible: enabled }).eq('nick', nick);
   if (error) return res.json({ ok: false, error: 'Помилка збереження', code: 'err_save_failed' });
   if (enabled) invisibleNicks.add(nick); else invisibleNicks.delete(nick);
+  busPublish({ t: 'invis', nick, on: enabled });
   res.json({ ok: true, invisible: enabled });
 });
 
@@ -4189,6 +4328,7 @@ wss.on('connection', (ws) => {
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` })); ws.close(); return; }
         if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився' })); old.ws.close(); }
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
+        busPublish({ t: 'up', nick: userNick });
         // nickDevices має відображати, де нік ЗАРАЗ, а не де колись був.
         // Мапа живе в памʼяті й накопичувалась: якщо акаунт колись заходив із
         // телефона, запис лишався назавжди. Коли ТОЙ САМИЙ нік потім заходив із
@@ -4622,7 +4762,10 @@ wss.on('connection', (ws) => {
     // ВАЖЛИВО: видаляємо presence ЛИШЕ якщо цей сокет — досі поточний. Інакше
     // гонка реконекту: закриття СТАРОГО сокета (після того, як login уже
     // зареєстрував НОВИЙ) стирало б запис нового → юзер «постійно офлайн».
-    if (userNick && onlineUsers.get(userNick)?.ws === ws) onlineUsers.delete(userNick);
+    if (userNick && onlineUsers.get(userNick)?.ws === ws) {
+      onlineUsers.delete(userNick);
+      busPublish({ t: 'down', nick: userNick });
+    }
   });
   ws.on('error', (e) => { console.log(`[ws] error nick=${userNick || '?'}: ${e && e.message}`); });
 });
