@@ -202,6 +202,14 @@ create table if not exists public.coin_transactions (
   primary key (id)
 );
 
+create table if not exists public.download_counts (
+  day date not null,
+  kind text not null,     -- apk | appimage
+  source text not null,   -- site | other
+  count bigint not null default 0,
+  primary key (day, kind, source)
+);
+
 create table if not exists public.deleted_messages (
   created_at timestamp with time zone DEFAULT now(),
   from_nick text NOT NULL,
@@ -418,6 +426,8 @@ create table if not exists public.users (
   avatar_url text,
   block_incoming boolean NOT NULL DEFAULT false,
   coins integer DEFAULT 200,
+  created_at timestamptz,
+  last_seen timestamptz,
   color bigint DEFAULT '4280391411'::bigint,
   email text,
   fcm_device_id text,
@@ -480,6 +490,20 @@ CREATE INDEX IF NOT EXISTS idx_users_nick_lower ON public.users USING btree (nic
 -- 4. SQL-ФУНКЦІЇ (атомарні операції з монетами)
 -- ─────────────────────────────────────────────────────────────────
 
+-- Атомарний інкремент лічильника завантажень (див. migrations/metrics.sql).
+create or replace function public.bump_download(p_kind text, p_source text)
+returns void language plpgsql security definer
+set search_path = public
+as $$
+begin
+  insert into public.download_counts (day, kind, source, count)
+  values (current_date, p_kind, p_source, 1)
+  on conflict (day, kind, source) do update set count = public.download_counts.count + 1;
+end;
+$$;
+revoke all on function public.bump_download(text, text) from public, anon, authenticated;
+grant execute on function public.bump_download(text, text) to postgres, service_role;
+
 CREATE OR REPLACE FUNCTION public.add_coins(p_nick text, p_amount integer)
  RETURNS integer
  LANGUAGE plpgsql
@@ -540,6 +564,7 @@ alter table public.channel_reactions enable row level security;
 alter table public.channels enable row level security;
 alter table public.chat_reads enable row level security;
 alter table public.coin_transactions enable row level security;
+alter table public.download_counts enable row level security;
 alter table public.deleted_messages enable row level security;
 alter table public.direct_message_reactions enable row level security;
 alter table public.email_codes enable row level security;
@@ -779,6 +804,8 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 grant delete, insert, references, select, trigger, truncate, update on table public.chat_reads to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_transactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_transactions to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.download_counts to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.download_counts to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.deleted_messages to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.deleted_messages to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to postgres;

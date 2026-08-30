@@ -145,6 +145,7 @@ const PUBLIC_PATHS = new Set([
   '/health', '/stats', '/ping', '/keepalive',
   '/login', '/register', '/forgot', '/reset', '/verify-email',
   '/phone/request-code', '/phone/verify-code',
+  '/download-ping',
 ]);
 app.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/') || req.path.startsWith('/locales/') || req.path === '/coin/supply') return next();
@@ -169,6 +170,31 @@ app.get('/usage/today', async (req, res) => {
     console.error('[usage/today]', e.message);
     res.status(500).json({ ok: false, error: 'Не вдалося отримати норми', code: 'err_quota_unavailable' });
   }
+});
+
+// Лічильник завантажень. Кнопки на сайті ведуть ПРЯМО на GitHub, а сюди летить
+// `navigator.sendBeacon` — тобто завантаження починається одразу, не чекаючи
+// нашого сервера (він на безкоштовному тарифі спить і будиться 30–60 с; редирект
+// через нього перетворив би головну дію сайту на півхвилини очікування).
+//
+// Навіщо взагалі свій лічильник: GitHub рахує завантаження НА ФАЙЛ, а ми при
+// кожній збірці замінюємо asset у релізі — старий видаляється разом зі своїм
+// лічильником, і число там завжди «з моменту останньої заміни».
+//
+// Точність свідомо неповна: beacon може не дійти (вимкнений JS, блокувальник,
+// закрита вкладка). Це показник динаміки, а не бухгалтерія.
+app.post('/download-ping', async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.json({ ok: true });   // відповідаємо одразу, рахуємо після
+  const kind = req.query.kind === 'appimage' ? 'appimage' : 'apk';
+  // Джерело — лише «наш сайт чи ні». Referer далі не розбираємо: повний шлях
+  // разом із часом уже наближається до сліду конкретної людини.
+  const ref = String(req.headers['referer'] || '');
+  const source = /(^|\/\/)([a-z0-9-]+\.)?eion\.network/i.test(ref) ? 'site' : 'other';
+  try {
+    const { error } = await supabase.rpc('bump_download', { p_kind: kind, p_source: source });
+    if (error) console.error('[download-ping]', error.message);
+  } catch (e) { console.error('[download-ping]', e.message); }
 });
 
 // Публічний стан монети: скільки видано з фондів і скільки спалено назавжди.
@@ -2049,6 +2075,20 @@ async function quotaSnapshot(nick) {
   return { premium, kinds };
 }
 
+/// Позначка «нік був онлайн». Пишемо не частіше разу на годину на нік: логін
+/// трапляється при кожному реконекті (а на Render їх багато через code=1006),
+/// і без цього фільтра метрика коштувала б запису в БД на кожен обрив звʼязку.
+const lastSeenWrites = new Map();
+const LAST_SEEN_MIN_INTERVAL = 60 * 60 * 1000;
+function touchLastSeen(nick) {
+  if (!nick) return;
+  const prev = lastSeenWrites.get(nick) || 0;
+  if (Date.now() - prev < LAST_SEEN_MIN_INTERVAL) return;
+  lastSeenWrites.set(nick, Date.now());
+  supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('nick', nick)
+    .then(({ error }) => { if (error) console.error('[metrics] last_seen:', error.message); });
+}
+
 async function bumpUsage(nick, kind, by = 1) {
   const day = new Date().toISOString().slice(0, 10);
   const used = (await usageToday(nick, kind)) || 0;
@@ -2319,6 +2359,7 @@ app.post('/register', async (req, res) => {
   const userData = {
     nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash,
     email, color: color || 4280391411, coins: NEW_USER_COINS,
+    created_at: new Date().toISOString(),
     // Нік міг належати комусь раніше — відсікаємо його токени (див. destroySessionsForNick).
     tokens_valid_from: Date.now(),
     ...(phone ? { phone } : {}),
@@ -4293,6 +4334,214 @@ app.get('/admin/mail-test', async (req, res) => {
 });
 
 // Тестовий endpoint для перевірки механізму адмін-авторизації (нешкідливий).
+// ── Огляд: одна картина «що відбувається» ────────────────────────────────
+// Доти дивитись доводилось руками по таблицях Supabase, логах Render, Sentry і
+// GitHub — тобто в чотирьох місцях, і жодне не давало відповіді «скільки людей
+// користується». Тут усе разом; `?format=html` — щоб відкрити з телефона.
+async function collectOverview() {
+  const iso = (ms) => new Date(Date.now() - ms).toISOString();
+  const DAY = 86400000;
+  const dayAgo = iso(DAY), weekAgo = iso(7 * DAY);
+  const errors = [];
+
+  // head:true — рахунок без вигрібання рядків.
+  const cnt = async (table, apply) => {
+    let q = supabase.from(table).select('*', { count: 'exact', head: true });
+    if (apply) q = apply(q);
+    const { count, error } = await q;
+    if (error) { errors.push(`${table}: ${error.message}`); return null; }
+    return count;
+  };
+
+  const [
+    usersTotal, usersNewDay, usersNewWeek, usersSeenDay, usersSeenWeek,
+    usersNoCreated, usersPremium, usersPhone, banned,
+    msgs, msgsDay, groupMsgs, channelMsgs, comments,
+    groups, channels, files, packsOwned,
+  ] = await Promise.all([
+    cnt('users'),
+    cnt('users', q => q.gte('created_at', dayAgo)),
+    cnt('users', q => q.gte('created_at', weekAgo)),
+    cnt('users', q => q.gte('last_seen', dayAgo)),
+    cnt('users', q => q.gte('last_seen', weekAgo)),
+    cnt('users', q => q.is('created_at', null)),
+    cnt('users', q => q.gt('premium_expires_at', new Date().toISOString())),
+    cnt('users', q => q.eq('phone_verified', true)),
+    cnt('platform_bans'),
+    cnt('messages'),
+    cnt('messages', q => q.gte('timestamp', Date.now() - DAY)),
+    cnt('group_messages'),
+    cnt('channel_messages'),
+    cnt('channel_comments'),
+    cnt('groups'),
+    cnt('channels'),
+    cnt('file_objects'),
+    cnt('user_sticker_packs'),
+  ]);
+
+  // Норми за сьогодні: рядків мало (по одному на нік×вид), тож агрегуємо в JS.
+  const today = new Date().toISOString().slice(0, 10);
+  const quotas = {};
+  let quotaUsers = null;
+  {
+    const { data, error } = await supabase.from('usage_counters')
+      .select('nick, kind, used').eq('day', today);
+    if (error) errors.push(`usage_counters: ${error.message}`);
+    else {
+      const nicks = new Set();
+      for (const r of data) {
+        quotas[r.kind] = (quotas[r.kind] || 0) + (r.used || 0);
+        nicks.add(r.nick);
+      }
+      quotaUsers = nicks.size;
+    }
+  }
+
+  // Монета
+  let coins = null;
+  {
+    const { data: supply } = await supabase.from('coin_supply').select('minted, burned').eq('id', 1).single();
+    const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
+    const txWeek = await cnt('coin_transactions', q => q.gte('created_at', weekAgo));
+    coins = {
+      minted: supply ? supply.minted : null,
+      burned: supply ? supply.burned : null,
+      treasury: company ? company.coins : null,
+      transactionsWeek: txWeek,
+    };
+  }
+
+  // Завантаження: за 7 днів у розрізі файлу й джерела + сума за весь час.
+  const downloads = { week: {}, total: {} };
+  {
+    const { data, error } = await supabase.from('download_counts')
+      .select('day, kind, source, count').gte('day', weekAgo.slice(0, 10));
+    if (error) errors.push(`download_counts: ${error.message}`);
+    else for (const r of data) {
+      downloads.week[r.kind] = (downloads.week[r.kind] || 0) + r.count;
+      downloads.week[`${r.kind}:${r.source}`] = (downloads.week[`${r.kind}:${r.source}`] || 0) + r.count;
+    }
+    const { data: all, error: e2 } = await supabase.from('download_counts').select('kind, count');
+    if (e2) errors.push(`download_counts(all): ${e2.message}`);
+    else for (const r of all) downloads.total[r.kind] = (downloads.total[r.kind] || 0) + r.count;
+  }
+
+  const mem = process.memoryUsage();
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    users: {
+      total: usersTotal, newDay: usersNewDay, newWeek: usersNewWeek,
+      activeDay: usersSeenDay, activeWeek: usersSeenWeek,
+      premium: usersPremium, phoneVerified: usersPhone, banned,
+      // Акаунти, створені до появи колонки: у «нових» вони не рахуються ніколи.
+      withoutCreatedAt: usersNoCreated,
+    },
+    content: {
+      directMessages: msgs, directMessagesDay: msgsDay,
+      groupMessages: groupMsgs, channelPosts: channelMsgs, channelComments: comments,
+      groups, channels, files, stickerPacksOwned: packsOwned,
+    },
+    quotasToday: { ...quotas, users: quotaUsers },
+    coins,
+    downloads,
+    runtime: {
+      onlineNow: onlineUsers.size,
+      uptimeHours: +(process.uptime() / 3600).toFixed(1),
+      memoryMB: Math.round(mem.rss / 1024 / 1024),
+      cluster: busReady() ? 'on' : 'off',
+      node: process.version,
+    },
+    // Порожній масив = усі запити пройшли. Непорожній означає, що числа
+    // НЕПОВНІ — мовчазний нуль тут гірший за видиму помилку.
+    errors,
+  };
+}
+
+function overviewHtml(o) {
+  const n = (v) => v === null || v === undefined ? '—' : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const card = (title, rows) => `<section><h2>${title}</h2><table>${
+    rows.map(([k, v]) => `<tr><td>${k}</td><td class="v">${n(v)}</td></tr>`).join('')}</table></section>`;
+  const d = o.downloads;
+  return `<!doctype html><html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EION — огляд</title><style>
+:root{color-scheme:dark}body{margin:0;padding:16px;background:#0b1015;color:#dbe6ee;
+font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+h1{font-size:18px;margin:0 0 4px}.sub{color:#7d8f9d;font-size:12px;margin-bottom:16px}
+section{background:#121a22;border:1px solid #1e2a35;border-radius:12px;padding:12px 14px;margin-bottom:12px}
+h2{font-size:13px;margin:0 0 8px;color:#4fd1c5;text-transform:uppercase;letter-spacing:.04em}
+table{width:100%;border-collapse:collapse}td{padding:3px 0;border-bottom:1px solid #18232d}
+tr:last-child td{border:0}td.v{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.err{background:#2b1416;border-color:#5c2126;color:#ffb4ad}</style></head><body>
+<h1>EION — огляд</h1><div class="sub">${o.generatedAt.replace('T', ' ').slice(0, 16)} UTC</div>
+${o.errors.length ? `<section class="err"><h2>Числа неповні</h2><table>${
+    o.errors.map(e => `<tr><td>${e}</td></tr>`).join('')}</table></section>` : ''}
+${card('Люди', [
+    ['Усього акаунтів', o.users.total],
+    ['Нових за добу', o.users.newDay],
+    ['Нових за тиждень', o.users.newWeek],
+    ['Заходили за добу', o.users.activeDay],
+    ['Заходили за тиждень', o.users.activeWeek],
+    ['З преміумом', o.users.premium],
+    ['Підтверджений телефон', o.users.phoneVerified],
+    ['Заблоковані', o.users.banned],
+    ['Без дати реєстрації (старі)', o.users.withoutCreatedAt],
+  ])}
+${card('Завантаження', [
+    ['APK за тиждень', d.week.apk || 0],
+    ['— із сайту', d.week['apk:site'] || 0],
+    ['AppImage за тиждень', d.week.appimage || 0],
+    ['— із сайту', d.week['appimage:site'] || 0],
+    ['APK усього', d.total.apk || 0],
+    ['AppImage усього', d.total.appimage || 0],
+  ])}
+${card('Вміст', [
+    ['Особисті повідомлення', o.content.directMessages],
+    ['— за добу', o.content.directMessagesDay],
+    ['Групові повідомлення', o.content.groupMessages],
+    ['Пости в каналах', o.content.channelPosts],
+    ['Коментарі', o.content.channelComments],
+    ['Групи', o.content.groups],
+    ['Канали', o.content.channels],
+    ['Файли у сховищі', o.content.files],
+    ['Куплених наборів наліпок', o.content.stickerPacksOwned],
+  ])}
+${card('Норми сьогодні', [
+    ['Людей витрачали', o.quotasToday.users],
+    ['AI-запитів', o.quotasToday.ai || 0],
+    ['Вивантажено, МБ', o.quotasToday.storage || 0],
+    ['Дзвінків через релей', o.quotasToday.turn || 0],
+    ['Перекладів', o.quotasToday.translate || 0],
+  ])}
+${card('Монета', [
+    ['Видано з фондів', o.coins.minted],
+    ['Спалено назавжди', o.coins.burned],
+    ['У скарбниці', o.coins.treasury],
+    ['Транзакцій за тиждень', o.coins.transactionsWeek],
+  ])}
+${card('Сервер', [
+    ['Онлайн зараз', o.runtime.onlineNow],
+    ['Аптайм, год', o.runtime.uptimeHours],
+    ['Памʼять, МБ', o.runtime.memoryMB],
+    ['Кластер', o.runtime.cluster],
+    ['Node', o.runtime.node],
+  ])}
+</body></html>`;
+}
+
+app.get('/admin/overview', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false });
+  try {
+    const o = await collectOverview();
+    if (req.query.format === 'html') return res.type('html').send(overviewHtml(o));
+    res.json(o);
+  } catch (e) {
+    console.error('[admin/overview]', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 app.get('/admin/ping', (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
   res.json({ ok: true, admin: true, message: 'Секрет вірний' });
@@ -4360,6 +4609,7 @@ wss.on('connection', (ws) => {
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}`, ...(ban.reason ? { code: 'err_kick_banned_reason', banReason: ban.reason } : { code: 'err_kick_banned' }) })); ws.close(); return; }
         if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився', code: 'err_kick_new_device' })); old.ws.close(); }
         onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
+        touchLastSeen(userNick);
         busPublish({ t: 'up', nick: userNick });
         // nickDevices має відображати, де нік ЗАРАЗ, а не де колись був.
         // Мапа живе в памʼяті й накопичувалась: якщо акаунт колись заходив із
