@@ -417,7 +417,7 @@ create table if not exists public.user_sticker_packs (
 create table if not exists public.users (
   avatar_url text,
   block_incoming boolean NOT NULL DEFAULT false,
-  coins integer DEFAULT 50,
+  coins integer DEFAULT 200,
   color bigint DEFAULT '4280391411'::bigint,
   email text,
   fcm_device_id text,

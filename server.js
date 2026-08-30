@@ -37,10 +37,10 @@ const TRANSFER_FEE_PCT = 1;
 // Ціни преміуму — на рівні модуля: їх читає і покупка, і довідка, яку сервер
 // підкладає AI-асистенту. Дві копії розійшлись би тихо, і асистент упевнено
 // називав би стару ціну.
-const PREMIUM_PRICES = { monthly: 500, yearly: 4200 };
+const PREMIUM_PRICES = { monthly: 1000, yearly: 8400 };
 // Стартовий баланс нового акаунта. Задається ТУТ (у /register), колонка в БД
 // має свій DEFAULT лише як запобіжник.
-const NEW_USER_COINS = 50;
+const NEW_USER_COINS = 200;
 // Render стоїть за балансувальником: реальний IP клієнта — у X-Forwarded-For.
 // Без цього rate-limit бачив би один IP проксі для всіх і різав би всіх гуртом.
 app.set('trust proxy', 1);
