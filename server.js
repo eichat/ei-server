@@ -4348,7 +4348,9 @@ async function collectOverview() {
     let q = supabase.from(table).select('*', { count: 'exact', head: true });
     if (apply) q = apply(q);
     const { count, error } = await q;
-    if (error) { errors.push(`${table}: ${error.message}`); return null; }
+    // message інколи порожній (напр. коли колонки ще немає) — тоді код або hint,
+    // інакше в списку помилок висів би безмовний рядок «users: ».
+    if (error) { errors.push(`${table}: ${error.message || error.code || error.hint || 'запит не вдався'}`); return null; }
     return count;
   };
 
@@ -4389,6 +4391,10 @@ async function collectOverview() {
     else {
       const nicks = new Set();
       for (const r of data) {
+        // Службові лічильники (#ai-provider — денна стеля на провайдера) живуть
+        // у тій самій таблиці. Без фільтра вони і додавали чужі види ('groq'),
+        // і роздували «скільки людей витрачали норму».
+        if (String(r.nick).startsWith('#')) continue;
         quotas[r.kind] = (quotas[r.kind] || 0) + (r.used || 0);
         nicks.add(r.nick);
       }
