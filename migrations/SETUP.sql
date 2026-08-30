@@ -711,130 +711,157 @@ create policy "service_all" on public.users
 -- пропущено (захищений режим): "Auth upload files" on storage.objects — була "to public"
 -- ─────────────────────────────────────────────────────────────────
 -- 7. ПРАВА (GRANT)
---    Сервер ходить service-ключем. anon/authenticated навмисно без прав
---    на службові таблиці — див. аудит #11 (revoke_anon_grants).
+--    Сервер ходить service-ключем, клієнт із Supabase не спілкується взагалі
+--    (supabase_flutter прибрано 29.08). Тож anon/authenticated не потрібні
+--    ЖОДНІ права — див. аудит #11.
+--
+--    ⚠️ САМОГО «не давати грантів» НЕ ДОСИТЬ. Supabase тримає
+--    `alter default privileges in schema public grant all on tables
+--    to anon, authenticated`, тому кожна створена таблиця отримує повний CRUD
+--    для anon АВТОМАТИЧНО. Ця схема розрахована на застосунки БЕЗ власного
+--    бекенда (ключ у клієнті + RLS як єдиний захист); у нас бекенд є, і другий
+--    шар нам лише шкодить. Саме через це дірка, закрита 28.07, повернулась
+--    у новому проєкті 29.08 — блок нижче перекриває джерело.
+--
+--    ℹ️ Вимкнути Data API цілком (найсильніша порада документації Supabase)
+--    НЕ можна: наш сервер ходить у базу через PostgREST (@supabase/supabase-js),
+--    прямого підключення до Postgres немає. Вимкнення вбило б і сервер.
 -- ─────────────────────────────────────────────────────────────────
+
+-- Спершу перекрити джерело, ПОТІМ роздавати права поіменно.
+alter default privileges in schema public revoke all on tables    from anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;
+alter default privileges in schema public revoke all on functions from anon, authenticated;
+
+do $$
+declare owner_role text; obj text;
+begin
+  foreach owner_role in array array['postgres','supabase_admin'] loop
+    if not exists (select 1 from pg_roles where rolname = owner_role) then continue; end if;
+    foreach obj in array array['TABLES','SEQUENCES','FUNCTIONS'] loop
+      -- Кожен окремо: postgres у Supabase не суперкористувач і членом
+      -- supabase_admin зазвичай не є, тож ALTER для чужої ролі кине
+      -- "permission denied" — і без перехоплення скасував би роботу на своїй.
+      begin
+        execute format('alter default privileges for role %I in schema public '
+                       'revoke all on %s from anon, authenticated', owner_role, obj);
+      exception when insufficient_privilege or undefined_object then null;
+      end;
+    end loop;
+  end loop;
+end $$;
 
 grant delete, insert, references, select, trigger, truncate, update on table public.block_allowlist to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.block_allowlist to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.blocked_contacts to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.blocked_contacts to service_role;
-grant references, trigger, truncate on table public.call_logs to anon;
-grant references, trigger, truncate on table public.call_logs to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.call_logs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.call_logs to service_role;
-grant references, trigger, truncate on table public.channel_blocked to anon;
-grant references, trigger, truncate on table public.channel_blocked to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_blocked to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_blocked to service_role;
-grant references, trigger, truncate on table public.channel_comment_reactions to anon;
-grant references, trigger, truncate on table public.channel_comment_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_comment_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_comment_reactions to service_role;
-grant references, trigger, truncate on table public.channel_comments to anon;
-grant references, trigger, truncate on table public.channel_comments to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_comments to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_comments to service_role;
-grant references, trigger, truncate on table public.channel_members to anon;
-grant references, trigger, truncate on table public.channel_members to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_members to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_members to service_role;
-grant references, trigger, truncate on table public.channel_messages to anon;
-grant references, trigger, truncate on table public.channel_messages to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_messages to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_messages to service_role;
-grant references, trigger, truncate on table public.channel_paid_subs to anon;
-grant references, trigger, truncate on table public.channel_paid_subs to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_paid_subs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_paid_subs to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_post_views to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_post_views to service_role;
-grant references, trigger, truncate on table public.channel_reactions to anon;
-grant references, trigger, truncate on table public.channel_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channel_reactions to service_role;
-grant references, trigger, truncate on table public.channels to anon;
-grant references, trigger, truncate on table public.channels to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.channels to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.channels to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.chat_reads to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.chat_reads to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_transactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_transactions to service_role;
-grant references, trigger, truncate on table public.deleted_messages to anon;
-grant references, trigger, truncate on table public.deleted_messages to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.deleted_messages to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.deleted_messages to service_role;
-grant references, trigger, truncate on table public.direct_message_reactions to anon;
-grant references, trigger, truncate on table public.direct_message_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.email_codes to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.email_codes to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.file_objects to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.file_objects to service_role;
-grant references, trigger, truncate on table public.group_bans to anon;
-grant references, trigger, truncate on table public.group_bans to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_bans to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_bans to service_role;
-grant references, trigger, truncate on table public.group_history_cleared to anon;
-grant references, trigger, truncate on table public.group_history_cleared to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_history_cleared to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_history_cleared to service_role;
-grant references, trigger, truncate on table public.group_join_requests to anon;
-grant references, trigger, truncate on table public.group_join_requests to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_join_requests to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_join_requests to service_role;
-grant references, trigger, truncate on table public.group_members to anon;
-grant references, trigger, truncate on table public.group_members to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_members to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_members to service_role;
-grant references, trigger, truncate on table public.group_message_reactions to anon;
-grant references, trigger, truncate on table public.group_message_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_message_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_message_reactions to service_role;
-grant references, trigger, truncate on table public.group_messages to anon;
-grant references, trigger, truncate on table public.group_messages to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_messages to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.group_messages to service_role;
-grant references, trigger, truncate on table public.groups to anon;
-grant references, trigger, truncate on table public.groups to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.groups to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.groups to service_role;
-grant references, trigger, truncate on table public.messages to anon;
-grant references, trigger, truncate on table public.messages to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.messages to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.messages to service_role;
-grant references, trigger, truncate on table public.pending_channel_invites to anon;
-grant references, trigger, truncate on table public.pending_channel_invites to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_channel_invites to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_channel_invites to service_role;
-grant references, trigger, truncate on table public.pending_group_invites to anon;
-grant references, trigger, truncate on table public.pending_group_invites to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_group_invites to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_group_invites to service_role;
-grant references, trigger, truncate on table public.pending_reactions to anon;
-grant references, trigger, truncate on table public.pending_reactions to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_reactions to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_reactions to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to service_role;
-grant references, trigger, truncate on table public.platform_bans to anon;
-grant references, trigger, truncate on table public.platform_bans to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to service_role;
-grant references, trigger, truncate on table public.reports to anon;
-grant references, trigger, truncate on table public.reports to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.reports to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.reports to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.sticker_packs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.sticker_packs to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_sticker_packs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_sticker_packs to service_role;
-grant references, trigger, truncate on table public.users to anon;
-grant references, trigger, truncate on table public.users to authenticated;
 grant delete, insert, references, select, trigger, truncate, update on table public.users to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.users to service_role;
+
+-- Таблиці створено в розділі 1 — тобто ДО того, як ми перекрили дефолтні
+-- привілеї. Тому підмітаємо те, що Supabase уже встиг видати.
+do $$
+declare r record;
+begin
+  for r in
+    select c.relname, c.relkind
+      from pg_class c
+      join pg_namespace ns on ns.oid = c.relnamespace
+     where ns.nspname = 'public' and c.relkind in ('r','p','v','m','S')
+  loop
+    -- Кожен revoke окремо: його може виконати лише ВЛАСНИК обʼєкта, і чуже
+    -- (напр. від supabase_admin) інакше обірвало б увесь блок на середині.
+    begin
+      if r.relkind = 'S' then
+        execute format('revoke all on sequence public.%I from anon, authenticated', r.relname);
+      else
+        execute format('revoke all on table public.%I from anon, authenticated', r.relname);
+      end if;
+    exception when insufficient_privilege or wrong_object_type then null;
+    end;
+  end loop;
+
+  -- Функції монет зараз SECURITY INVOKER, тож RLS їх стримує. Але щойно
+  -- атомарну операцію зроблять SECURITY DEFINER — а це природна думка —
+  -- відкритий EXECUTE стане прямим друком монет.
+  for r in
+    select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+     where ns.nspname = 'public'
+  loop
+    -- 🔴 Разом із PUBLIC: Postgres за замовчуванням дає йому EXECUTE (в acl це
+    -- `=X/postgres`), і revoke лише від anon був би косметикою — anon зберіг би
+    -- доступ через PUBLIC. postgres і service_role мають явні гранти, їх не чіпає.
+    begin
+      execute format('revoke all on function %s from PUBLIC, anon, authenticated', r.sig);
+    exception when insufficient_privilege or wrong_object_type then null;  -- функції розширень
+    end;
+  end loop;
+end $$;
 
 -- ─────────────────────────────────────────────────────────────────
 -- 8. STORAGE — бакети
