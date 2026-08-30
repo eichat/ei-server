@@ -3909,23 +3909,38 @@ const ORPHAN_MARKERS = ['/object/public/files/', '/object/sign/files/'];
 const ORPHAN_REF = 'eion://files/';
 const ORPHAN_PREFIXES = ['direct/', 'group/', 'channel/', 'channels/'];
 
+// 🔴 Шлях треба обрізати не лише по `?`, а й по роздільнику codec-рядка.
+// UGC-наліпка лежить у повідомленні як `user:id~|~<url>~|~scale~|~dx~|~dy`,
+// тож без цього «шлях» виходив `stickers/nick/1.png~|~1.0~|~0~|~0` — у набір
+// посилань справжній шлях не потрапляв, і жива наліпка виглядала сміттям.
+// Саме через це перевірка перед видаленням і робилась.
+function orphanCutTail(tail) {
+  let out = tail.split('?')[0];
+  const sep = out.indexOf('~|~');
+  if (sep !== -1) out = out.slice(0, sep);
+  const stop = out.search(/[\s"'<>)\]]/);
+  if (stop !== -1) out = out.slice(0, stop);
+  return out;
+}
+
 function orphanPathFromValue(val) {
   if (!val || typeof val !== 'string') return null;
   for (const marker of ORPHAN_MARKERS) {
     const i = val.indexOf(marker);
     if (i !== -1) {
-      const tail = val.slice(i + marker.length).split('?')[0];
+      const tail = orphanCutTail(val.slice(i + marker.length));
       try { return decodeURIComponent(tail); } catch (_) { return tail; }
     }
   }
   const r = val.indexOf(ORPHAN_REF);
   if (r !== -1) {
-    const tail = val.slice(r + ORPHAN_REF.length).split('?')[0];
+    const tail = orphanCutTail(val.slice(r + ORPHAN_REF.length));
     try { return decodeURIComponent(tail); } catch (_) { return tail; }
   }
   const trimmed = val.trim();
   if (ORPHAN_PREFIXES.some(p => trimmed.startsWith(p))) {
-    try { return decodeURIComponent(trimmed.split('?')[0]); } catch (_) { return trimmed.split('?')[0]; }
+    const tail = orphanCutTail(trimmed);
+    try { return decodeURIComponent(tail); } catch (_) { return tail; }
   }
   return null;
 }
@@ -3941,12 +3956,25 @@ async function orphanWalk(prefix, out, depth = 0) {
       const full = prefix ? `${prefix}/${item.name}` : item.name;
       const isFolder = item.id === null && !item.metadata;
       if (isFolder) await orphanWalk(full, out, depth + 1);
-      else out.push({ path: full, size: (item.metadata && item.metadata.size) || 0 });
+      else out.push({
+        path: full,
+        size: (item.metadata && item.metadata.size) || 0,
+        createdAt: Date.parse(item.created_at || item.updated_at || '') || 0,
+      });
     }
     if (data.length < limit) break;
     offset += limit;
   }
 }
+
+// Захищені префікси: файли, на які в БАЗІ посилань може не бути взагалі.
+// UGC-наліпка існує у Storage одразу після створення, а в повідомлення
+// потрапляє лише коли її НАДІШЛЮТЬ — і може не потрапити ніколи. Прибрати її
+// як «сміття» означало б зламати людині її ж набір наліпок.
+const ORPHAN_PROTECTED = ['stickers/'];
+// Скільки файл має відлежати, перш ніж вважати його покинутим. Захищає від
+// гонки «файл залито, рядок повідомлення ще не створено».
+const ORPHAN_MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 app.get('/admin/orphan-audit', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
@@ -3968,8 +3996,39 @@ app.get('/admin/orphan-audit', async (req, res) => {
   }
   const files = [];
   await orphanWalk('', files);
+  const now = Date.now();
   const orphans = files.filter(f => !refs.has(f.path));
   const bytes = orphans.reduce((n, f) => n + (f.size || 0), 0);
+
+  // Кандидати на видалення — лише ті, що пройшли ВСІ запобіжники.
+  const protectedOnes = orphans.filter(f => ORPHAN_PROTECTED.some(p => f.path.startsWith(p)));
+  const tooFresh = orphans.filter(f => !ORPHAN_PROTECTED.some(p => f.path.startsWith(p))
+    && (!f.createdAt || now - f.createdAt < ORPHAN_MIN_AGE_MS));
+  let candidates = orphans.filter(f => !protectedOnes.includes(f) && !tooFresh.includes(f));
+
+  // 2C: файл ще може чекати, поки його заберуть.
+  const stillActive = [];
+  for (const f of candidates) if (await fileObjectActive(f.path)) stillActive.push(f);
+  candidates = candidates.filter(f => !stillActive.includes(f));
+
+  const doDelete = req.query.delete === '1';
+  let deleted = 0, deleteError = null;
+  if (doDelete) {
+    // 🔴 Видаляємо ЛИШЕ якщо набір посилань повний. Неповний означає, що
+    // якийсь запит до БД упав — і тоді «сміттям» виглядають живі файли.
+    if (hadError) deleteError = 'набір посилань неповний — видалення скасовано';
+    else {
+      for (let i = 0; i < candidates.length; i += 50) {
+        const batch = candidates.slice(i, i + 50).map(f => f.path);
+        const { error } = await supabase.storage.from('files').remove(batch);
+        if (error) { deleteError = error.message; break; }
+        deleted += batch.length;
+        for (const p of batch) await supabase.from('file_objects').delete().eq('storage_path', p);
+      }
+      console.log(`[orphan] видалено ${deleted} покинутих файлів`);
+    }
+  }
+
   res.json({
     ok: true,
     // hadError означає, що набір посилань НЕПОВНИЙ → числу вірити не можна.
@@ -3977,9 +4036,16 @@ app.get('/admin/orphan-audit', async (req, res) => {
     files: files.length,
     referenced: refs.size,
     orphans: orphans.length,
-    orphanBytes: bytes,
     orphanMB: +(bytes / 1048576).toFixed(1),
-    sample: orphans.slice(0, 20).map(o => o.path),
+    candidates: candidates.length,
+    candidateMB: +(candidates.reduce((n, f) => n + (f.size || 0), 0) / 1048576).toFixed(1),
+    skipped: { protected: protectedOnes.length, tooFresh: tooFresh.length, waitingPickup: stillActive.length },
+    minAgeDays: Math.round(ORPHAN_MIN_AGE_MS / 86400000),
+    // Періодична чистка за замовчуванням лише ЛОГУЄ. Якщо тут true — старі
+    // повідомлення й файли не видаляються взагалі, і сховище лише росте.
+    periodicCleanupDryRun: CLEANUP_DRY_RUN,
+    deleted, deleteError,
+    sample: candidates.slice(0, 20).map(o => o.path),
   });
 });
 
@@ -4585,14 +4651,42 @@ const CLEANUP_DRY_RUN = (process.env.CLEANUP_DRY_RUN || 'true') !== 'false';
 const DIRECT_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // direct: 7 днів після доставки
 const GROUP_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // групи: 30 днів І лише якщо доставлено ВСІМ поточним учасникам
 
+/// Чи посилається на це саме значення ще якийсь запис у базі?
+///
+/// Потрібно, бо переслана копія несе ТЕ САМЕ значення `file_data`: без
+/// перевірки видалення одного поста забирало б файл в усіх, хто його
+/// переслав. Рядок самого поста на момент виклику вже видалений, тож
+/// перевірка чесна.
+async function valueStillReferenced(value) {
+  const probes = [
+    ['channel_messages', 'file_data'], ['channel_messages', 'image_url'],
+    ['channel_comments', 'file_data'],
+    ['messages', 'file_data'], ['group_messages', 'file_data'],
+  ];
+  for (const [table, col] of probes) {
+    const { data, error } = await supabase.from(table).select('id').eq(col, value).limit(1);
+    // Помилка запиту — вважаємо, що посилання Є: краще лишити зайвий файл,
+    // ніж видалити потрібний через збій БД.
+    if (error) return true;
+    if (data && data.length) return true;
+  }
+  return false;
+}
+
 // Видалення файлу каналу (пост/коментар) зі Storage при видаленні запису.
 // Безпечний: пропускає base64/порожнє, ковтає помилки, не блокує відповідь.
 async function removeChannelFile(...urls) {
   for (const u of urls) {
     const path = storagePathFromUrl(u);
     if (!path) continue; // base64 або не-Storage URL — нічого видаляти
-    try { await supabase.storage.from('files').remove([path]); console.log('[channel-cleanup] removed:', path); }
-    catch (e) { console.log('[channel-cleanup] remove error:', path, e.message); }
+    if (await valueStillReferenced(u)) { console.log('[channel-cleanup] ще використовується:', path); continue; }
+    try {
+      await supabase.storage.from('files').remove([path]);
+      // Разом із байтами прибираємо й обліковий рядок 2C — інакше він
+      // лишався б назавжди вказувати на неіснуючий обʼєкт.
+      await supabase.from('file_objects').delete().eq('storage_path', path);
+      console.log('[channel-cleanup] removed:', path);
+    } catch (e) { console.log('[channel-cleanup] remove error:', path, e.message); }
   }
 }
 
