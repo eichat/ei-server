@@ -727,5 +727,6 @@
   "deposit_body": "Magpadala ng tokens mula sa naka-link mong address papunta rito — awtomatikong makikredito ang barya.",
   "deposit_check": "Tingnan ang papasok",
   "deposit_none": "Wala pang bagong dumating",
-  "err_deposit_check": "Hindi ma-check ang papasok"
+  "err_deposit_check": "Hindi ma-check ang papasok",
+  "err_solana_internal_address": "Service address iyan"
 }

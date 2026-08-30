@@ -727,5 +727,6 @@
   "deposit_body": "Invia i token dal tuo indirizzo collegato a questo: le monete vengono accreditate da sole.",
   "deposit_check": "Verifica ricezione",
   "deposit_none": "Non è ancora arrivato nulla di nuovo",
-  "err_deposit_check": "Impossibile verificare la ricezione"
+  "err_deposit_check": "Impossibile verificare la ricezione",
+  "err_solana_internal_address": "È un indirizzo di servizio"
 }

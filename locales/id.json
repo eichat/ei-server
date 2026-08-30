@@ -727,5 +727,6 @@
   "deposit_body": "Kirim token dari alamat tertaut Anda ke alamat ini — koin masuk otomatis.",
   "deposit_check": "Periksa masuk",
   "deposit_none": "Belum ada yang baru masuk",
-  "err_deposit_check": "Gagal memeriksa dana masuk"
+  "err_deposit_check": "Gagal memeriksa dana masuk",
+  "err_solana_internal_address": "Itu alamat layanan"
 }

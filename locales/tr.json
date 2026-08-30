@@ -727,5 +727,6 @@
   "deposit_body": "Bağlı adresinizden bu adrese token gönderin — coinler otomatik yüklenir.",
   "deposit_check": "Gelen işlemi kontrol et",
   "deposit_none": "Henüz yeni bir giriş yok",
-  "err_deposit_check": "Gelen işlem kontrol edilemedi"
+  "err_deposit_check": "Gelen işlem kontrol edilemedi",
+  "err_solana_internal_address": "Bu bir servis adresi"
 }

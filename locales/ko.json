@@ -727,5 +727,6 @@
   "deposit_body": "연결한 주소에서 이 주소로 토큰을 보내세요. 코인은 자동으로 적립됩니다.",
   "deposit_check": "입금 확인",
   "deposit_none": "아직 새로 들어온 것이 없습니다",
-  "err_deposit_check": "입금을 확인하지 못했습니다"
+  "err_deposit_check": "입금을 확인하지 못했습니다",
+  "err_solana_internal_address": "서비스 전용 주소입니다"
 }

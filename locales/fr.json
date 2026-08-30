@@ -727,5 +727,6 @@
   "deposit_body": "Envoyez des jetons depuis votre adresse liée vers celle-ci — les pièces sont créditées automatiquement.",
   "deposit_check": "Vérifier la réception",
   "deposit_none": "Rien de nouveau pour l’instant",
-  "err_deposit_check": "Impossible de vérifier la réception"
+  "err_deposit_check": "Impossible de vérifier la réception",
+  "err_solana_internal_address": "Cette adresse est interne"
 }

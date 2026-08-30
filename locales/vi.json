@@ -727,5 +727,6 @@
   "deposit_body": "Gửi token từ địa chỉ đã liên kết của bạn tới địa chỉ này — xu sẽ được cộng tự động.",
   "deposit_check": "Kiểm tra tiền vào",
   "deposit_none": "Chưa có khoản nào mới",
-  "err_deposit_check": "Không kiểm tra được tiền vào"
+  "err_deposit_check": "Không kiểm tra được tiền vào",
+  "err_solana_internal_address": "Đây là địa chỉ dịch vụ"
 }

@@ -727,5 +727,6 @@
   "deposit_body": "Wyślij tokeny z powiązanego adresu na ten — monety dopiszemy automatycznie.",
   "deposit_check": "Sprawdź wpłatę",
   "deposit_none": "Nic nowego jeszcze nie dotarło",
-  "err_deposit_check": "Nie udało się sprawdzić wpłaty"
+  "err_deposit_check": "Nie udało się sprawdzić wpłaty",
+  "err_solana_internal_address": "To adres serwisowy"
 }

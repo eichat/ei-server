@@ -2772,6 +2772,12 @@ app.post('/profile/solana-address', async (req, res) => {
   if (address && base58Len(address) !== 32) {
     return res.json({ ok: false, error: 'Невірна адреса Solana', code: 'err_invalid_solana_address' });
   }
+  // Службову адресу прив'язати не можна: інакше наші ж перекази між фондами
+  // виглядали б як поповнення цього акаунта (так уже сталося з EION).
+  const payoutAddr = payoutReady() ? getPayoutKeypair().publicKey.toBase58() : null;
+  if (address && (SOLANA_INTERNAL.has(address) || address === payoutAddr)) {
+    return res.json({ ok: false, error: 'Ця адреса службова', code: 'err_solana_internal_address' });
+  }
   const { error } = await supabase.from('users')
     .update({ solana_address: address || null }).eq('nick', req.nick);
   if (error) return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
@@ -2823,6 +2829,17 @@ const TOKEN_PAYOUT_RATE = Number(process.env.TOKEN_PAYOUT_RATE || 1);   // то�
 const TOKEN_PAYOUT_MIN = Number(process.env.TOKEN_PAYOUT_MIN || 100);   // мінімум балів за раз
 const TOKEN_PAYOUT_DAILY = Number(process.env.TOKEN_PAYOUT_DAILY || 1000); // стеля балів на добу
 const SOLANA_PAYOUT_SECRET = process.env.SOLANA_PAYOUT_SECRET || '';
+// 🔴 Наші власні гаманці (фонди, payer) НІКОЛИ не зараховуються як депозит.
+// Причина з практики: адреса фонду винагород опинилась прив'язаною до акаунта
+// EION (її вставили, щоб подивитись баланс), і службовий переказ 5 млн токенів
+// на гаманець обміну перетворився на 5 млн нарахованих балів. Службовий рух
+// коштів між нашими ж гаманцями не є чиїмось поповненням за визначенням.
+const SOLANA_INTERNAL = new Set(
+  (process.env.SOLANA_INTERNAL_ADDRESSES || '').split(',').map(x => x.trim()).filter(Boolean)
+);
+// Стеля на одне надходження: захист від абсурдних сум, які означають помилку
+// (службовий переказ, тест, чужий скрипт), а не справжнє поповнення.
+const TOKEN_DEPOSIT_MAX = Number(process.env.TOKEN_DEPOSIT_MAX || 100000);
 
 let payoutKeypair = null;
 function getPayoutKeypair() {
@@ -3035,9 +3052,16 @@ async function scanTokenDeposits() {
       }
       if (!sender) continue;
 
-      const { data: user } = await supabase.from('users')
+      // Внутрішній гаманець або сума понад стелю — записуємо, але не зараховуємо.
+      // Запис потрібен, щоб наступний скан не розбирав цю транзакцію знову.
+      const internal = SOLANA_INTERNAL.has(sender) || sender === kp.publicKey.toBase58();
+      const tooBig = gained > TOKEN_DEPOSIT_MAX;
+      const { data: user } = internal || tooBig ? { data: null } : await supabase.from('users')
         .select('nick').eq('solana_address', sender).single();
       const coins = user ? Math.floor(gained / TOKEN_PAYOUT_RATE) : 0;
+      if (internal || tooBig) {
+        console.log('[deposit] пропущено:', s.signature, internal ? 'внутрішня адреса' : `сума ${gained} > ${TOKEN_DEPOSIT_MAX}`);
+      }
 
       // Спершу запис (ключ — signature), потім нарахування: якщо процес упаде
       // між ними, повторний скан побачить запис і не зарахує вдруге. Втратити

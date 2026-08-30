@@ -727,5 +727,6 @@
   "deposit_body": "Sende Token von deiner verknüpften Adresse an diese — die Coins schreiben wir automatisch gut.",
   "deposit_check": "Eingang prüfen",
   "deposit_none": "Noch nichts Neues eingegangen",
-  "err_deposit_check": "Eingang konnte nicht geprüft werden"
+  "err_deposit_check": "Eingang konnte nicht geprüft werden",
+  "err_solana_internal_address": "Das ist eine interne Adresse"
 }

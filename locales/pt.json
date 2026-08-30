@@ -727,5 +727,6 @@
   "deposit_body": "Envie tokens do seu endereço vinculado para este — as moedas são creditadas automaticamente.",
   "deposit_check": "Verificar entrada",
   "deposit_none": "Ainda não chegou nada novo",
-  "err_deposit_check": "Não foi possível verificar a entrada"
+  "err_deposit_check": "Não foi possível verificar a entrada",
+  "err_solana_internal_address": "Esse é um endereço de serviço"
 }

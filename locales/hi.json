@@ -727,5 +727,6 @@
   "deposit_body": "अपने जुड़े पते से इस पते पर टोकन भेजें — सिक्के अपने आप जुड़ जाएँगे।",
   "deposit_check": "आवक जाँचें",
   "deposit_none": "अभी कुछ नया नहीं आया",
-  "err_deposit_check": "आवक जाँची नहीं जा सकी"
+  "err_deposit_check": "आवक जाँची नहीं जा सकी",
+  "err_solana_internal_address": "यह एक सेवा पता है"
 }

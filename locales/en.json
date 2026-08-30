@@ -727,5 +727,6 @@
   "deposit_body": "Send tokens from your linked address to this one — the coins are credited automatically.",
   "deposit_check": "Check for incoming",
   "deposit_none": "Nothing new has arrived yet",
-  "err_deposit_check": "Couldn’t check for incoming"
+  "err_deposit_check": "Couldn’t check for incoming",
+  "err_solana_internal_address": "That is a service address"
 }

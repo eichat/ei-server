@@ -727,5 +727,6 @@
   "deposit_body": "Stuur tokens van je gekoppelde adres naar dit adres — de munten worden automatisch bijgeschreven.",
   "deposit_check": "Controleer ontvangst",
   "deposit_none": "Er is nog niets nieuws binnengekomen",
-  "err_deposit_check": "Kon ontvangst niet controleren"
+  "err_deposit_check": "Kon ontvangst niet controleren",
+  "err_solana_internal_address": "Dat is een serviceadres"
 }

@@ -727,5 +727,6 @@
   "deposit_body": "从你已绑定的地址向该地址发送代币，金币会自动入账。",
   "deposit_check": "查询到账",
   "deposit_none": "暂无新的入账",
-  "err_deposit_check": "无法查询到账"
+  "err_deposit_check": "无法查询到账",
+  "err_solana_internal_address": "这是服务地址"
 }

@@ -16796,6 +16796,29 @@
       "uk": "Не вдалося перевірити надходження",
       "vi": "Không kiểm tra được tiền vào",
       "zh": "无法查询到账"
+    },
+    "err_solana_internal_address": {
+      "ar": "هذا عنوان خدمي",
+      "bn": "এটি একটি সিস্টেম ঠিকানা",
+      "de": "Das ist eine interne Adresse",
+      "en": "That is a service address",
+      "es": "Esa es una dirección de servicio",
+      "fr": "Cette adresse est interne",
+      "hi": "यह एक सेवा पता है",
+      "id": "Itu alamat layanan",
+      "it": "È un indirizzo di servizio",
+      "ja": "これは運営用のアドレスです",
+      "ko": "서비스 전용 주소입니다",
+      "nl": "Dat is een serviceadres",
+      "pl": "To adres serwisowy",
+      "pt": "Esse é um endereço de serviço",
+      "ru": "Это служебный адрес",
+      "th": "นี่คือที่อยู่ของระบบ",
+      "tl": "Service address iyan",
+      "tr": "Bu bir servis adresi",
+      "uk": "Ця адреса службова",
+      "vi": "Đây là địa chỉ dịch vụ",
+      "zh": "这是服务地址"
     }
   }
 }
