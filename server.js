@@ -1289,9 +1289,17 @@ app.get('/admin/ai-cache', async (req, res) => {
     return res.json({ ok: !error, cleared: !error, error: error ? error.message : null });
   }
   const { data, error } = await supabase.from('ai_cache')
-    .select('question, hits, created_at, model').order('hits', { ascending: false }).limit(50);
+    .select('question, hits, created_at, model, source').order('hits', { ascending: false }).limit(50);
   if (error) return res.json({ ok: false, error: error.message });
-  res.json({ ok: true, count: (data || []).length, ttlDays: Math.round(AI_CACHE_TTL_MS / 86400000), top: data || [] });
+  // Раніше `count` рахував довжину видачі, обмеженої 50 — і при 200 записах
+  // діагностика показувала б 50. Числа, що тихо брешуть, і є те, через що
+  // сьогодні тричі шукали причину не там.
+  const total = await supabase.from('ai_cache').select('key', { count: 'exact', head: true });
+  const model = await supabase.from('ai_cache').select('key', { count: 'exact', head: true }).eq('source', 'model');
+  res.json({
+    ok: true, total: total.count ?? null, modelAnswers: model.count ?? null,
+    shown: (data || []).length, ttlDays: Math.round(AI_CACHE_TTL_MS / 86400000), top: data || [],
+  });
 });
 
 // ── База знань: наші власні відповіді ─────────────────────────────────────
