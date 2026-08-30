@@ -728,5 +728,6 @@
   "deposit_check": "입금 확인",
   "deposit_none": "아직 새로 들어온 것이 없습니다",
   "err_deposit_check": "입금을 확인하지 못했습니다",
-  "err_solana_internal_address": "서비스 전용 주소입니다"
+  "err_solana_internal_address": "서비스 전용 주소입니다",
+  "err_solana_address_taken": "이 주소는 다른 계정에 연결되어 있습니다"
 }

@@ -728,5 +728,6 @@
   "deposit_check": "Verificar entrada",
   "deposit_none": "Ainda não chegou nada novo",
   "err_deposit_check": "Não foi possível verificar a entrada",
-  "err_solana_internal_address": "Esse é um endereço de serviço"
+  "err_solana_internal_address": "Esse é um endereço de serviço",
+  "err_solana_address_taken": "Esse endereço está vinculado a outra conta"
 }

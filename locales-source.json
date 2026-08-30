@@ -16819,6 +16819,29 @@
       "uk": "Ця адреса службова",
       "vi": "Đây là địa chỉ dịch vụ",
       "zh": "这是服务地址"
+    },
+    "err_solana_address_taken": {
+      "ar": "هذا العنوان مرتبط بحساب آخر",
+      "bn": "এই ঠিকানা অন্য অ্যাকাউন্টে যুক্ত",
+      "de": "Diese Adresse gehört zu einem anderen Konto",
+      "en": "That address is linked to another account",
+      "es": "Esa dirección está vinculada a otra cuenta",
+      "fr": "Cette adresse est liée à un autre compte",
+      "hi": "यह पता किसी और खाते से जुड़ा है",
+      "id": "Alamat itu tertaut ke akun lain",
+      "it": "Questo indirizzo è collegato a un altro account",
+      "ja": "このアドレスは別のアカウントに登録されています",
+      "ko": "이 주소는 다른 계정에 연결되어 있습니다",
+      "nl": "Dat adres hoort bij een ander account",
+      "pl": "Ten adres jest powiązany z innym kontem",
+      "pt": "Esse endereço está vinculado a outra conta",
+      "ru": "Этот адрес привязан к другому аккаунту",
+      "th": "ที่อยู่นี้ผูกกับบัญชีอื่นแล้ว",
+      "tl": "Naka-link ang address na iyan sa ibang account",
+      "tr": "Bu adres başka bir hesaba bağlı",
+      "uk": "Ця адреса прив'язана до іншого акаунта",
+      "vi": "Địa chỉ này đã liên kết với tài khoản khác",
+      "zh": "该地址已绑定到其他账号"
     }
   }
 }

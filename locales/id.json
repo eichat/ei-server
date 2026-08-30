@@ -728,5 +728,6 @@
   "deposit_check": "Periksa masuk",
   "deposit_none": "Belum ada yang baru masuk",
   "err_deposit_check": "Gagal memeriksa dana masuk",
-  "err_solana_internal_address": "Itu alamat layanan"
+  "err_solana_internal_address": "Itu alamat layanan",
+  "err_solana_address_taken": "Alamat itu tertaut ke akun lain"
 }

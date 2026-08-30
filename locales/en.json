@@ -728,5 +728,6 @@
   "deposit_check": "Check for incoming",
   "deposit_none": "Nothing new has arrived yet",
   "err_deposit_check": "Couldn’t check for incoming",
-  "err_solana_internal_address": "That is a service address"
+  "err_solana_internal_address": "That is a service address",
+  "err_solana_address_taken": "That address is linked to another account"
 }

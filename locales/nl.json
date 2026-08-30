@@ -728,5 +728,6 @@
   "deposit_check": "Controleer ontvangst",
   "deposit_none": "Er is nog niets nieuws binnengekomen",
   "err_deposit_check": "Kon ontvangst niet controleren",
-  "err_solana_internal_address": "Dat is een serviceadres"
+  "err_solana_internal_address": "Dat is een serviceadres",
+  "err_solana_address_taken": "Dat adres hoort bij een ander account"
 }

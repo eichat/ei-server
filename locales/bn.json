@@ -728,5 +728,6 @@
   "deposit_check": "আগমন যাচাই করুন",
   "deposit_none": "এখনো নতুন কিছু আসেনি",
   "err_deposit_check": "আগমন যাচাই করা যায়নি",
-  "err_solana_internal_address": "এটি একটি সিস্টেম ঠিকানা"
+  "err_solana_internal_address": "এটি একটি সিস্টেম ঠিকানা",
+  "err_solana_address_taken": "এই ঠিকানা অন্য অ্যাকাউন্টে যুক্ত"
 }

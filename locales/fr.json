@@ -728,5 +728,6 @@
   "deposit_check": "Vérifier la réception",
   "deposit_none": "Rien de nouveau pour l’instant",
   "err_deposit_check": "Impossible de vérifier la réception",
-  "err_solana_internal_address": "Cette adresse est interne"
+  "err_solana_internal_address": "Cette adresse est interne",
+  "err_solana_address_taken": "Cette adresse est liée à un autre compte"
 }

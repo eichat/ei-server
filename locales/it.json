@@ -728,5 +728,6 @@
   "deposit_check": "Verifica ricezione",
   "deposit_none": "Non è ancora arrivato nulla di nuovo",
   "err_deposit_check": "Impossibile verificare la ricezione",
-  "err_solana_internal_address": "È un indirizzo di servizio"
+  "err_solana_internal_address": "È un indirizzo di servizio",
+  "err_solana_address_taken": "Questo indirizzo è collegato a un altro account"
 }

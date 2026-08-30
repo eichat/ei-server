@@ -2778,6 +2778,17 @@ app.post('/profile/solana-address', async (req, res) => {
   if (address && (SOLANA_INTERNAL.has(address) || address === payoutAddr)) {
     return res.json({ ok: false, error: 'Ця адреса службова', code: 'err_solana_internal_address' });
   }
+  // Одна адреса — один акаунт. Інакше надходження з неї не зарахувалось би
+  // НІКОМУ: запит `.eq('solana_address', …).single()` на двох рядках падає, і
+  // депозит тихо ставав би «нерозпізнаним». Плюс це відкривало б плутанину,
+  // коли двоє вказують чужий гаманець.
+  if (address) {
+    const { data: taken } = await supabase.from('users')
+      .select('nick').eq('solana_address', address).neq('nick', req.nick).limit(1);
+    if (taken && taken.length) {
+      return res.json({ ok: false, error: 'Ця адреса вже прив\'язана до іншого акаунта', code: 'err_solana_address_taken' });
+    }
+  }
   const { error } = await supabase.from('users')
     .update({ solana_address: address || null }).eq('nick', req.nick);
   if (error) return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
@@ -3056,8 +3067,11 @@ async function scanTokenDeposits() {
       // Запис потрібен, щоб наступний скан не розбирав цю транзакцію знову.
       const internal = SOLANA_INTERNAL.has(sender) || sender === kp.publicKey.toBase58();
       const tooBig = gained > TOKEN_DEPOSIT_MAX;
-      const { data: user } = internal || tooBig ? { data: null } : await supabase.from('users')
-        .select('nick').eq('solana_address', sender).single();
+      // limit(1) замість single(): якщо в старих даних адреса все ж дублюється,
+      // single() кинув би помилку і надходження не зарахувалось би нікому.
+      const { data: found } = internal || tooBig ? { data: null } : await supabase.from('users')
+        .select('nick').eq('solana_address', sender).limit(1);
+      const user = found && found.length ? found[0] : null;
       const coins = user ? Math.floor(gained / TOKEN_PAYOUT_RATE) : 0;
       if (internal || tooBig) {
         console.log('[deposit] пропущено:', s.signature, internal ? 'внутрішня адреса' : `сума ${gained} > ${TOKEN_DEPOSIT_MAX}`);

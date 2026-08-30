@@ -728,5 +728,6 @@
   "deposit_check": "Eingang prüfen",
   "deposit_none": "Noch nichts Neues eingegangen",
   "err_deposit_check": "Eingang konnte nicht geprüft werden",
-  "err_solana_internal_address": "Das ist eine interne Adresse"
+  "err_solana_internal_address": "Das ist eine interne Adresse",
+  "err_solana_address_taken": "Diese Adresse gehört zu einem anderen Konto"
 }

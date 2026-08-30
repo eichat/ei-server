@@ -728,5 +728,6 @@
   "deposit_check": "Tingnan ang papasok",
   "deposit_none": "Wala pang bagong dumating",
   "err_deposit_check": "Hindi ma-check ang papasok",
-  "err_solana_internal_address": "Service address iyan"
+  "err_solana_internal_address": "Service address iyan",
+  "err_solana_address_taken": "Naka-link ang address na iyan sa ibang account"
 }

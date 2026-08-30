@@ -728,5 +728,6 @@
   "deposit_check": "入金を確認",
   "deposit_none": "新しい入金はまだありません",
   "err_deposit_check": "入金を確認できませんでした",
-  "err_solana_internal_address": "これは運営用のアドレスです"
+  "err_solana_internal_address": "これは運営用のアドレスです",
+  "err_solana_address_taken": "このアドレスは別のアカウントに登録されています"
 }
