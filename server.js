@@ -2359,7 +2359,6 @@ app.post('/register', async (req, res) => {
   const userData = {
     nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash,
     email, color: color || 4280391411, coins: NEW_USER_COINS,
-    created_at: new Date().toISOString(),
     // Нік міг належати комусь раніше — відсікаємо його токени (див. destroySessionsForNick).
     tokens_valid_from: Date.now(),
     ...(phone ? { phone } : {}),

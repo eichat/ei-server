@@ -426,7 +426,7 @@ create table if not exists public.users (
   avatar_url text,
   block_incoming boolean NOT NULL DEFAULT false,
   coins integer DEFAULT 200,
-  created_at timestamptz,
+  created_at timestamptz default now(),
   last_seen timestamptz,
   color bigint DEFAULT '4280391411'::bigint,
   email text,

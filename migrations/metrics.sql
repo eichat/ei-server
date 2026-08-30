@@ -8,10 +8,12 @@
 -- активності. «Скільки нових за тиждень» і «скільки живих» не рахувалось
 -- нічим — лише «скільки всього», що нічого не каже.
 
+-- Спершу БЕЗ default: інакше Postgres проставив би «зараз» наявним рядкам,
+-- тобто вигадав би їм дату реєстрації. Вони лишаються null, і overview
+-- показує, скільки таких. Default додаємо ОКРЕМО — він діє лише на нові.
 alter table public.users add column if not exists created_at timestamptz;
 alter table public.users add column if not exists last_seen timestamptz;
--- У наявних рядків обидві null і лишаються null: підставити «зараз» означало б
--- вигадати дату реєстрації. Overview показує, скільки рядків без неї.
+alter table public.users alter column created_at set default now();
 
 create table if not exists public.download_counts (
   day date not null,
