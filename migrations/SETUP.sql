@@ -415,6 +415,30 @@ create table if not exists public.sticker_packs (
   primary key (id)
 );
 
+create table if not exists public.token_deposits (
+  signature text primary key,
+  nick text,
+  address text not null,
+  tokens numeric not null,
+  coins integer not null default 0,
+  slot bigint,
+  status text not null default 'credited',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.token_payouts (
+  id bigserial primary key,
+  nick text not null,
+  address text not null,
+  coins integer not null,
+  tokens numeric not null,
+  status text not null default 'pending',
+  signature text,
+  error text,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz
+);
+
 create table if not exists public.user_sticker_packs (
   acquired_at timestamp with time zone NOT NULL DEFAULT now(),
   nick text NOT NULL,
@@ -585,6 +609,8 @@ alter table public.phone_codes enable row level security;
 alter table public.platform_bans enable row level security;
 alter table public.reports enable row level security;
 alter table public.sticker_packs enable row level security;
+alter table public.token_deposits enable row level security;
+alter table public.token_payouts enable row level security;
 alter table public.user_sticker_packs enable row level security;
 alter table public.users enable row level security;
 
@@ -807,6 +833,11 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_transactions to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.download_counts to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.download_counts to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.token_deposits to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.token_deposits to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.token_payouts to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.token_payouts to service_role;
+grant usage, select on sequence public.token_payouts_id_seq to postgres, service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.deleted_messages to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.deleted_messages to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.direct_message_reactions to postgres;
