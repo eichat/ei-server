@@ -691,5 +691,13 @@
   "premium_feat_relay": "Panggilan lewat relay: 50 per hari, bukan 10",
   "premium_feat_ai_model": "Model AI yang lebih kuat",
   "earn_paid_channel": "Langganan berbayar ke kanal Anda",
-  "earn_contact_owner": "Kontak ke Anda sebagai pemilik kanal"
+  "earn_contact_owner": "Kontak ke Anda sebagai pemilik kanal",
+  "quota_today": "Kuota hari ini",
+  "quota_ai": "Asisten AI",
+  "quota_storage": "Unggahan",
+  "quota_turn": "Panggilan lewat relay",
+  "quota_translate": "Terjemahan otomatis",
+  "quota_exhausted": "habis — selanjutnya {price} koin per unit",
+  "err_quota_unavailable": "Gagal memuat kuota",
+  "unit_mb": "MB"
 }

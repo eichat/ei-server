@@ -691,5 +691,13 @@
   "premium_feat_relay": "Anrufe über Relay: 50 pro Tag statt 10",
   "premium_feat_ai_model": "Stärkeres KI-Modell",
   "earn_paid_channel": "Kostenpflichtiges Abo deines Kanals",
-  "earn_contact_owner": "Kontaktaufnahme mit dir als Kanalinhaber"
+  "earn_contact_owner": "Kontaktaufnahme mit dir als Kanalinhaber",
+  "quota_today": "Heutige Limits",
+  "quota_ai": "KI-Assistent",
+  "quota_storage": "Uploads",
+  "quota_turn": "Anrufe über Relay",
+  "quota_translate": "Automatische Übersetzung",
+  "quota_exhausted": "aufgebraucht — danach {price} Coins pro Einheit",
+  "err_quota_unavailable": "Limits konnten nicht geladen werden",
+  "unit_mb": "MB"
 }

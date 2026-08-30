@@ -691,5 +691,13 @@
   "premium_feat_relay": "リレー経由の通話：1日10件ではなく50件",
   "premium_feat_ai_model": "より高性能なAIモデル",
   "earn_paid_channel": "自分のチャンネルの有料購読",
-  "earn_contact_owner": "チャンネル所有者としてのあなたへの連絡"
+  "earn_contact_owner": "チャンネル所有者としてのあなたへの連絡",
+  "quota_today": "今日の上限",
+  "quota_ai": "AIアシスタント",
+  "quota_storage": "アップロード",
+  "quota_turn": "リレー経由の通話",
+  "quota_translate": "自動翻訳",
+  "quota_exhausted": "上限到達 — 以降は1件あたり{price}コイン",
+  "err_quota_unavailable": "上限を取得できませんでした",
+  "unit_mb": "MB"
 }

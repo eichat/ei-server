@@ -691,5 +691,13 @@
   "premium_feat_relay": "Chiamate tramite relay: 50 al giorno invece di 10",
   "premium_feat_ai_model": "Un modello IA più potente",
   "earn_paid_channel": "Abbonamento a pagamento al tuo canale",
-  "earn_contact_owner": "Contatto con te come proprietario del canale"
+  "earn_contact_owner": "Contatto con te come proprietario del canale",
+  "quota_today": "Limiti di oggi",
+  "quota_ai": "Assistente IA",
+  "quota_storage": "Caricamenti",
+  "quota_turn": "Chiamate tramite relay",
+  "quota_translate": "Traduzione automatica",
+  "quota_exhausted": "esaurito — poi {price} monete per unità",
+  "err_quota_unavailable": "Impossibile caricare i limiti",
+  "unit_mb": "MB"
 }

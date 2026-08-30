@@ -691,5 +691,13 @@
   "premium_feat_relay": "สายผ่านรีเลย์: 50 สายต่อวัน แทน 10",
   "premium_feat_ai_model": "โมเดล AI ที่แรงกว่า",
   "earn_paid_channel": "การสมัครสมาชิกแบบเสียเงินในช่องของคุณ",
-  "earn_contact_owner": "การติดต่อคุณในฐานะเจ้าของช่อง"
+  "earn_contact_owner": "การติดต่อคุณในฐานะเจ้าของช่อง",
+  "quota_today": "โควตาวันนี้",
+  "quota_ai": "ผู้ช่วย AI",
+  "quota_storage": "อัปโหลด",
+  "quota_turn": "โทรผ่านรีเลย์",
+  "quota_translate": "แปลอัตโนมัติ",
+  "quota_exhausted": "ใช้หมดแล้ว — ต่อไปหน่วยละ {price} เหรียญ",
+  "err_quota_unavailable": "โหลดโควตาไม่สำเร็จ",
+  "unit_mb": "MB"
 }

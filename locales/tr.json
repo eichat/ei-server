@@ -691,5 +691,13 @@
   "premium_feat_relay": "Relay üzerinden arama: günde 10 yerine 50",
   "premium_feat_ai_model": "Daha güçlü yapay zekâ modeli",
   "earn_paid_channel": "Kanalınıza ücretli abonelik",
-  "earn_contact_owner": "Kanal sahibi olarak size ulaşma"
+  "earn_contact_owner": "Kanal sahibi olarak size ulaşma",
+  "quota_today": "Bugünkü kota",
+  "quota_ai": "Yapay zekâ asistanı",
+  "quota_storage": "Yükleme",
+  "quota_turn": "Relay üzerinden aramalar",
+  "quota_translate": "Otomatik çeviri",
+  "quota_exhausted": "tükendi — sonrası birim başına {price} coin",
+  "err_quota_unavailable": "Kotalar alınamadı",
+  "unit_mb": "MB"
 }

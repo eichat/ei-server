@@ -691,5 +691,13 @@
   "premium_feat_relay": "রিলে-কল: দিনে ১০ নয়, ৫০টি",
   "premium_feat_ai_model": "আরও শক্তিশালী AI মডেল",
   "earn_paid_channel": "আপনার চ্যানেলে পেইড সাবস্ক্রিপশন",
-  "earn_contact_owner": "চ্যানেলের মালিক হিসেবে আপনার সঙ্গে যোগাযোগ"
+  "earn_contact_owner": "চ্যানেলের মালিক হিসেবে আপনার সঙ্গে যোগাযোগ",
+  "quota_today": "আজকের সীমা",
+  "quota_ai": "AI সহকারী",
+  "quota_storage": "আপলোড",
+  "quota_turn": "রিলে কল",
+  "quota_translate": "স্বয়ংক্রিয় অনুবাদ",
+  "quota_exhausted": "শেষ — এরপর প্রতি ইউনিটে {price} কয়েন",
+  "err_quota_unavailable": "সীমা আনা যায়নি",
+  "unit_mb": "MB"
 }

@@ -691,5 +691,13 @@
   "premium_feat_relay": "Cuộc gọi qua relay: 50 mỗi ngày thay vì 10",
   "premium_feat_ai_model": "Mô hình AI mạnh hơn",
   "earn_paid_channel": "Đăng ký trả phí kênh của bạn",
-  "earn_contact_owner": "Liên hệ với bạn với tư cách chủ kênh"
+  "earn_contact_owner": "Liên hệ với bạn với tư cách chủ kênh",
+  "quota_today": "Hạn mức hôm nay",
+  "quota_ai": "Trợ lý AI",
+  "quota_storage": "Tải lên",
+  "quota_turn": "Cuộc gọi qua relay",
+  "quota_translate": "Dịch tự động",
+  "quota_exhausted": "đã hết — sau đó {price} xu mỗi đơn vị",
+  "err_quota_unavailable": "Không tải được hạn mức",
+  "unit_mb": "MB"
 }

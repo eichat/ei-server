@@ -691,5 +691,13 @@
   "premium_feat_relay": "المكالمات عبر المُرحِّل: 50 يوميًا بدل 10",
   "premium_feat_ai_model": "نموذج ذكاء اصطناعي أقوى",
   "earn_paid_channel": "اشتراك مدفوع في قناتك",
-  "earn_contact_owner": "تواصل معك كمالك للقناة"
+  "earn_contact_owner": "تواصل معك كمالك للقناة",
+  "quota_today": "حدود اليوم",
+  "quota_ai": "مساعد الذكاء الاصطناعي",
+  "quota_storage": "الرفع",
+  "quota_turn": "مكالمات عبر المُرحِّل",
+  "quota_translate": "الترجمة التلقائية",
+  "quota_exhausted": "انتهت — بعدها {price} عملة للوحدة",
+  "err_quota_unavailable": "تعذّر جلب الحدود",
+  "unit_mb": "ميغابايت"
 }

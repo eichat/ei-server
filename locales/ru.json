@@ -691,5 +691,13 @@
   "premium_feat_relay": "Звонки через релей: 50 в сутки вместо 10",
   "premium_feat_ai_model": "Более мощная модель AI-ассистента",
   "earn_paid_channel": "Платная подписка на ваш канал",
-  "earn_contact_owner": "Обращение к вам как к владельцу канала"
+  "earn_contact_owner": "Обращение к вам как к владельцу канала",
+  "quota_today": "Нормы на сегодня",
+  "quota_ai": "AI-ассистент",
+  "quota_storage": "Выгрузки",
+  "quota_turn": "Звонки через релей",
+  "quota_translate": "Автоперевод",
+  "quota_exhausted": "исчерпано — далее {price} монет за единицу",
+  "err_quota_unavailable": "Не удалось получить нормы",
+  "unit_mb": "МБ"
 }

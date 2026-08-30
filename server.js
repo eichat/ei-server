@@ -156,6 +156,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Денні норми користувача для екрана гаманця. Актор — ЗАВЖДИ з сесії:
+// чужі витрати не показуємо, ніка в запиті немає взагалі.
+//
+// Навіщо endpoint, а не число в локалі: тексти з зашитими нормами вже двічі
+// розходились із кодом (ціни 30.08, «+50» у гаманці). Те, що прийшло з
+// сервера, розійтись не може — і заразом видно, скільки норми лишилось.
+app.get('/usage/today', async (req, res) => {
+  try {
+    res.json({ ok: true, ...(await quotaSnapshot(req.nick)) });
+  } catch (e) {
+    console.error('[usage/today]', e.message);
+    res.status(500).json({ ok: false, error: 'Не вдалося отримати норми', code: 'err_quota_unavailable' });
+  }
+});
+
 // Публічний стан монети: скільки видано з фондів і скільки спалено назавжди.
 // Токеноміка вимагає прозорого burn-дашборда; це його джерело даних.
 app.get('/coin/supply', async (req, res) => {
@@ -1128,17 +1143,14 @@ async function runAiTool(name, rawArgs, nick) {
       return { coins: u.coins || 0, premium, premium_until: premium ? u.premium_expires_at : null, premium_plan: premium ? u.premium_plan : null };
     }
     if (name === 'get_usage_today') {
-      const { data: u } = await supabase.from('users').select('premium_expires_at').eq('nick', nick).single();
-      const premium = !!(u && u.premium_expires_at && new Date(u.premium_expires_at) > new Date());
-      const out = { premium, kinds: {} };
-      for (const kind of ['ai', 'storage', 'turn', 'translate']) {
-        const limit = premium ? (FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind]) : FREE_QUOTA[kind];
-        const used = await usageToday(nick, kind);
+      const snap = await quotaSnapshot(nick);
+      const out = { premium: snap.premium, kinds: {} };
+      for (const [kind, k] of Object.entries(snap.kinds)) {
         out.kinds[kind] = {
-          used: used === null ? 'unknown' : used,
-          free_per_day: limit,
-          left: used === null ? 'unknown' : Math.max(0, limit - used),
-          coins_per_unit_over: SINK_PRICE[kind] || 0,
+          used: k.used === null ? 'unknown' : k.used,
+          free_per_day: k.limit,
+          left: k.left === null ? 'unknown' : k.left,
+          coins_per_unit_over: k.price,
         };
       }
       out.units = { ai: 'requests', storage: 'megabytes uploaded', turn: 'relayed calls', translate: 'translated messages' };
@@ -2015,6 +2027,26 @@ async function usageToday(nick, kind) {
     .select('used').eq('nick', nick).eq('kind', kind).eq('day', day).limit(1);
   if (error) { console.error('[sink] usageToday:', kind, error.message); return null; }
   return (data && data[0] ? data[0].used : 0);
+}
+
+/// Стан денних норм користувача: скільки витрачено, скільки лишилось і почому
+/// одиниця понад норму. ОДНЕ джерело для екрана гаманця (`GET /usage/today`) і
+/// для інструмента асистента `get_usage_today` — інакше вони розійшлись би,
+/// і застосунок показував би одні числа, а асистент називав інші.
+///
+/// `used: null` означає «лічильник недоступний», а не нуль: при збої запиту
+/// сінк пропускає операцію безкоштовно, і мовчазний нуль приховав би це.
+const QUOTA_KINDS = ['ai', 'storage', 'turn', 'translate'];
+async function quotaSnapshot(nick) {
+  const { data: u } = await supabase.from('users').select('premium_expires_at').eq('nick', nick).single();
+  const premium = !!(u && u.premium_expires_at && new Date(u.premium_expires_at) > new Date());
+  const kinds = {};
+  for (const kind of QUOTA_KINDS) {
+    const limit = premium ? (FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind]) : FREE_QUOTA[kind];
+    const used = await usageToday(nick, kind);
+    kinds[kind] = { used, limit, left: used === null ? null : Math.max(0, limit - used), price: SINK_PRICE[kind] || 0 };
+  }
+  return { premium, kinds };
 }
 
 async function bumpUsage(nick, kind, by = 1) {

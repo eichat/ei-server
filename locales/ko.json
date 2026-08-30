@@ -691,5 +691,13 @@
   "premium_feat_relay": "릴레이 통화: 하루 10회 대신 50회",
   "premium_feat_ai_model": "더 강력한 AI 모델",
   "earn_paid_channel": "내 채널 유료 구독",
-  "earn_contact_owner": "채널 소유자인 나에게 보내는 연락"
+  "earn_contact_owner": "채널 소유자인 나에게 보내는 연락",
+  "quota_today": "오늘의 한도",
+  "quota_ai": "AI 어시스턴트",
+  "quota_storage": "업로드",
+  "quota_turn": "릴레이 통화",
+  "quota_translate": "자동 번역",
+  "quota_exhausted": "모두 사용 — 이후 단위당 {price}코인",
+  "err_quota_unavailable": "한도를 불러오지 못했습니다",
+  "unit_mb": "MB"
 }

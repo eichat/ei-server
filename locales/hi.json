@@ -691,5 +691,13 @@
   "premium_feat_relay": "रिले से कॉल: रोज़ 10 नहीं, 50",
   "premium_feat_ai_model": "अधिक शक्तिशाली AI मॉडल",
   "earn_paid_channel": "आपके चैनल की सशुल्क सदस्यता",
-  "earn_contact_owner": "चैनल स्वामी के रूप में आपसे संपर्क"
+  "earn_contact_owner": "चैनल स्वामी के रूप में आपसे संपर्क",
+  "quota_today": "आज की सीमा",
+  "quota_ai": "AI सहायक",
+  "quota_storage": "अपलोड",
+  "quota_turn": "रिले से कॉल",
+  "quota_translate": "स्वचालित अनुवाद",
+  "quota_exhausted": "समाप्त — इसके बाद प्रति इकाई {price} सिक्के",
+  "err_quota_unavailable": "सीमाएँ लोड नहीं हो सकीं",
+  "unit_mb": "MB"
 }

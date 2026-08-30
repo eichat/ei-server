@@ -691,5 +691,13 @@
   "premium_feat_relay": "Дзвінки через релей: 50 на добу замість 10",
   "premium_feat_ai_model": "Потужніша модель AI-асистента",
   "earn_paid_channel": "Платна підписка на ваш канал",
-  "earn_contact_owner": "Звернення до вас як власника каналу"
+  "earn_contact_owner": "Звернення до вас як власника каналу",
+  "quota_today": "Норми на сьогодні",
+  "quota_ai": "AI-асистент",
+  "quota_storage": "Вивантаження",
+  "quota_turn": "Дзвінки через релей",
+  "quota_translate": "Автопереклад",
+  "quota_exhausted": "вичерпано — далі {price} монет за одиницю",
+  "err_quota_unavailable": "Не вдалося отримати норми",
+  "unit_mb": "МБ"
 }

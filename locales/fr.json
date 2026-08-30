@@ -691,5 +691,13 @@
   "premium_feat_relay": "Appels via relais : 50 par jour au lieu de 10",
   "premium_feat_ai_model": "Un modèle d'IA plus puissant",
   "earn_paid_channel": "Abonnement payant à votre chaîne",
-  "earn_contact_owner": "Contact avec vous en tant que propriétaire de la chaîne"
+  "earn_contact_owner": "Contact avec vous en tant que propriétaire de la chaîne",
+  "quota_today": "Quotas du jour",
+  "quota_ai": "Assistant IA",
+  "quota_storage": "Envois",
+  "quota_turn": "Appels via relais",
+  "quota_translate": "Traduction automatique",
+  "quota_exhausted": "épuisé — ensuite {price} pièces par unité",
+  "err_quota_unavailable": "Impossible de charger les quotas",
+  "unit_mb": "Mo"
 }

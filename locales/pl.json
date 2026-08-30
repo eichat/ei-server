@@ -691,5 +691,13 @@
   "premium_feat_relay": "Połączenia przez relay: 50 dziennie zamiast 10",
   "premium_feat_ai_model": "Mocniejszy model AI",
   "earn_paid_channel": "Płatna subskrypcja Twojego kanału",
-  "earn_contact_owner": "Kontakt z Tobą jako właścicielem kanału"
+  "earn_contact_owner": "Kontakt z Tobą jako właścicielem kanału",
+  "quota_today": "Dzisiejszy limit",
+  "quota_ai": "Asystent AI",
+  "quota_storage": "Wysyłanie",
+  "quota_turn": "Połączenia przez relay",
+  "quota_translate": "Tłumaczenie automatyczne",
+  "quota_exhausted": "wyczerpano — dalej {price} monet za jednostkę",
+  "err_quota_unavailable": "Nie udało się pobrać limitów",
+  "unit_mb": "MB"
 }

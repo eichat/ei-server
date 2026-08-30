@@ -691,5 +691,13 @@
   "premium_feat_relay": "Tawag sa pamamagitan ng relay: 50 bawat araw sa halip na 10",
   "premium_feat_ai_model": "Mas malakas na AI model",
   "earn_paid_channel": "Bayad na subscription sa channel mo",
-  "earn_contact_owner": "Pakikipag-ugnayan sa iyo bilang may-ari ng channel"
+  "earn_contact_owner": "Pakikipag-ugnayan sa iyo bilang may-ari ng channel",
+  "quota_today": "Limitasyon ngayong araw",
+  "quota_ai": "AI assistant",
+  "quota_storage": "Upload",
+  "quota_turn": "Tawag sa relay",
+  "quota_translate": "Awtomatikong pagsasalin",
+  "quota_exhausted": "naubos na — {price} barya kada unit pagkatapos",
+  "err_quota_unavailable": "Hindi makuha ang limitasyon",
+  "unit_mb": "MB"
 }

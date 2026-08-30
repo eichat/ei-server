@@ -691,5 +691,13 @@
   "premium_feat_relay": "Relayed calls: 50 a day instead of 10",
   "premium_feat_ai_model": "A stronger AI model",
   "earn_paid_channel": "Paid subscription to your channel",
-  "earn_contact_owner": "Someone contacting you as channel owner"
+  "earn_contact_owner": "Someone contacting you as channel owner",
+  "quota_today": "Today’s allowance",
+  "quota_ai": "AI assistant",
+  "quota_storage": "Uploads",
+  "quota_turn": "Relayed calls",
+  "quota_translate": "Auto-translation",
+  "quota_exhausted": "used up — {price} coins per unit after that",
+  "err_quota_unavailable": "Couldn’t load the allowance",
+  "unit_mb": "MB"
 }
