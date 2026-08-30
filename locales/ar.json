@@ -711,5 +711,21 @@
   "solana_testnet_note": "التوكن في شبكة اختبار devnet: لا قيمة له ولا يمكن بيعه.",
   "err_invalid_solana_address": "عنوان Solana غير صالح",
   "err_token_disabled": "لم يُطلق التوكن بعد",
-  "err_token_balance": "تعذّر قراءة الرصيد"
+  "err_token_balance": "تعذّر قراءة الرصيد",
+  "payout_title": "تحويل إلى Solana",
+  "payout_body": "كم عملة تريد تحويلها إلى توكن؟ الحد الأدنى {min}، والحد اليومي {daily}.",
+  "payout_sent": "تم الإرسال — التوكنات في طريقها",
+  "err_payout_disabled": "التحويلات غير متاحة",
+  "err_payout_min": "المبلغ أقل من الحد الأدنى",
+  "err_payout_no_address": "أضف عنوان Solana أولًا",
+  "err_payout_daily_limit": "انتهى الحد اليومي للتحويل",
+  "err_payout_unconfirmed": "لم يتم تأكيد التحويل بعد — نتحقق منه",
+  "err_payout_create": "تعذّر إنشاء طلب التحويل",
+  "err_payout_history": "تعذّر قراءة سجل التحويلات",
+  "err_payout_limit_check": "تعذّر التحقق من الحد اليومي",
+  "deposit_title": "شحن من Solana",
+  "deposit_body": "أرسل التوكن من عنوانك المربوط إلى هذا العنوان — سنضيف العملات تلقائيًا.",
+  "deposit_check": "تحقّق من الوصول",
+  "deposit_none": "لا توجد مبالغ جديدة بعد",
+  "err_deposit_check": "تعذّر التحقق من الوصول"
 }

@@ -711,5 +711,21 @@
   "solana_testnet_note": "Token, devnet test ağında: değeri yok ve satılamaz.",
   "err_invalid_solana_address": "Geçersiz Solana adresi",
   "err_token_disabled": "Token henüz çıkarılmadı",
-  "err_token_balance": "Bakiye okunamadı"
+  "err_token_balance": "Bakiye okunamadı",
+  "payout_title": "Solana’ya çek",
+  "payout_body": "Kaç coin token’a çevrilsin? En az {min}, günlük sınır {daily}.",
+  "payout_sent": "Gönderildi — tokenlar yolda",
+  "err_payout_disabled": "Çekimler kullanılamıyor",
+  "err_payout_min": "En düşük tutarın altında",
+  "err_payout_no_address": "Önce bir Solana adresi ekleyin",
+  "err_payout_daily_limit": "Günlük çekim sınırına ulaşıldı",
+  "err_payout_unconfirmed": "Çekim henüz doğrulanmadı — kontrol ediyoruz",
+  "err_payout_create": "Çekim talebi oluşturulamadı",
+  "err_payout_history": "Çekim geçmişi yüklenemedi",
+  "err_payout_limit_check": "Günlük sınır kontrol edilemedi",
+  "deposit_title": "Solana’dan yükle",
+  "deposit_body": "Bağlı adresinizden bu adrese token gönderin — coinler otomatik yüklenir.",
+  "deposit_check": "Gelen işlemi kontrol et",
+  "deposit_none": "Henüz yeni bir giriş yok",
+  "err_deposit_check": "Gelen işlem kontrol edilemedi"
 }

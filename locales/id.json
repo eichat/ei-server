@@ -711,5 +711,21 @@
   "solana_testnet_note": "Token berjalan di jaringan uji devnet: tanpa nilai dan tidak bisa dijual.",
   "err_invalid_solana_address": "Alamat Solana tidak valid",
   "err_token_disabled": "Token belum diterbitkan",
-  "err_token_balance": "Gagal membaca saldo"
+  "err_token_balance": "Gagal membaca saldo",
+  "payout_title": "Tarik ke Solana",
+  "payout_body": "Berapa koin yang diubah jadi token? Minimum {min}, batas harian {daily}.",
+  "payout_sent": "Terkirim — token sedang dalam perjalanan",
+  "err_payout_disabled": "Penarikan tidak tersedia",
+  "err_payout_min": "Di bawah jumlah minimum",
+  "err_payout_no_address": "Tambahkan alamat Solana dulu",
+  "err_payout_daily_limit": "Batas penarikan harian tercapai",
+  "err_payout_unconfirmed": "Penarikan belum terkonfirmasi — sedang kami cek",
+  "err_payout_create": "Gagal membuat permintaan penarikan",
+  "err_payout_history": "Gagal memuat riwayat penarikan",
+  "err_payout_limit_check": "Gagal memeriksa batas harian",
+  "deposit_title": "Isi ulang dari Solana",
+  "deposit_body": "Kirim token dari alamat tertaut Anda ke alamat ini — koin masuk otomatis.",
+  "deposit_check": "Periksa masuk",
+  "deposit_none": "Belum ada yang baru masuk",
+  "err_deposit_check": "Gagal memeriksa dana masuk"
 }

@@ -711,5 +711,21 @@
   "solana_testnet_note": "टोकन devnet टेस्ट नेटवर्क पर है: इसका कोई मूल्य नहीं और इसे बेचा नहीं जा सकता।",
   "err_invalid_solana_address": "अमान्य Solana पता",
   "err_token_disabled": "टोकन अभी जारी नहीं हुआ",
-  "err_token_balance": "बैलेंस नहीं पढ़ा जा सका"
+  "err_token_balance": "बैलेंस नहीं पढ़ा जा सका",
+  "payout_title": "Solana में निकालें",
+  "payout_body": "कितने सिक्के टोकन में बदलें? न्यूनतम {min}, दैनिक सीमा {daily}।",
+  "payout_sent": "भेज दिया — टोकन रास्ते में हैं",
+  "err_payout_disabled": "निकासी उपलब्ध नहीं है",
+  "err_payout_min": "न्यूनतम राशि से कम",
+  "err_payout_no_address": "पहले Solana पता जोड़ें",
+  "err_payout_daily_limit": "दैनिक निकासी सीमा पूरी",
+  "err_payout_unconfirmed": "भुगतान अभी पुष्ट नहीं हुआ — हम जाँच रहे हैं",
+  "err_payout_create": "निकासी अनुरोध नहीं बना",
+  "err_payout_history": "निकासी इतिहास नहीं मिला",
+  "err_payout_limit_check": "दैनिक सीमा जाँची नहीं जा सकी",
+  "deposit_title": "Solana से टॉप-अप",
+  "deposit_body": "अपने जुड़े पते से इस पते पर टोकन भेजें — सिक्के अपने आप जुड़ जाएँगे।",
+  "deposit_check": "आवक जाँचें",
+  "deposit_none": "अभी कुछ नया नहीं आया",
+  "err_deposit_check": "आवक जाँची नहीं जा सकी"
 }

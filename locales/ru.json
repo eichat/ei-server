@@ -711,5 +711,21 @@
   "solana_testnet_note": "Токен в тестовой сети devnet: не имеет стоимости и не продаётся.",
   "err_invalid_solana_address": "Неверный адрес Solana",
   "err_token_disabled": "Токен ещё не выпущен",
-  "err_token_balance": "Не удалось прочитать баланс"
+  "err_token_balance": "Не удалось прочитать баланс",
+  "payout_title": "Вывести на Solana",
+  "payout_body": "Сколько монет обменять на токены? Минимум {min}, дневной лимит {daily}.",
+  "payout_sent": "Отправлено — токены в пути",
+  "err_payout_disabled": "Выводы недоступны",
+  "err_payout_min": "Меньше минимальной суммы",
+  "err_payout_no_address": "Сначала укажите адрес Solana",
+  "err_payout_daily_limit": "Дневной лимит вывода исчерпан",
+  "err_payout_unconfirmed": "Вывод пока не подтверждён — проверяем",
+  "err_payout_create": "Не удалось создать заявку на вывод",
+  "err_payout_history": "Не удалось прочитать историю выводов",
+  "err_payout_limit_check": "Не удалось проверить дневной лимит",
+  "deposit_title": "Пополнить с Solana",
+  "deposit_body": "Отправьте токены со своего привязанного адреса на этот — монеты зачислятся сами.",
+  "deposit_check": "Проверить поступление",
+  "deposit_none": "Пока ничего не поступило",
+  "err_deposit_check": "Не удалось проверить поступление"
 }

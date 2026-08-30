@@ -711,5 +711,21 @@
   "solana_testnet_note": "โทเคนอยู่บนเครือข่ายทดสอบ devnet ไม่มีมูลค่าและขายไม่ได้",
   "err_invalid_solana_address": "ที่อยู่ Solana ไม่ถูกต้อง",
   "err_token_disabled": "ยังไม่ได้ออกโทเคน",
-  "err_token_balance": "อ่านยอดคงเหลือไม่สำเร็จ"
+  "err_token_balance": "อ่านยอดคงเหลือไม่สำเร็จ",
+  "payout_title": "ถอนไปยัง Solana",
+  "payout_body": "จะแลกกี่เหรียญเป็นโทเคน ขั้นต่ำ {min} จำกัดวันละ {daily}",
+  "payout_sent": "ส่งแล้ว — โทเคนกำลังไป",
+  "err_payout_disabled": "ยังถอนไม่ได้",
+  "err_payout_min": "น้อยกว่าขั้นต่ำ",
+  "err_payout_no_address": "กรุณาเพิ่มที่อยู่ Solana ก่อน",
+  "err_payout_daily_limit": "ถึงขีดจำกัดการถอนรายวันแล้ว",
+  "err_payout_unconfirmed": "ยังไม่ยืนยันการถอน — กำลังตรวจสอบ",
+  "err_payout_create": "สร้างคำขอถอนไม่สำเร็จ",
+  "err_payout_history": "โหลดประวัติการถอนไม่สำเร็จ",
+  "err_payout_limit_check": "ตรวจสอบขีดจำกัดรายวันไม่สำเร็จ",
+  "deposit_title": "เติมจาก Solana",
+  "deposit_body": "ส่งโทเคนจากที่อยู่ที่ผูกไว้มายังที่อยู่นี้ ระบบจะเติมเหรียญให้อัตโนมัติ",
+  "deposit_check": "ตรวจสอบยอดเข้า",
+  "deposit_none": "ยังไม่มียอดเข้ามาใหม่",
+  "err_deposit_check": "ตรวจสอบยอดเข้าไม่สำเร็จ"
 }

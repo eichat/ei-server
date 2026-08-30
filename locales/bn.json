@@ -711,5 +711,21 @@
   "solana_testnet_note": "টোকেনটি devnet টেস্ট নেটওয়ার্কে — এর কোনো মূল্য নেই এবং বিক্রি করা যায় না।",
   "err_invalid_solana_address": "ভুল Solana ঠিকানা",
   "err_token_disabled": "টোকেন এখনো চালু হয়নি",
-  "err_token_balance": "ব্যালেন্স পড়া যায়নি"
+  "err_token_balance": "ব্যালেন্স পড়া যায়নি",
+  "payout_title": "Solana-তে পাঠান",
+  "payout_body": "কত কয়েন টোকেনে বদলাতে চান? সর্বনিম্ন {min}, দৈনিক সীমা {daily}।",
+  "payout_sent": "পাঠানো হয়েছে — টোকেন পথে আছে",
+  "err_payout_disabled": "উত্তোলন এখন বন্ধ",
+  "err_payout_min": "পরিমাণ সর্বনিম্নের চেয়ে কম",
+  "err_payout_no_address": "প্রথমে Solana ঠিকানা দিন",
+  "err_payout_daily_limit": "দৈনিক উত্তোলনের সীমা শেষ",
+  "err_payout_unconfirmed": "লেনদেন এখনো নিশ্চিত হয়নি — আমরা দেখছি",
+  "err_payout_create": "উত্তোলনের অনুরোধ তৈরি করা যায়নি",
+  "err_payout_history": "উত্তোলনের ইতিহাস পড়া যায়নি",
+  "err_payout_limit_check": "দৈনিক সীমা যাচাই করা যায়নি",
+  "deposit_title": "Solana থেকে টপ-আপ",
+  "deposit_body": "আপনার সংযুক্ত ঠিকানা থেকে এই ঠিকানায় টোকেন পাঠান — কয়েন আপনা-আপনি যোগ হবে।",
+  "deposit_check": "আগমন যাচাই করুন",
+  "deposit_none": "এখনো নতুন কিছু আসেনি",
+  "err_deposit_check": "আগমন যাচাই করা যায়নি"
 }

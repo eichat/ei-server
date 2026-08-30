@@ -711,5 +711,21 @@
   "solana_testnet_note": "トークンはテストネット devnet 上です。価値はなく、売買もできません。",
   "err_invalid_solana_address": "Solana アドレスが正しくありません",
   "err_token_disabled": "トークンはまだ発行されていません",
-  "err_token_balance": "残高を取得できませんでした"
+  "err_token_balance": "残高を取得できませんでした",
+  "payout_title": "Solana へ出金",
+  "payout_body": "何コインをトークンに換えますか？ 最小 {min}、1日の上限 {daily}。",
+  "payout_sent": "送信しました。トークンは送金中です",
+  "err_payout_disabled": "出金はご利用いただけません",
+  "err_payout_min": "最小額を下回っています",
+  "err_payout_no_address": "先に Solana アドレスを登録してください",
+  "err_payout_daily_limit": "1日の出金上限に達しました",
+  "err_payout_unconfirmed": "出金はまだ確定していません。確認中です",
+  "err_payout_create": "出金リクエストを作成できませんでした",
+  "err_payout_history": "出金履歴を取得できませんでした",
+  "err_payout_limit_check": "1日の上限を確認できませんでした",
+  "deposit_title": "Solana からチャージ",
+  "deposit_body": "登録済みのアドレスからこのアドレスへトークンを送ってください。コインは自動で加算されます。",
+  "deposit_check": "入金を確認",
+  "deposit_none": "新しい入金はまだありません",
+  "err_deposit_check": "入金を確認できませんでした"
 }

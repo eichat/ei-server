@@ -711,5 +711,21 @@
   "solana_testnet_note": "Token nằm trên mạng thử nghiệm devnet: không có giá trị và không thể bán.",
   "err_invalid_solana_address": "Địa chỉ Solana không hợp lệ",
   "err_token_disabled": "Token chưa được phát hành",
-  "err_token_balance": "Không đọc được số dư"
+  "err_token_balance": "Không đọc được số dư",
+  "payout_title": "Rút về Solana",
+  "payout_body": "Đổi bao nhiêu xu sang token? Tối thiểu {min}, hạn mức ngày {daily}.",
+  "payout_sent": "Đã gửi — token đang trên đường",
+  "err_payout_disabled": "Chưa thể rút",
+  "err_payout_min": "Thấp hơn mức tối thiểu",
+  "err_payout_no_address": "Hãy thêm địa chỉ Solana trước",
+  "err_payout_daily_limit": "Đã đạt hạn mức rút trong ngày",
+  "err_payout_unconfirmed": "Khoản rút chưa được xác nhận — chúng tôi đang kiểm tra",
+  "err_payout_create": "Không tạo được yêu cầu rút",
+  "err_payout_history": "Không tải được lịch sử rút",
+  "err_payout_limit_check": "Không kiểm tra được hạn mức ngày",
+  "deposit_title": "Nạp từ Solana",
+  "deposit_body": "Gửi token từ địa chỉ đã liên kết của bạn tới địa chỉ này — xu sẽ được cộng tự động.",
+  "deposit_check": "Kiểm tra tiền vào",
+  "deposit_none": "Chưa có khoản nào mới",
+  "err_deposit_check": "Không kiểm tra được tiền vào"
 }

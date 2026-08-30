@@ -711,5 +711,21 @@
   "solana_testnet_note": "Il token è sulla rete di test devnet: nessun valore, non è vendibile.",
   "err_invalid_solana_address": "Indirizzo Solana non valido",
   "err_token_disabled": "Il token non è ancora stato emesso",
-  "err_token_balance": "Impossibile leggere il saldo"
+  "err_token_balance": "Impossibile leggere il saldo",
+  "payout_title": "Preleva su Solana",
+  "payout_body": "Quante monete convertire in token? Minimo {min}, limite giornaliero {daily}.",
+  "payout_sent": "Inviato — i token stanno arrivando",
+  "err_payout_disabled": "I prelievi non sono disponibili",
+  "err_payout_min": "Importo sotto il minimo",
+  "err_payout_no_address": "Aggiungi prima un indirizzo Solana",
+  "err_payout_daily_limit": "Limite giornaliero di prelievo raggiunto",
+  "err_payout_unconfirmed": "Il prelievo non è ancora confermato: stiamo verificando",
+  "err_payout_create": "Impossibile creare la richiesta di prelievo",
+  "err_payout_history": "Impossibile caricare lo storico dei prelievi",
+  "err_payout_limit_check": "Impossibile verificare il limite giornaliero",
+  "deposit_title": "Ricarica da Solana",
+  "deposit_body": "Invia i token dal tuo indirizzo collegato a questo: le monete vengono accreditate da sole.",
+  "deposit_check": "Verifica ricezione",
+  "deposit_none": "Non è ancora arrivato nulla di nuovo",
+  "err_deposit_check": "Impossibile verificare la ricezione"
 }

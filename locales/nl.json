@@ -711,5 +711,21 @@
   "solana_testnet_note": "De token draait op het testnetwerk devnet: geen waarde, niet verhandelbaar.",
   "err_invalid_solana_address": "Ongeldig Solana-adres",
   "err_token_disabled": "De token is nog niet uitgegeven",
-  "err_token_balance": "Saldo kon niet worden gelezen"
+  "err_token_balance": "Saldo kon niet worden gelezen",
+  "payout_title": "Uitbetalen naar Solana",
+  "payout_body": "Hoeveel munten omzetten in tokens? Minimaal {min}, daglimiet {daily}.",
+  "payout_sent": "Verzonden — de tokens zijn onderweg",
+  "err_payout_disabled": "Uitbetalingen zijn niet beschikbaar",
+  "err_payout_min": "Onder het minimumbedrag",
+  "err_payout_no_address": "Voeg eerst een Solana-adres toe",
+  "err_payout_daily_limit": "Daglimiet voor uitbetalingen bereikt",
+  "err_payout_unconfirmed": "De uitbetaling is nog niet bevestigd — we controleren het",
+  "err_payout_create": "Kon het uitbetalingsverzoek niet aanmaken",
+  "err_payout_history": "Kon de uitbetalingsgeschiedenis niet laden",
+  "err_payout_limit_check": "Kon het daglimiet niet controleren",
+  "deposit_title": "Opwaarderen vanaf Solana",
+  "deposit_body": "Stuur tokens van je gekoppelde adres naar dit adres — de munten worden automatisch bijgeschreven.",
+  "deposit_check": "Controleer ontvangst",
+  "deposit_none": "Er is nog niets nieuws binnengekomen",
+  "err_deposit_check": "Kon ontvangst niet controleren"
 }

@@ -711,5 +711,21 @@
   "solana_testnet_note": "Nasa devnet test network ang token: walang halaga at hindi maibebenta.",
   "err_invalid_solana_address": "Hindi wastong Solana address",
   "err_token_disabled": "Hindi pa naibibigay ang token",
-  "err_token_balance": "Hindi mabasa ang balanse"
+  "err_token_balance": "Hindi mabasa ang balanse",
+  "payout_title": "I-withdraw sa Solana",
+  "payout_body": "Ilang barya ang papalitan ng token? Minimum {min}, daily limit {daily}.",
+  "payout_sent": "Naipadala — paparating na ang tokens",
+  "err_payout_disabled": "Hindi available ang withdrawal",
+  "err_payout_min": "Wala sa minimum na halaga",
+  "err_payout_no_address": "Magdagdag muna ng Solana address",
+  "err_payout_daily_limit": "Naabot na ang daily withdrawal limit",
+  "err_payout_unconfirmed": "Hindi pa kumpirmado ang payout — chinecheck namin",
+  "err_payout_create": "Hindi nagawa ang withdrawal request",
+  "err_payout_history": "Hindi makuha ang withdrawal history",
+  "err_payout_limit_check": "Hindi ma-check ang daily limit",
+  "deposit_title": "Mag-top up mula Solana",
+  "deposit_body": "Magpadala ng tokens mula sa naka-link mong address papunta rito — awtomatikong makikredito ang barya.",
+  "deposit_check": "Tingnan ang papasok",
+  "deposit_none": "Wala pang bagong dumating",
+  "err_deposit_check": "Hindi ma-check ang papasok"
 }

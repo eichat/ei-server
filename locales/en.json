@@ -711,5 +711,21 @@
   "solana_testnet_note": "The token runs on the devnet test network: no value, nothing to sell.",
   "err_invalid_solana_address": "Invalid Solana address",
   "err_token_disabled": "The token has not been issued yet",
-  "err_token_balance": "Couldn’t read the balance"
+  "err_token_balance": "Couldn’t read the balance",
+  "payout_title": "Withdraw to Solana",
+  "payout_body": "How many coins to convert into tokens? Minimum {min}, daily limit {daily}.",
+  "payout_sent": "Sent — the tokens are on their way",
+  "err_payout_disabled": "Withdrawals are unavailable",
+  "err_payout_min": "Below the minimum amount",
+  "err_payout_no_address": "Add a Solana address first",
+  "err_payout_daily_limit": "Daily withdrawal limit reached",
+  "err_payout_unconfirmed": "The payout isn’t confirmed yet — we’re checking",
+  "err_payout_create": "Couldn’t create the withdrawal request",
+  "err_payout_history": "Couldn’t load the withdrawal history",
+  "err_payout_limit_check": "Couldn’t check the daily limit",
+  "deposit_title": "Top up from Solana",
+  "deposit_body": "Send tokens from your linked address to this one — the coins are credited automatically.",
+  "deposit_check": "Check for incoming",
+  "deposit_none": "Nothing new has arrived yet",
+  "err_deposit_check": "Couldn’t check for incoming"
 }

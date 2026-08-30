@@ -711,5 +711,21 @@
   "solana_testnet_note": "토큰은 테스트 네트워크 devnet에 있습니다. 가치가 없고 판매할 수 없습니다.",
   "err_invalid_solana_address": "올바르지 않은 Solana 주소",
   "err_token_disabled": "토큰이 아직 발행되지 않았습니다",
-  "err_token_balance": "잔액을 불러오지 못했습니다"
+  "err_token_balance": "잔액을 불러오지 못했습니다",
+  "payout_title": "Solana로 출금",
+  "payout_body": "몇 코인을 토큰으로 바꿀까요? 최소 {min}, 하루 한도 {daily}.",
+  "payout_sent": "전송했습니다 — 토큰이 가는 중입니다",
+  "err_payout_disabled": "출금을 사용할 수 없습니다",
+  "err_payout_min": "최소 금액보다 적습니다",
+  "err_payout_no_address": "먼저 Solana 주소를 입력하세요",
+  "err_payout_daily_limit": "하루 출금 한도에 도달했습니다",
+  "err_payout_unconfirmed": "출금이 아직 확정되지 않았습니다 — 확인 중입니다",
+  "err_payout_create": "출금 요청을 만들지 못했습니다",
+  "err_payout_history": "출금 내역을 불러오지 못했습니다",
+  "err_payout_limit_check": "하루 한도를 확인하지 못했습니다",
+  "deposit_title": "Solana에서 충전",
+  "deposit_body": "연결한 주소에서 이 주소로 토큰을 보내세요. 코인은 자동으로 적립됩니다.",
+  "deposit_check": "입금 확인",
+  "deposit_none": "아직 새로 들어온 것이 없습니다",
+  "err_deposit_check": "입금을 확인하지 못했습니다"
 }

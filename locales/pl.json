@@ -711,5 +711,21 @@
   "solana_testnet_note": "Token działa w sieci testowej devnet: nie ma wartości i nie da się go sprzedać.",
   "err_invalid_solana_address": "Nieprawidłowy adres Solana",
   "err_token_disabled": "Token nie został jeszcze wydany",
-  "err_token_balance": "Nie udało się odczytać salda"
+  "err_token_balance": "Nie udało się odczytać salda",
+  "payout_title": "Wypłać na Solanę",
+  "payout_body": "Ile monet zamienić na tokeny? Minimum {min}, limit dzienny {daily}.",
+  "payout_sent": "Wysłano — tokeny są w drodze",
+  "err_payout_disabled": "Wypłaty są niedostępne",
+  "err_payout_min": "Poniżej minimalnej kwoty",
+  "err_payout_no_address": "Najpierw podaj adres Solana",
+  "err_payout_daily_limit": "Osiągnięto dzienny limit wypłat",
+  "err_payout_unconfirmed": "Wypłata nie została jeszcze potwierdzona — sprawdzamy",
+  "err_payout_create": "Nie udało się utworzyć zlecenia wypłaty",
+  "err_payout_history": "Nie udało się wczytać historii wypłat",
+  "err_payout_limit_check": "Nie udało się sprawdzić limitu dziennego",
+  "deposit_title": "Doładuj z Solany",
+  "deposit_body": "Wyślij tokeny z powiązanego adresu na ten — monety dopiszemy automatycznie.",
+  "deposit_check": "Sprawdź wpłatę",
+  "deposit_none": "Nic nowego jeszcze nie dotarło",
+  "err_deposit_check": "Nie udało się sprawdzić wpłaty"
 }

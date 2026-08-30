@@ -711,5 +711,21 @@
   "solana_testnet_note": "O token está na rede de testes devnet: sem valor e não pode ser vendido.",
   "err_invalid_solana_address": "Endereço Solana inválido",
   "err_token_disabled": "O token ainda não foi emitido",
-  "err_token_balance": "Não foi possível ler o saldo"
+  "err_token_balance": "Não foi possível ler o saldo",
+  "payout_title": "Sacar para Solana",
+  "payout_body": "Quantas moedas converter em tokens? Mínimo {min}, limite diário {daily}.",
+  "payout_sent": "Enviado — os tokens estão a caminho",
+  "err_payout_disabled": "Os saques estão indisponíveis",
+  "err_payout_min": "Abaixo do valor mínimo",
+  "err_payout_no_address": "Adicione primeiro um endereço Solana",
+  "err_payout_daily_limit": "Limite diário de saque atingido",
+  "err_payout_unconfirmed": "O saque ainda não foi confirmado — estamos verificando",
+  "err_payout_create": "Não foi possível criar o pedido de saque",
+  "err_payout_history": "Não foi possível carregar o histórico de saques",
+  "err_payout_limit_check": "Não foi possível verificar o limite diário",
+  "deposit_title": "Recarregar via Solana",
+  "deposit_body": "Envie tokens do seu endereço vinculado para este — as moedas são creditadas automaticamente.",
+  "deposit_check": "Verificar entrada",
+  "deposit_none": "Ainda não chegou nada novo",
+  "err_deposit_check": "Não foi possível verificar a entrada"
 }

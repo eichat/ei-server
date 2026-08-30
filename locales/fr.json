@@ -711,5 +711,21 @@
   "solana_testnet_note": "Le jeton est sur le réseau de test devnet : sans valeur, invendable.",
   "err_invalid_solana_address": "Adresse Solana invalide",
   "err_token_disabled": "Le jeton n’est pas encore émis",
-  "err_token_balance": "Impossible de lire le solde"
+  "err_token_balance": "Impossible de lire le solde",
+  "payout_title": "Retirer vers Solana",
+  "payout_body": "Combien de pièces convertir en jetons ? Minimum {min}, limite quotidienne {daily}.",
+  "payout_sent": "Envoyé — les jetons sont en route",
+  "err_payout_disabled": "Les retraits sont indisponibles",
+  "err_payout_min": "Montant inférieur au minimum",
+  "err_payout_no_address": "Indiquez d’abord une adresse Solana",
+  "err_payout_daily_limit": "Limite quotidienne de retrait atteinte",
+  "err_payout_unconfirmed": "Le retrait n’est pas encore confirmé — nous vérifions",
+  "err_payout_create": "Impossible de créer la demande de retrait",
+  "err_payout_history": "Impossible de charger l’historique des retraits",
+  "err_payout_limit_check": "Impossible de vérifier la limite quotidienne",
+  "deposit_title": "Recharger depuis Solana",
+  "deposit_body": "Envoyez des jetons depuis votre adresse liée vers celle-ci — les pièces sont créditées automatiquement.",
+  "deposit_check": "Vérifier la réception",
+  "deposit_none": "Rien de nouveau pour l’instant",
+  "err_deposit_check": "Impossible de vérifier la réception"
 }

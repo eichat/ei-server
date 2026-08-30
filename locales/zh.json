@@ -711,5 +711,21 @@
   "solana_testnet_note": "该代币运行在测试网 devnet：没有价值，也无法出售。",
   "err_invalid_solana_address": "Solana 地址无效",
   "err_token_disabled": "代币尚未发行",
-  "err_token_balance": "无法读取余额"
+  "err_token_balance": "无法读取余额",
+  "payout_title": "提现到 Solana",
+  "payout_body": "要把多少金币兑换成代币？最少 {min}，每日上限 {daily}。",
+  "payout_sent": "已发送——代币正在到账",
+  "err_payout_disabled": "当前无法提现",
+  "err_payout_min": "低于最低金额",
+  "err_payout_no_address": "请先填写 Solana 地址",
+  "err_payout_daily_limit": "已达每日提现上限",
+  "err_payout_unconfirmed": "提现尚未确认——我们正在核对",
+  "err_payout_create": "无法创建提现申请",
+  "err_payout_history": "无法读取提现记录",
+  "err_payout_limit_check": "无法检查每日限额",
+  "deposit_title": "从 Solana 充值",
+  "deposit_body": "从你已绑定的地址向该地址发送代币，金币会自动入账。",
+  "deposit_check": "查询到账",
+  "deposit_none": "暂无新的入账",
+  "err_deposit_check": "无法查询到账"
 }

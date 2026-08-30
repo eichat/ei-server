@@ -2807,6 +2807,293 @@ app.get('/token/balance', async (req, res) => {
   }
 });
 
+// ── Виплата токена за внутрішні бали ─────────────────────────────────────
+// Найтонше місце всієї теми: між списанням балів і підтвердженням транзакції
+// є проміжок, у якому процес може впасти. Тому порядок саме такий:
+//   1) атомарно списуємо бали (spend_coins) — інакше два паралельні запити
+//      витратили б один баланс двічі;
+//   2) створюємо заявку pending ДО відправки — щоб слід лишився навіть якщо
+//      далі все обірветься;
+//   3) відправляємо, зберігаємо підпис, підтверджуємо;
+//   4) не вдалося — повертаємо бали й пишемо чому.
+// Незавершені заявки доперевіряються в мережі за підписом (`resumePendingPayouts`),
+// а не переграються наосліп: підтверджену транзакцію повторити означало б
+// надіслати вдруге.
+const TOKEN_PAYOUT_RATE = Number(process.env.TOKEN_PAYOUT_RATE || 1);   // токенів за 1 бал
+const TOKEN_PAYOUT_MIN = Number(process.env.TOKEN_PAYOUT_MIN || 100);   // мінімум балів за раз
+const TOKEN_PAYOUT_DAILY = Number(process.env.TOKEN_PAYOUT_DAILY || 1000); // стеля балів на добу
+const SOLANA_PAYOUT_SECRET = process.env.SOLANA_PAYOUT_SECRET || '';
+
+let payoutKeypair = null;
+function getPayoutKeypair() {
+  if (payoutKeypair || !SOLANA_PAYOUT_SECRET) return payoutKeypair;
+  try {
+    const { Keypair } = require('@solana/web3.js');
+    const bs58 = require('bs58');
+    const dec = (bs58.default || bs58).decode(SOLANA_PAYOUT_SECRET.trim());
+    payoutKeypair = Keypair.fromSecretKey(Uint8Array.from(dec));
+  } catch (e) {
+    console.error('[payout] SOLANA_PAYOUT_SECRET не розібрано:', e.message);
+  }
+  return payoutKeypair;
+}
+const payoutReady = () => !!(SOLANA_TOKEN_MINT && getPayoutKeypair());
+
+// Скільки балів людина вже вивела за добу. Рахуємо ВСІ заявки, крім повернених:
+// невдала спроба теж витратила ліміт, інакше нею можна було б довбати мережу.
+async function payoutUsedToday(nick) {
+  const since = new Date(Date.now() - 86400000).toISOString();
+  const { data, error } = await supabase.from('token_payouts')
+    .select('coins, status').eq('nick', nick).gte('created_at', since);
+  if (error) { console.error('[payout] usedToday:', error.message); return null; }
+  return (data || []).filter(r => r.status !== 'refunded').reduce((a, r) => a + (r.coins || 0), 0);
+}
+
+// Транзакція будується вручну (а не через готовий `transfer`) заради ОДНОГО:
+// підпис має бути відомий ДО відправки. `transfer` повертає його вже після
+// підтвердження, тож обрив посеред очікування лишив би нас без підпису при
+// можливо надісланих токенах — і повторна спроба надіслала б удруге.
+//
+// `createAssociatedTokenAccountIdempotent` замість звичайного створення: у
+// отримувача акаунт може вже бути (або зʼявитись між нашою перевіркою та
+// відправкою), і звичайна інструкція в такому разі валить усю транзакцію.
+async function buildPayoutTx(toAddress, tokensAmount) {
+  const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
+  const {
+    getMint, getAssociatedTokenAddress, createTransferInstruction,
+    createAssociatedTokenAccountIdempotentInstruction,
+  } = require('@solana/spl-token');
+  const bs58 = require('bs58');
+  const c = new Connection(SOLANA_RPC, 'confirmed');
+  const kp = getPayoutKeypair();
+  const mint = new PublicKey(SOLANA_TOKEN_MINT);
+  const owner = new PublicKey(toAddress);
+  const info = await getMint(c, mint);
+  const raw = BigInt(Math.round(tokensAmount)) * (10n ** BigInt(info.decimals));
+
+  const from = await getAssociatedTokenAddress(mint, kp.publicKey);
+  const to = await getAssociatedTokenAddress(mint, owner);
+  const { blockhash, lastValidBlockHeight } = await c.getLatestBlockhash('confirmed');
+  const tx = new Transaction({ feePayer: kp.publicKey, blockhash, lastValidBlockHeight })
+    // Ренту за новий акаунт отримувача (~0.002 SOL) платить гаманець виплат.
+    .add(createAssociatedTokenAccountIdempotentInstruction(kp.publicKey, to, owner, mint))
+    .add(createTransferInstruction(from, to, kp.publicKey, raw));
+  tx.sign(kp);
+  const signature = (bs58.default || bs58).encode(tx.signature);
+  return { c, tx, signature, lastValidBlockHeight };
+}
+
+// Стан транзакції в мережі: єдине джерело правди про те, чи пішли токени.
+async function payoutTxStatus(signature) {
+  const { Connection } = require('@solana/web3.js');
+  const c = new Connection(SOLANA_RPC, 'confirmed');
+  const st = await c.getSignatureStatus(signature, { searchTransactionHistory: true });
+  const v = st && st.value;
+  if (!v) return 'unknown';                       // не знайдено: або ще летить, або не існувала
+  if (v.err) return 'failed';
+  return 'sent';
+}
+
+// Дорозбір заявок, що лишились у pending після падіння процесу. Ключове: ми
+// НЕ переграємо їх наосліп — питаємо мережу за підписом. Підтверджену
+// транзакцію повторити означало б надіслати вдруге.
+async function resumePendingPayouts() {
+  if (!payoutReady()) return;
+  const cutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.from('token_payouts')
+    .select('id, nick, coins, signature').eq('status', 'pending').lt('created_at', cutoff).limit(50);
+  if (error) { console.error('[payout] resume:', error.message); return; }
+  for (const p of data || []) {
+    try {
+      if (!p.signature) {
+        // Підпису немає — транзакція не будувалась, тож і токенів не було.
+        await supabase.from('token_payouts').update({ status: 'refunded', error: 'обірвано до відправки' }).eq('id', p.id);
+        await supabase.rpc('add_coins', { p_nick: p.nick, p_amount: p.coins });
+        console.log('[payout] повернуто бали за заявкою', p.id);
+        continue;
+      }
+      const st = await payoutTxStatus(p.signature);
+      if (st === 'sent') {
+        await supabase.from('token_payouts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', p.id);
+        console.log('[payout] заявка', p.id, 'насправді пройшла');
+      } else if (st === 'failed') {
+        await supabase.from('token_payouts').update({ status: 'refunded', error: 'транзакція відхилена мережею' }).eq('id', p.id);
+        await supabase.rpc('add_coins', { p_nick: p.nick, p_amount: p.coins });
+        console.log('[payout] заявка', p.id, 'відхилена, бали повернуто');
+      }
+      // 'unknown' лишаємо як є: транзакція може ще підтвердитись. Повторна
+      // перевірка буде наступного разу — краще затримка, ніж подвійна виплата.
+    } catch (e) { console.error('[payout] resume', p.id, e.message); }
+  }
+}
+
+app.post('/token/payout', async (req, res) => {
+  if (!payoutReady()) return res.json({ ok: false, error: 'Виплати недоступні', code: 'err_payout_disabled' });
+  const coins = Math.floor(Number(req.body.coins));
+  if (!Number.isFinite(coins) || coins < TOKEN_PAYOUT_MIN) {
+    return res.json({ ok: false, error: `Мінімум ${TOKEN_PAYOUT_MIN} монет`, code: 'err_payout_min' });
+  }
+  const { data: user } = await supabase.from('users').select('solana_address').eq('nick', req.nick).single();
+  const address = user && user.solana_address;
+  if (!address) return res.json({ ok: false, error: 'Спершу вкажіть адресу Solana', code: 'err_payout_no_address' });
+
+  const used = await payoutUsedToday(req.nick);
+  if (used === null) return res.json({ ok: false, error: 'Не вдалося перевірити ліміт', code: 'err_payout_limit_check' });
+  if (used + coins > TOKEN_PAYOUT_DAILY) {
+    return res.json({ ok: false, error: 'Денний ліміт виплат вичерпано', code: 'err_payout_daily_limit' });
+  }
+
+  // Списання ПЕРШИМ і атомарно: два паралельні запити не витратять один баланс двічі.
+  const { data: left, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: req.nick, p_amount: coins });
+  if (spendErr || left === -1 || left === null) {
+    return res.json({ ok: false, error: 'Недостатньо монет', code: 'err_not_enough_coins' });
+  }
+
+  const tokens = coins * TOKEN_PAYOUT_RATE;
+  const { data: row, error: insErr } = await supabase.from('token_payouts')
+    .insert({ nick: req.nick, address, coins, tokens, status: 'pending' }).select('id').single();
+  if (insErr) {
+    // Заявку не записали — тоді й бали не мають зникнути.
+    await supabase.rpc('add_coins', { p_nick: req.nick, p_amount: coins });
+    return res.json({ ok: false, error: 'Не вдалося створити заявку', code: 'err_payout_create' });
+  }
+
+  try {
+    const { c, tx, signature, lastValidBlockHeight } = await buildPayoutTx(address, tokens);
+    // Підпис у базу ДО відправки — щоб обрив не лишив нас без сліду.
+    await supabase.from('token_payouts').update({ signature }).eq('id', row.id);
+    const raw = tx.serialize();
+    await c.sendRawTransaction(raw, { skipPreflight: false });
+    await c.confirmTransaction({ signature, blockhash: tx.recentBlockhash, lastValidBlockHeight }, 'confirmed');
+    await supabase.from('token_payouts')
+      .update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', row.id);
+    logTx({ fromNick: req.nick, toNick: null, amount: coins, kind: 'token_payout', ref: signature });
+    res.json({ ok: true, id: row.id, tokens, signature, balance: left, cluster: SOLANA_CLUSTER });
+  } catch (e) {
+    console.error('[payout] send:', e.message);
+    // 🔴 Бали НЕ повертаємо наосліп: помилка могла статись уже після того, як
+    // транзакція пішла в мережу (найчастіше — таймаут підтвердження). Заявка
+    // лишається pending із підписом, і resumePendingPayouts спитає мережу.
+    // Повертати тут означало б віддати бали за реально надіслані токени.
+    await supabase.from('token_payouts')
+      .update({ error: String(e.message).slice(0, 300) }).eq('id', row.id);
+    setTimeout(() => resumePendingPayouts().catch(() => {}), 30000).unref?.();
+    res.json({ ok: false, error: 'Виплату не підтверджено, перевіряємо', code: 'err_payout_unconfirmed' });
+  }
+});
+
+// ── Надходження: токен → бали ────────────────────────────────────────────
+// Зворотний бік мосту. Людина надсилає токени на гаманець обміну (той самий,
+// що платить виплати — так ліквідність не розсипається на два пули), а ми
+// зараховуємо бали.
+//
+// Хто надіслав, визначаємо ЗА АДРЕСОЮ ВІДПРАВНИКА, без memo: адреса вже є в
+// профілі. Memo вимагало б від людини вставити код у поле, яке більшість
+// гаманців ховає, і кожна помилка означала б загублені токени.
+//
+// Баланси читаємо з `preTokenBalances`/`postTokenBalances` транзакції, а не
+// розбираємо інструкції: різниця балансів однаково точна і не залежить від
+// того, якою саме інструкцією зроблено переказ.
+async function scanTokenDeposits() {
+  if (!payoutReady()) return { ok: false, reason: 'disabled' };
+  const { Connection, PublicKey } = require('@solana/web3.js');
+  const { getAssociatedTokenAddress } = require('@solana/spl-token');
+  const c = new Connection(SOLANA_RPC, 'confirmed');
+  const kp = getPayoutKeypair();
+  const mint = new PublicKey(SOLANA_TOKEN_MINT);
+  const ata = await getAssociatedTokenAddress(mint, kp.publicKey);
+
+  const sigs = await c.getSignaturesForAddress(ata, { limit: 25 }, 'confirmed');
+  if (!sigs.length) return { ok: true, checked: 0, credited: 0 };
+
+  // Уже оброблені відсіюємо ОДНИМ запитом: інакше на кожен скан ішло б 25.
+  const { data: known } = await supabase.from('token_deposits')
+    .select('signature').in('signature', sigs.map(x => x.signature));
+  const seen = new Set((known || []).map(r => r.signature));
+
+  let credited = 0;
+  for (const s of sigs) {
+    if (seen.has(s.signature) || s.err) continue;
+    try {
+      const tx = await c.getParsedTransaction(s.signature, { maxSupportedTransactionVersion: 0 });
+      if (!tx || !tx.meta) continue;
+      const pre = tx.meta.preTokenBalances || [];
+      const post = tx.meta.postTokenBalances || [];
+      const amountOf = (arr, owner) => {
+        const r = arr.find(b => b.owner === owner && b.mint === SOLANA_TOKEN_MINT);
+        return r ? Number(r.uiTokenAmount.uiAmount || 0) : 0;
+      };
+      const gained = amountOf(post, kp.publicKey.toBase58()) - amountOf(pre, kp.publicKey.toBase58());
+      if (gained <= 0) continue;   // це не надходження (виплата або чужа операція)
+
+      // Відправник — той, чий баланс цього ж mint зменшився найбільше.
+      let sender = null, drop = 0;
+      for (const b of post) {
+        if (b.mint !== SOLANA_TOKEN_MINT || b.owner === kp.publicKey.toBase58()) continue;
+        const d = amountOf(pre, b.owner) - Number(b.uiTokenAmount.uiAmount || 0);
+        if (d > drop) { drop = d; sender = b.owner; }
+      }
+      if (!sender) continue;
+
+      const { data: user } = await supabase.from('users')
+        .select('nick').eq('solana_address', sender).single();
+      const coins = user ? Math.floor(gained / TOKEN_PAYOUT_RATE) : 0;
+
+      // Спершу запис (ключ — signature), потім нарахування: якщо процес упаде
+      // між ними, повторний скан побачить запис і не зарахує вдруге. Втратити
+      // нарахування гірше не буде — його видно в історії й можна долити руками.
+      const { error: insErr } = await supabase.from('token_deposits').insert({
+        signature: s.signature, nick: user ? user.nick : null, address: sender,
+        tokens: gained, coins, slot: s.slot,
+        status: user ? 'credited' : 'unmatched',
+      });
+      if (insErr) continue;   // найімовірніше гонка — інший інстанс уже записав
+      if (user && coins > 0) {
+        await supabase.rpc('add_coins', { p_nick: user.nick, p_amount: coins });
+        logTx({ fromNick: null, toNick: user.nick, amount: coins, kind: 'token_deposit', ref: s.signature });
+        credited++;
+      }
+    } catch (e) { console.error('[deposit]', s.signature, e.message); }
+  }
+  return { ok: true, checked: sigs.length, credited };
+}
+
+// Куди надсилати + ручна перевірка. Автоматичний скан теж є (раз на 5 хв), але
+// чекати п'ять хвилин, дивлячись на порожній екран, — погана перша вражіння.
+app.get('/token/deposit-address', async (req, res) => {
+  if (!payoutReady()) return res.json({ ok: false, error: 'Виплати недоступні', code: 'err_payout_disabled' });
+  const { data: user } = await supabase.from('users').select('solana_address').eq('nick', req.nick).single();
+  res.json({
+    ok: true,
+    address: getPayoutKeypair().publicKey.toBase58(),
+    mint: SOLANA_TOKEN_MINT,
+    cluster: SOLANA_CLUSTER,
+    rate: TOKEN_PAYOUT_RATE,
+    // Без прив'язаної адреси надходження не буде кому зарахувати.
+    from: (user && user.solana_address) || null,
+  });
+});
+
+app.post('/token/deposit-check', async (req, res) => {
+  try {
+    const r = await scanTokenDeposits();
+    if (!r.ok) return res.json({ ok: false, error: 'Виплати недоступні', code: 'err_payout_disabled' });
+    const { data: u } = await supabase.from('users').select('coins').eq('nick', req.nick).single();
+    res.json({ ok: true, checked: r.checked, credited: r.credited, balance: u ? u.coins : null });
+  } catch (e) {
+    console.error('[deposit] check:', e.message);
+    res.json({ ok: false, error: 'Не вдалося перевірити надходження', code: 'err_deposit_check' });
+  }
+});
+
+app.get('/token/payouts', async (req, res) => {
+  const { data, error } = await supabase.from('token_payouts')
+    .select('id, coins, tokens, status, signature, created_at')
+    .eq('nick', req.nick).order('id', { ascending: false }).limit(20);
+  if (error) return res.json({ ok: false, error: 'Не вдалося прочитати історію', code: 'err_payout_history' });
+  res.json({ ok: true, cluster: SOLANA_CLUSTER, payouts: data || [] });
+});
+
 app.get('/search-user', async (req, res) => {
   const { nick } = req.query; if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Введіть мін. 2 символи', code: 'err_query_too_short' });
   const { data } = await supabase.from('users').select('nick').ilike('nick_lower', `%${nick.toLowerCase()}%`).neq('invisible', true).limit(10);
@@ -5435,4 +5722,12 @@ setInterval(async () => {
 }, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`EION сервер запущено на порті ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`EION сервер запущено на порті ${PORT}`);
+  // Заявки, що зависли в pending після падіння чи перезапуску (Render робить це
+  // при кожному деплої й після сну). Питаємо мережу, а не переграємо наосліп.
+  resumePendingPayouts().catch((e) => console.error('[payout] resume on boot:', e.message));
+  setInterval(() => resumePendingPayouts().catch(() => {}), 10 * 60 * 1000).unref();
+  // Надходження токена: людина могла надіслати їх, не відкриваючи застосунок.
+  setInterval(() => scanTokenDeposits().catch((e) => console.error('[deposit] scan:', e.message)), 5 * 60 * 1000).unref();
+});

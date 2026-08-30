@@ -711,5 +711,21 @@
   "solana_testnet_note": "Der Token läuft im Testnetz devnet: kein Wert, kein Verkauf.",
   "err_invalid_solana_address": "Ungültige Solana-Adresse",
   "err_token_disabled": "Der Token ist noch nicht ausgegeben",
-  "err_token_balance": "Guthaben konnte nicht gelesen werden"
+  "err_token_balance": "Guthaben konnte nicht gelesen werden",
+  "payout_title": "Auf Solana auszahlen",
+  "payout_body": "Wie viele Coins in Token umwandeln? Minimum {min}, Tageslimit {daily}.",
+  "payout_sent": "Gesendet — die Token sind unterwegs",
+  "err_payout_disabled": "Auszahlungen sind nicht verfügbar",
+  "err_payout_min": "Betrag unter dem Minimum",
+  "err_payout_no_address": "Gib zuerst eine Solana-Adresse an",
+  "err_payout_daily_limit": "Tageslimit für Auszahlungen erreicht",
+  "err_payout_unconfirmed": "Auszahlung noch nicht bestätigt — wir prüfen",
+  "err_payout_create": "Auszahlungsauftrag konnte nicht erstellt werden",
+  "err_payout_history": "Auszahlungsverlauf konnte nicht geladen werden",
+  "err_payout_limit_check": "Tageslimit konnte nicht geprüft werden",
+  "deposit_title": "Von Solana aufladen",
+  "deposit_body": "Sende Token von deiner verknüpften Adresse an diese — die Coins schreiben wir automatisch gut.",
+  "deposit_check": "Eingang prüfen",
+  "deposit_none": "Noch nichts Neues eingegangen",
+  "err_deposit_check": "Eingang konnte nicht geprüft werden"
 }
