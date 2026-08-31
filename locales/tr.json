@@ -744,5 +744,12 @@
   "err_relay_failed": "Transfer gerçekleşmedi",
   "err_relay_signature": "Geçersiz imza",
   "deposit_body3": "EION’u burada jetona çevirin. Ücreti biz karşılıyoruz.",
-  "coins_label": "Jeton"
+  "coins_label": "Jeton",
+  "err_recipient_no_wallet": "Alıcının cüzdanı yok",
+  "err_transfer_daily_limit": "Bugünkü transfer limitine ulaşıldı",
+  "token_transfer_title": "EION gönder",
+  "token_transfer_to": "Takma ad veya adres",
+  "token_transfer_body": "Bir kullanıcının takma adını veya cüzdan adresini girin. Ağ ücretini EION öder.",
+  "token_transfer_sent": "{amount} EION gönderildi",
+  "token_received": "{nick} kişisinden {amount} EION alındı"
 }

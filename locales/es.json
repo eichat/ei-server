@@ -744,5 +744,12 @@
   "err_relay_failed": "La transferencia no se completó",
   "err_relay_signature": "Firma no válida",
   "deposit_body3": "Convierte EION en monedas aquí mismo. Nosotros pagamos la comisión.",
-  "coins_label": "Monedas"
+  "coins_label": "Monedas",
+  "err_recipient_no_wallet": "El destinatario no tiene monedero",
+  "err_transfer_daily_limit": "Se alcanzó el límite de transferencias de hoy",
+  "token_transfer_title": "Enviar EION",
+  "token_transfer_to": "Apodo o dirección",
+  "token_transfer_body": "Introduce el apodo de un usuario o una dirección de monedero. EION paga la comisión de red.",
+  "token_transfer_sent": "Enviado {amount} EION",
+  "token_received": "Recibiste {amount} EION de {nick}"
 }

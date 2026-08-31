@@ -744,5 +744,12 @@
   "err_relay_failed": "Transfer tidak berhasil",
   "err_relay_signature": "Tanda tangan tidak valid",
   "deposit_body3": "Ubah EION jadi koin di sini. Biayanya kami yang tanggung.",
-  "coins_label": "Koin"
+  "coins_label": "Koin",
+  "err_recipient_no_wallet": "Penerima tidak memiliki dompet",
+  "err_transfer_daily_limit": "Batas transfer hari ini telah tercapai",
+  "token_transfer_title": "Kirim EION",
+  "token_transfer_to": "Nama pengguna atau alamat",
+  "token_transfer_body": "Masukkan nama pengguna atau alamat dompet. Biaya jaringan dibayar EION.",
+  "token_transfer_sent": "{amount} EION terkirim",
+  "token_received": "Menerima {amount} EION dari {nick}"
 }

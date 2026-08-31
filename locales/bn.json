@@ -744,5 +744,12 @@
   "err_relay_failed": "লেনদেন সম্পন্ন হয়নি",
   "err_relay_signature": "সই বৈধ নয়",
   "deposit_body3": "এখানেই EION থেকে কয়েনে বদলান। ফি আমরা দিই।",
-  "coins_label": "কয়েন"
+  "coins_label": "কয়েন",
+  "err_recipient_no_wallet": "প্রাপকের কোনও ওয়ালেট নেই",
+  "err_transfer_daily_limit": "আজকের স্থানান্তর সীমা শেষ",
+  "token_transfer_title": "EION পাঠান",
+  "token_transfer_to": "নিক বা ঠিকানা",
+  "token_transfer_body": "ব্যবহারকারীর নিক বা ওয়ালেট ঠিকানা লিখুন। নেটওয়ার্ক ফি EION বহন করে।",
+  "token_transfer_sent": "{amount} EION পাঠানো হয়েছে",
+  "token_received": "{nick} থেকে {amount} EION পাওয়া গেছে"
 }

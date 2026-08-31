@@ -744,5 +744,12 @@
   "err_relay_failed": "การโอนไม่สำเร็จ",
   "err_relay_signature": "ลายเซ็นไม่ถูกต้อง",
   "deposit_body3": "แลก EION เป็นเหรียญได้ที่นี่ ค่าธรรมเนียมเราจ่ายให้",
-  "coins_label": "เหรียญ"
+  "coins_label": "เหรียญ",
+  "err_recipient_no_wallet": "ผู้รับไม่มีกระเป๋าเงิน",
+  "err_transfer_daily_limit": "ถึงขีดจำกัดการโอนของวันนี้แล้ว",
+  "token_transfer_title": "ส่ง EION",
+  "token_transfer_to": "ชื่อผู้ใช้หรือที่อยู่",
+  "token_transfer_body": "ใส่ชื่อผู้ใช้หรือที่อยู่กระเป๋าเงิน ค่าธรรมเนียมเครือข่าย EION เป็นผู้จ่าย",
+  "token_transfer_sent": "ส่ง {amount} EION แล้ว",
+  "token_received": "ได้รับ {amount} EION จาก {nick}"
 }

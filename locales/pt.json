@@ -744,5 +744,12 @@
   "err_relay_failed": "A transferência não foi concluída",
   "err_relay_signature": "Assinatura inválida",
   "deposit_body3": "Converta EION em moedas aqui mesmo. A taxa é por nossa conta.",
-  "coins_label": "Moedas"
+  "coins_label": "Moedas",
+  "err_recipient_no_wallet": "O destinatário não tem carteira",
+  "err_transfer_daily_limit": "O limite de transferências de hoje foi atingido",
+  "token_transfer_title": "Enviar EION",
+  "token_transfer_to": "Apelido ou endereço",
+  "token_transfer_body": "Digite o apelido de um utilizador ou um endereço de carteira. A taxa de rede é paga pela EION.",
+  "token_transfer_sent": "Enviados {amount} EION",
+  "token_received": "Recebeste {amount} EION de {nick}"
 }

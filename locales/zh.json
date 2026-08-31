@@ -744,5 +744,12 @@
   "err_relay_failed": "转账未成功",
   "err_relay_signature": "签名无效",
   "deposit_body3": "在这里把 EION 兑换成金币。手续费由我们承担。",
-  "coins_label": "金币"
+  "coins_label": "金币",
+  "err_recipient_no_wallet": "接收者没有钱包",
+  "err_transfer_daily_limit": "今日转账次数已达上限",
+  "token_transfer_title": "转账 EION",
+  "token_transfer_to": "昵称或地址",
+  "token_transfer_body": "输入用户昵称或钱包地址。网络手续费由 EION 支付。",
+  "token_transfer_sent": "已发送 {amount} EION",
+  "token_received": "收到来自 {nick} 的 {amount} EION"
 }

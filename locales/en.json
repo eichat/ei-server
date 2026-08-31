@@ -744,5 +744,12 @@
   "err_relay_failed": "The transfer didn’t go through",
   "err_relay_signature": "Invalid signature",
   "deposit_body3": "Turn EION into coins right here. We cover the fee.",
-  "coins_label": "Coins"
+  "coins_label": "Coins",
+  "err_recipient_no_wallet": "The recipient has no wallet",
+  "err_transfer_daily_limit": "Today's transfer limit is reached",
+  "token_transfer_title": "Send EION",
+  "token_transfer_to": "Nickname or address",
+  "token_transfer_body": "Enter a user's nickname or a wallet address. EION pays the network fee.",
+  "token_transfer_sent": "Sent {amount} EION",
+  "token_received": "Received {amount} EION from {nick}"
 }

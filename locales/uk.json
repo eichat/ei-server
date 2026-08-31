@@ -744,5 +744,12 @@
   "err_relay_failed": "Переказ не пройшов",
   "err_relay_signature": "Недійсний підпис",
   "deposit_body3": "Обміняйте EION на монети просто тут. Комісію платимо ми.",
-  "coins_label": "Монети"
+  "coins_label": "Монети",
+  "err_recipient_no_wallet": "У отримувача немає гаманця",
+  "err_transfer_daily_limit": "Ліміт переказів на сьогодні вичерпано",
+  "token_transfer_title": "Переказ EION",
+  "token_transfer_to": "Нік або адреса",
+  "token_transfer_body": "Вкажіть нік користувача або адресу гаманця. Комісію мережі оплачує EION.",
+  "token_transfer_sent": "Надіслано {amount} EION",
+  "token_received": "Отримано {amount} EION від {nick}"
 }

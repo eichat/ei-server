@@ -744,5 +744,12 @@
   "err_relay_failed": "Giao dịch không thành công",
   "err_relay_signature": "Chữ ký không hợp lệ",
   "deposit_body3": "Đổi EION sang xu ngay tại đây. Phí do chúng tôi trả.",
-  "coins_label": "Xu"
+  "coins_label": "Xu",
+  "err_recipient_no_wallet": "Người nhận không có ví",
+  "err_transfer_daily_limit": "Đã đạt giới hạn chuyển hôm nay",
+  "token_transfer_title": "Gửi EION",
+  "token_transfer_to": "Biệt danh hoặc địa chỉ",
+  "token_transfer_body": "Nhập biệt danh người dùng hoặc địa chỉ ví. Phí mạng do EION trả.",
+  "token_transfer_sent": "Đã gửi {amount} EION",
+  "token_received": "Đã nhận {amount} EION từ {nick}"
 }

@@ -744,5 +744,12 @@
   "err_relay_failed": "Перевод не прошёл",
   "err_relay_signature": "Недействительная подпись",
   "deposit_body3": "Обменяйте EION на монеты прямо тут. Комиссию платим мы.",
-  "coins_label": "Монеты"
+  "coins_label": "Монеты",
+  "err_recipient_no_wallet": "У получателя нет кошелька",
+  "err_transfer_daily_limit": "Лимит переводов на сегодня исчерпан",
+  "token_transfer_title": "Перевод EION",
+  "token_transfer_to": "Ник или адрес",
+  "token_transfer_body": "Укажите ник пользователя или адрес кошелька. Комиссию сети оплачивает EION.",
+  "token_transfer_sent": "Отправлено {amount} EION",
+  "token_received": "Получено {amount} EION от {nick}"
 }

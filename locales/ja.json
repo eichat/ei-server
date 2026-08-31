@@ -744,5 +744,12 @@
   "err_relay_failed": "送金できませんでした",
   "err_relay_signature": "署名が正しくありません",
   "deposit_body3": "ここでEIONをコインに交換できます。手数料は当社が負担します。",
-  "coins_label": "コイン"
+  "coins_label": "コイン",
+  "err_recipient_no_wallet": "受取人はウォレットを持っていません",
+  "err_transfer_daily_limit": "本日の送金上限に達しました",
+  "token_transfer_title": "EIONを送る",
+  "token_transfer_to": "ニックネームまたはアドレス",
+  "token_transfer_body": "ユーザーのニックネームかウォレットアドレスを入力してください。ネットワーク手数料はEIONが負担します。",
+  "token_transfer_sent": "{amount} EIONを送信しました",
+  "token_received": "{nick}から{amount} EIONを受け取りました"
 }

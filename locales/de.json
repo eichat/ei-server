@@ -744,5 +744,12 @@
   "err_relay_failed": "Der Transfer ist fehlgeschlagen",
   "err_relay_signature": "Ungültige Signatur",
   "deposit_body3": "Wandle EION hier direkt in Coins um. Die Gebühr zahlen wir.",
-  "coins_label": "Coins"
+  "coins_label": "Coins",
+  "err_recipient_no_wallet": "Der Empfänger hat keine Wallet",
+  "err_transfer_daily_limit": "Das heutige Überweisungslimit ist erreicht",
+  "token_transfer_title": "EION senden",
+  "token_transfer_to": "Name oder Adresse",
+  "token_transfer_body": "Gib den Namen eines Nutzers oder eine Wallet-Adresse ein. Die Netzwerkgebühr zahlt EION.",
+  "token_transfer_sent": "{amount} EION gesendet",
+  "token_received": "{amount} EION von {nick} erhalten"
 }

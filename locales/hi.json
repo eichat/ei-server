@@ -744,5 +744,12 @@
   "err_relay_failed": "ट्रांसफ़र नहीं हो सका",
   "err_relay_signature": "अमान्य हस्ताक्षर",
   "deposit_body3": "यहीं EION को सिक्कों में बदलें। शुल्क हम देते हैं।",
-  "coins_label": "सिक्के"
+  "coins_label": "सिक्के",
+  "err_recipient_no_wallet": "प्राप्तकर्ता के पास वॉलेट नहीं है",
+  "err_transfer_daily_limit": "आज की स्थानांतरण सीमा समाप्त हो गई",
+  "token_transfer_title": "EION भेजें",
+  "token_transfer_to": "उपनाम या पता",
+  "token_transfer_body": "उपयोगकर्ता का उपनाम या वॉलेट पता दर्ज करें। नेटवर्क शुल्क EION चुकाता है।",
+  "token_transfer_sent": "{amount} EION भेजे गए",
+  "token_received": "{nick} से {amount} EION मिले"
 }

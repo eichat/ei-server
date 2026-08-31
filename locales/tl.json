@@ -744,5 +744,12 @@
   "err_relay_failed": "Hindi natuloy ang transfer",
   "err_relay_signature": "Hindi wastong lagda",
   "deposit_body3": "Palitan ang EION sa coins dito mismo. Kami ang sasagot sa fee.",
-  "coins_label": "Coins"
+  "coins_label": "Coins",
+  "err_recipient_no_wallet": "Walang wallet ang tatanggap",
+  "err_transfer_daily_limit": "Naabot na ang limitasyon ng paglilipat ngayong araw",
+  "token_transfer_title": "Magpadala ng EION",
+  "token_transfer_to": "Palayaw o address",
+  "token_transfer_body": "Ilagay ang palayaw ng user o address ng wallet. Ang bayad sa network ay sagot ng EION.",
+  "token_transfer_sent": "Naipadala ang {amount} EION",
+  "token_received": "Nakatanggap ng {amount} EION mula kay {nick}"
 }

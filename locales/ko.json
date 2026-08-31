@@ -744,5 +744,12 @@
   "err_relay_failed": "전송이 완료되지 않았습니다",
   "err_relay_signature": "서명이 올바르지 않습니다",
   "deposit_body3": "여기서 EION을 코인으로 바꾸세요. 수수료는 저희가 냅니다.",
-  "coins_label": "코인"
+  "coins_label": "코인",
+  "err_recipient_no_wallet": "받는 사람에게 지갑이 없습니다",
+  "err_transfer_daily_limit": "오늘의 전송 한도에 도달했습니다",
+  "token_transfer_title": "EION 보내기",
+  "token_transfer_to": "닉네임 또는 주소",
+  "token_transfer_body": "사용자 닉네임 또는 지갑 주소를 입력하세요. 네트워크 수수료는 EION이 부담합니다.",
+  "token_transfer_sent": "{amount} EION 전송됨",
+  "token_received": "{nick}님에게서 {amount} EION을 받았습니다"
 }

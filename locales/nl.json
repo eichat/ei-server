@@ -744,5 +744,12 @@
   "err_relay_failed": "De overdracht is mislukt",
   "err_relay_signature": "Ongeldige handtekening",
   "deposit_body3": "Zet EION hier direct om in munten. De kosten zijn voor ons.",
-  "coins_label": "Munten"
+  "coins_label": "Munten",
+  "err_recipient_no_wallet": "De ontvanger heeft geen wallet",
+  "err_transfer_daily_limit": "De overboekingslimiet van vandaag is bereikt",
+  "token_transfer_title": "EION verzenden",
+  "token_transfer_to": "Naam of adres",
+  "token_transfer_body": "Voer de naam van een gebruiker of een wallet-adres in. EION betaalt de netwerkkosten.",
+  "token_transfer_sent": "{amount} EION verzonden",
+  "token_received": "{amount} EION ontvangen van {nick}"
 }

@@ -744,5 +744,12 @@
   "err_relay_failed": "Le transfert n’a pas abouti",
   "err_relay_signature": "Signature invalide",
   "deposit_body3": "Convertissez vos EION en pièces ici même. Les frais sont pour nous.",
-  "coins_label": "Pièces"
+  "coins_label": "Pièces",
+  "err_recipient_no_wallet": "Le destinataire n'a pas de portefeuille",
+  "err_transfer_daily_limit": "La limite de transferts pour aujourd'hui est atteinte",
+  "token_transfer_title": "Envoyer des EION",
+  "token_transfer_to": "Pseudo ou adresse",
+  "token_transfer_body": "Saisissez le pseudo d'un utilisateur ou une adresse de portefeuille. EION paie les frais de réseau.",
+  "token_transfer_sent": "{amount} EION envoyés",
+  "token_received": "{amount} EION reçus de {nick}"
 }

@@ -744,5 +744,12 @@
   "err_relay_failed": "Przelew się nie powiódł",
   "err_relay_signature": "Nieprawidłowy podpis",
   "deposit_body3": "Zamień EION na monety tutaj. Opłatę pokrywamy my.",
-  "coins_label": "Monety"
+  "coins_label": "Monety",
+  "err_recipient_no_wallet": "Odbiorca nie ma portfela",
+  "err_transfer_daily_limit": "Dzienny limit przelewów został wyczerpany",
+  "token_transfer_title": "Wyślij EION",
+  "token_transfer_to": "Nick lub adres",
+  "token_transfer_body": "Podaj nick użytkownika lub adres portfela. Opłatę sieciową pokrywa EION.",
+  "token_transfer_sent": "Wysłano {amount} EION",
+  "token_received": "Otrzymano {amount} EION od {nick}"
 }

@@ -744,5 +744,12 @@
   "err_relay_failed": "لم يتم التحويل",
   "err_relay_signature": "التوقيع غير صالح",
   "deposit_body3": "حوّل EION إلى عملات هنا مباشرة. نحن ندفع الرسوم.",
-  "coins_label": "العملات"
+  "coins_label": "العملات",
+  "err_recipient_no_wallet": "لا يملك المستلم محفظة",
+  "err_transfer_daily_limit": "تم استنفاد حد التحويلات لهذا اليوم",
+  "token_transfer_title": "تحويل EION",
+  "token_transfer_to": "الاسم أو العنوان",
+  "token_transfer_body": "أدخل اسم مستخدم أو عنوان محفظة. رسوم الشبكة يدفعها EION.",
+  "token_transfer_sent": "تم إرسال {amount} EION",
+  "token_received": "تم استلام {amount} EION من {nick}"
 }

@@ -185,8 +185,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.8',
-  code: 9,
+  version: '0.9.9',
+  code: 10,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -3187,6 +3187,129 @@ app.post('/token/deposit-submit', async (req, res) => {
     res.json({ ok: true, signature, credited: coins, balance: u ? u.coins : null });
   } catch (e) {
     console.error('[relay] submit:', e.message);
+    res.json({ ok: false, error: 'Переказ не пройшов', code: 'err_relay_failed' });
+  }
+});
+
+// ── Переказ токена між гаманцями ────────────────────────────────────────
+// Той самий relayer, що й у поповненні: комісію платить сервер, бо в
+// користувача SOL немає взагалі. Отримувач задається НІКОМ або адресою —
+// нік зручніший у месенджері, адреса потрібна, щоб надіслати назовні.
+//
+// Денна стеля тут не про токени, а про НАШ SOL: кожен переказ коштує комісії,
+// а перший переказ на нову адресу — ще й ренти за її токен-акаунт (~0.002 SOL).
+// Без стелі один користувач міг би ганяти переказ туди-сюди й спорожнити
+// гаманець обміну.
+const TOKEN_TRANSFER_DAILY = Number(process.env.TOKEN_TRANSFER_DAILY || 20);
+const pendingTokenTransfer = new Map();   // nick → { message, ... }
+
+/// Кому надсилаємо: нік нашого користувача або зовнішня адреса.
+/// Повертає { address, nick } або { error, code }.
+async function resolveTokenRecipient(to) {
+  const raw = typeof to === 'string' ? to.trim() : '';
+  if (!raw) return { error: 'Вкажіть отримувача', code: 'err_invalid_params' };
+  if (base58Len(raw) === 32) return { address: raw, nick: null };
+  let { data: u } = await supabase.from('users')
+    .select('nick, solana_address').eq('nick', raw).single();
+  if (!u) {
+    const { data: alt } = await supabase.from('users')
+      .select('nick, solana_address').eq('nick_lower', raw.toLowerCase()).limit(1);
+    u = alt && alt[0];
+  }
+  if (!u) return { error: 'Отримувача не знайдено', code: 'err_recipient_not_found' };
+  if (!u.solana_address) {
+    return { error: 'У отримувача немає гаманця', code: 'err_recipient_no_wallet' };
+  }
+  return { address: u.solana_address, nick: u.nick };
+}
+
+app.post('/token/transfer-prepare', async (req, res) => {
+  if (!payoutReady()) return res.json({ ok: false, error: 'Виплати недоступні', code: 'err_payout_disabled' });
+  const amount = Number(req.body.amount);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > TOKEN_DEPOSIT_MAX) {
+    return res.json({ ok: false, error: 'Невірна сума', code: 'err_invalid_params' });
+  }
+  const { data: user } = await supabase.from('users').select('solana_address').eq('nick', req.nick).single();
+  const owner = user && user.solana_address;
+  if (!owner) return res.json({ ok: false, error: 'Спершу вкажіть адресу Solana', code: 'err_payout_no_address' });
+
+  const dest = await resolveTokenRecipient(req.body.to);
+  if (dest.error) return res.json({ ok: false, error: dest.error, code: dest.code });
+  if (dest.address === owner) {
+    return res.json({ ok: false, error: 'Не можна переказати собі', code: 'err_cannot_transfer_self' });
+  }
+  // Службові гаманці не приймають переказів: надходження на них ми трактуємо
+  // як внутрішній рух фондів, і такий переказ просто зник би для відправника.
+  const payoutAddr = getPayoutKeypair().publicKey.toBase58();
+  if (SOLANA_INTERNAL.has(dest.address) || dest.address === payoutAddr) {
+    return res.json({ ok: false, error: 'Ця адреса службова', code: 'err_solana_internal_address' });
+  }
+  const used = await usageToday(req.nick, 'token_transfer');
+  if (used !== null && used >= TOKEN_TRANSFER_DAILY) {
+    return res.json({ ok: false, error: 'Ліміт переказів на сьогодні вичерпано', code: 'err_transfer_daily_limit' });
+  }
+
+  try {
+    const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
+    const { getMint, getAssociatedTokenAddress, createTransferInstruction,
+            createAssociatedTokenAccountIdempotentInstruction } = require('@solana/spl-token');
+    const c = new Connection(SOLANA_RPC, 'confirmed');
+    const kp = getPayoutKeypair();
+    const mint = new PublicKey(SOLANA_TOKEN_MINT);
+    const ownerPk = new PublicKey(owner);
+    const destPk = new PublicKey(dest.address);
+    const info = await getMint(c, mint);
+    const raw = BigInt(Math.round(amount)) * (10n ** BigInt(info.decimals));
+    const from = await getAssociatedTokenAddress(mint, ownerPk);
+    const toAta = await getAssociatedTokenAddress(mint, destPk);
+    const { blockhash, lastValidBlockHeight } = await c.getLatestBlockhash('confirmed');
+    // Рахунок отримувача може не існувати або зʼявитись між перевіркою й
+    // відправкою — idempotent-варіант не валить транзакцію в обох випадках.
+    const tx = new Transaction({ feePayer: kp.publicKey, blockhash, lastValidBlockHeight })
+      .add(createAssociatedTokenAccountIdempotentInstruction(kp.publicKey, toAta, destPk, mint))
+      .add(createTransferInstruction(from, toAta, ownerPk, raw));
+    const message = tx.serializeMessage();
+    pendingTokenTransfer.set(req.nick, {
+      message: message.toString('base64'), amount, owner,
+      toAddress: dest.address, toNick: dest.nick,
+      blockhash, lastValidBlockHeight, ts: Date.now(),
+    });
+    res.json({ ok: true, message: message.toString('base64'), amount,
+               to: dest.address, toNick: dest.nick });
+  } catch (e) {
+    console.error('[transfer] prepare:', e.message);
+    res.json({ ok: false, error: 'Не вдалося підготувати переказ', code: 'err_relay_prepare' });
+  }
+});
+
+app.post('/token/transfer-submit', async (req, res) => {
+  const pending = pendingTokenTransfer.get(req.nick);
+  if (!pending) return res.json({ ok: false, error: 'Переказ не підготовано', code: 'err_relay_expired' });
+  if (Date.now() - pending.ts > 90000) {
+    pendingTokenTransfer.delete(req.nick);
+    return res.json({ ok: false, error: 'Переказ протерміновано, спробуйте ще', code: 'err_relay_expired' });
+  }
+  try {
+    const { Connection, PublicKey, Transaction, Message } = require('@solana/web3.js');
+    const c = new Connection(SOLANA_RPC, 'confirmed');
+    const kp = getPayoutKeypair();
+    const tx = Transaction.populate(Message.from(Buffer.from(pending.message, 'base64')), []);
+    tx.addSignature(new PublicKey(pending.owner), Buffer.from(req.body.signature, 'base64'));
+    tx.partialSign(kp);
+    if (!tx.verifySignatures()) {
+      return res.json({ ok: false, error: 'Підпис недійсний', code: 'err_relay_signature' });
+    }
+    const signature = await c.sendRawTransaction(tx.serialize());
+    await c.confirmTransaction({ signature, blockhash: pending.blockhash, lastValidBlockHeight: pending.lastValidBlockHeight }, 'confirmed');
+    pendingTokenTransfer.delete(req.nick);
+    await bumpUsage(req.nick, 'token_transfer');
+    // Отримувач-користувач дізнається одразу, не відкриваючи гаманець.
+    if (pending.toNick) {
+      sendToUser(pending.toNick, { type: 'token_received', amount: pending.amount, from: req.nick, signature });
+    }
+    res.json({ ok: true, signature, amount: pending.amount, to: pending.toAddress, toNick: pending.toNick });
+  } catch (e) {
+    console.error('[transfer] submit:', e.message);
     res.json({ ok: false, error: 'Переказ не пройшов', code: 'err_relay_failed' });
   }
 });
