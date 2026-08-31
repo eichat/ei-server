@@ -751,5 +751,13 @@
   "token_transfer_to": "Name oder Adresse",
   "token_transfer_body": "Gib den Namen eines Nutzers oder eine Wallet-Adresse ein. Die Netzwerkgebühr zahlt EION.",
   "token_transfer_sent": "{amount} EION gesendet",
-  "token_received": "{amount} EION von {nick} erhalten"
+  "token_received": "{amount} EION von {nick} erhalten",
+  "wallet_other_device": "Die Wallet dieses Kontos wurde auf einem anderen Gerät erstellt. Einzahlung und Übertragung sind von hier nicht möglich: der Schlüssel blieb dort. Gib die Wiederherstellungsphrase jenes Geräts ein oder mache diese Wallet zur Haupt-Wallet — die EION auf der alten Adresse bleiben dann dort.",
+  "wallet_import_seed": "Phrase eingeben",
+  "wallet_use_this_device": "Wallet dieses Geräts",
+  "wallet_rebind_warn": "Die Wallet dieses Geräts wird zur Haupt-Wallet. EION auf der bisherigen Adresse bleiben dort — nur die Wiederherstellungsphrase jenes Geräts erreicht sie.",
+  "wallet_restore_title": "Wallet wiederherstellen",
+  "wallet_restore_hint": "Gib die 12 oder 24 Wörter der Wiederherstellungsphrase deines anderen Geräts ein. Die Wallet dieses Geräts wird dadurch ersetzt.",
+  "wallet_restore_bad": "Ungültige Phrase — prüfe Wörter und Leerzeichen",
+  "wallet_restored": "Wallet wiederhergestellt"
 }

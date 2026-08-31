@@ -751,5 +751,13 @@
   "token_transfer_to": "昵称或地址",
   "token_transfer_body": "输入用户昵称或钱包地址。网络手续费由 EION 支付。",
   "token_transfer_sent": "已发送 {amount} EION",
-  "token_received": "收到来自 {nick} 的 {amount} EION"
+  "token_received": "收到来自 {nick} 的 {amount} EION",
+  "wallet_other_device": "此账户的钱包是在另一台设备上创建的。密钥留在那里，因此无法从这里充值或转账。请输入那台设备的助记词，或将此钱包设为主钱包——旧地址上的 EION 会留在原处。",
+  "wallet_import_seed": "输入助记词",
+  "wallet_use_this_device": "使用本设备的钱包",
+  "wallet_rebind_warn": "本设备的钱包将成为主钱包。旧地址上的 EION 会留在原处——只有那台设备的助记词才能取出。",
+  "wallet_restore_title": "恢复钱包",
+  "wallet_restore_hint": "请输入另一台设备的 12 或 24 个助记词。本设备的钱包将被其替换。",
+  "wallet_restore_bad": "助记词无效——请检查词语和空格",
+  "wallet_restored": "钱包已恢复"
 }

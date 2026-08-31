@@ -751,5 +751,13 @@
   "token_transfer_to": "Pseudo ou adresse",
   "token_transfer_body": "Saisissez le pseudo d'un utilisateur ou une adresse de portefeuille. EION paie les frais de réseau.",
   "token_transfer_sent": "{amount} EION envoyés",
-  "token_received": "{amount} EION reçus de {nick}"
+  "token_received": "{amount} EION reçus de {nick}",
+  "wallet_other_device": "Le portefeuille de ce compte a été créé sur un autre appareil. Le dépôt et le transfert sont impossibles d’ici : la clé est restée là-bas. Saisissez la phrase de récupération de cet appareil ou faites de ce portefeuille le principal — les EION de l’ancienne adresse y resteront.",
+  "wallet_import_seed": "Saisir la phrase",
+  "wallet_use_this_device": "Portefeuille de cet appareil",
+  "wallet_rebind_warn": "Le portefeuille de cet appareil deviendra le principal. Les EION de l’ancienne adresse y resteront — seule la phrase de récupération de cet appareil permet d’y accéder.",
+  "wallet_restore_title": "Restaurer le portefeuille",
+  "wallet_restore_hint": "Saisissez les 12 ou 24 mots de récupération de votre autre appareil. Le portefeuille de cet appareil sera remplacé par celui-ci.",
+  "wallet_restore_bad": "Phrase invalide — vérifiez les mots et les espaces",
+  "wallet_restored": "Portefeuille restauré"
 }

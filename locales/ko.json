@@ -751,5 +751,13 @@
   "token_transfer_to": "닉네임 또는 주소",
   "token_transfer_body": "사용자 닉네임 또는 지갑 주소를 입력하세요. 네트워크 수수료는 EION이 부담합니다.",
   "token_transfer_sent": "{amount} EION 전송됨",
-  "token_received": "{nick}님에게서 {amount} EION을 받았습니다"
+  "token_received": "{nick}님에게서 {amount} EION을 받았습니다",
+  "wallet_other_device": "이 계정의 지갑은 다른 기기에서 만들어졌습니다. 키가 그곳에 있으므로 여기서는 충전과 전송이 불가능합니다. 그 기기의 복구 문구를 입력하거나 이 지갑을 기본으로 지정하세요. 이전 주소의 EION은 그대로 남습니다.",
+  "wallet_import_seed": "문구 입력",
+  "wallet_use_this_device": "이 기기의 지갑",
+  "wallet_rebind_warn": "이 기기의 지갑이 기본이 됩니다. 이전 주소의 EION은 그대로 남으며, 그 기기의 복구 문구로만 꺼낼 수 있습니다.",
+  "wallet_restore_title": "지갑 복원",
+  "wallet_restore_hint": "다른 기기의 복구 문구 12개 또는 24개 단어를 입력하세요. 이 기기의 지갑이 그것으로 교체됩니다.",
+  "wallet_restore_bad": "문구가 올바르지 않습니다 — 단어와 띄어쓰기를 확인하세요",
+  "wallet_restored": "지갑을 복원했습니다"
 }

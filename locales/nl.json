@@ -751,5 +751,13 @@
   "token_transfer_to": "Naam of adres",
   "token_transfer_body": "Voer de naam van een gebruiker of een wallet-adres in. EION betaalt de netwerkkosten.",
   "token_transfer_sent": "{amount} EION verzonden",
-  "token_received": "{amount} EION ontvangen van {nick}"
+  "token_received": "{amount} EION ontvangen van {nick}",
+  "wallet_other_device": "De wallet van dit account is op een ander apparaat aangemaakt. Storten en overmaken kan hier niet: de sleutel bleef daar. Voer de herstelzin van dat apparaat in of maak deze wallet de belangrijkste — de EION op het oude adres blijven daar.",
+  "wallet_import_seed": "Zin invoeren",
+  "wallet_use_this_device": "Wallet van dit apparaat",
+  "wallet_rebind_warn": "De wallet van dit apparaat wordt de belangrijkste. EION op het vorige adres blijven daar — alleen de herstelzin van dat apparaat komt erbij.",
+  "wallet_restore_title": "Wallet herstellen",
+  "wallet_restore_hint": "Voer de 12 of 24 herstelwoorden van je andere apparaat in. De wallet van dit apparaat wordt daardoor vervangen.",
+  "wallet_restore_bad": "Ongeldige zin — controleer de woorden en spaties",
+  "wallet_restored": "Wallet hersteld"
 }

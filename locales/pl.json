@@ -751,5 +751,13 @@
   "token_transfer_to": "Nick lub adres",
   "token_transfer_body": "Podaj nick użytkownika lub adres portfela. Opłatę sieciową pokrywa EION.",
   "token_transfer_sent": "Wysłano {amount} EION",
-  "token_received": "Otrzymano {amount} EION od {nick}"
+  "token_received": "Otrzymano {amount} EION od {nick}",
+  "wallet_other_device": "Portfel tego konta utworzono na innym urządzeniu. Wpłata i przelew stąd są niemożliwe: klucz został tam. Wpisz frazę odzyskiwania tamtego urządzenia albo ustaw ten portfel jako główny — EION ze starego adresu zostaną na nim.",
+  "wallet_import_seed": "Wpisz frazę",
+  "wallet_use_this_device": "Portfel tego urządzenia",
+  "wallet_rebind_warn": "Portfel tego urządzenia stanie się głównym. EION na poprzednim adresie zostaną tam — sięgnąć po nie można tylko frazą odzyskiwania tamtego urządzenia.",
+  "wallet_restore_title": "Przywróć portfel",
+  "wallet_restore_hint": "Wpisz 12 lub 24 słowa frazy odzyskiwania z drugiego urządzenia. Portfel tego urządzenia zostanie nim zastąpiony.",
+  "wallet_restore_bad": "Nieprawidłowa fraza — sprawdź słowa i odstępy",
+  "wallet_restored": "Portfel przywrócony"
 }

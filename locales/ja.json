@@ -751,5 +751,13 @@
   "token_transfer_to": "ニックネームまたはアドレス",
   "token_transfer_body": "ユーザーのニックネームかウォレットアドレスを入力してください。ネットワーク手数料はEIONが負担します。",
   "token_transfer_sent": "{amount} EIONを送信しました",
-  "token_received": "{nick}から{amount} EIONを受け取りました"
+  "token_received": "{nick}から{amount} EIONを受け取りました",
+  "wallet_other_device": "このアカウントのウォレットは別の端末で作成されました。鍵はそちらにあるため、ここからの入金と送付はできません。その端末の復元フレーズを入力するか、このウォレットをメインにしてください。古いアドレスのEIONはそのまま残ります。",
+  "wallet_import_seed": "フレーズを入力",
+  "wallet_use_this_device": "この端末のウォレット",
+  "wallet_rebind_warn": "この端末のウォレットがメインになります。以前のアドレスにあるEIONはそこに残り、その端末の復元フレーズでしか取り出せません。",
+  "wallet_restore_title": "ウォレットを復元",
+  "wallet_restore_hint": "もう一方の端末の復元フレーズ12語または24語を入力してください。この端末のウォレットは置き換わります。",
+  "wallet_restore_bad": "フレーズが無効です — 単語とスペースを確認してください",
+  "wallet_restored": "ウォレットを復元しました"
 }

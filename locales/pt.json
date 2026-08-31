@@ -751,5 +751,13 @@
   "token_transfer_to": "Apelido ou endereço",
   "token_transfer_body": "Digite o apelido de um utilizador ou um endereço de carteira. A taxa de rede é paga pela EION.",
   "token_transfer_sent": "Enviados {amount} EION",
-  "token_received": "Recebeste {amount} EION de {nick}"
+  "token_received": "Recebeste {amount} EION de {nick}",
+  "wallet_other_device": "A carteira desta conta foi criada noutro dispositivo. Depósito e transferência não são possíveis daqui: a chave ficou lá. Introduza a frase de recuperação desse dispositivo ou torne esta carteira a principal — os EION do endereço antigo permanecerão nele.",
+  "wallet_import_seed": "Introduzir frase",
+  "wallet_use_this_device": "Carteira deste dispositivo",
+  "wallet_rebind_warn": "A carteira deste dispositivo passará a ser a principal. Os EION no endereço anterior ficarão lá — só a frase de recuperação desse dispositivo lhes dá acesso.",
+  "wallet_restore_title": "Restaurar carteira",
+  "wallet_restore_hint": "Introduza as 12 ou 24 palavras de recuperação do seu outro dispositivo. A carteira deste dispositivo será substituída por ela.",
+  "wallet_restore_bad": "Frase inválida — verifique as palavras e os espaços",
+  "wallet_restored": "Carteira restaurada"
 }

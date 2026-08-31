@@ -751,5 +751,13 @@
   "token_transfer_to": "Apodo o dirección",
   "token_transfer_body": "Introduce el apodo de un usuario o una dirección de monedero. EION paga la comisión de red.",
   "token_transfer_sent": "Enviado {amount} EION",
-  "token_received": "Recibiste {amount} EION de {nick}"
+  "token_received": "Recibiste {amount} EION de {nick}",
+  "wallet_other_device": "La billetera de esta cuenta se creó en otro dispositivo. Desde aquí no se puede depositar ni transferir: la clave quedó allí. Introduce la frase de recuperación de ese dispositivo o convierte esta billetera en la principal; los EION de la dirección anterior se quedarán allí.",
+  "wallet_import_seed": "Introducir frase",
+  "wallet_use_this_device": "Billetera de este dispositivo",
+  "wallet_rebind_warn": "La billetera de este dispositivo pasará a ser la principal. Los EION de la dirección anterior se quedarán allí: solo la frase de recuperación de ese dispositivo puede recuperarlos.",
+  "wallet_restore_title": "Restaurar billetera",
+  "wallet_restore_hint": "Introduce las 12 o 24 palabras de recuperación de tu otro dispositivo. La billetera de este dispositivo será reemplazada por ella.",
+  "wallet_restore_bad": "Frase no válida: revisa las palabras y los espacios",
+  "wallet_restored": "Billetera restaurada"
 }

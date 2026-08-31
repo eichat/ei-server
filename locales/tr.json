@@ -751,5 +751,13 @@
   "token_transfer_to": "Takma ad veya adres",
   "token_transfer_body": "Bir kullanıcının takma adını veya cüzdan adresini girin. Ağ ücretini EION öder.",
   "token_transfer_sent": "{amount} EION gönderildi",
-  "token_received": "{nick} kişisinden {amount} EION alındı"
+  "token_received": "{nick} kişisinden {amount} EION alındı",
+  "wallet_other_device": "Bu hesabın cüzdanı başka bir cihazda oluşturuldu. Buradan yatırma ve transfer mümkün değil: anahtar orada kaldı. O cihazın kurtarma ifadesini girin ya da bu cüzdanı ana cüzdan yapın — eski adresteki EION orada kalır.",
+  "wallet_import_seed": "İfadeyi gir",
+  "wallet_use_this_device": "Bu cihazın cüzdanı",
+  "wallet_rebind_warn": "Bu cihazın cüzdanı ana cüzdan olacak. Önceki adresteki EION orada kalır — onlara yalnızca o cihazın kurtarma ifadesiyle ulaşılabilir.",
+  "wallet_restore_title": "Cüzdanı geri yükle",
+  "wallet_restore_hint": "Diğer cihazınızdaki 12 veya 24 kurtarma kelimesini girin. Bu cihazın cüzdanı onunla değiştirilecek.",
+  "wallet_restore_bad": "Geçersiz ifade — kelimeleri ve boşlukları kontrol edin",
+  "wallet_restored": "Cüzdan geri yüklendi"
 }

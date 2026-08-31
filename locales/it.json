@@ -751,5 +751,13 @@
   "token_transfer_to": "Nome o indirizzo",
   "token_transfer_body": "Inserisci il nome di un utente o un indirizzo di portafoglio. La commissione di rete la paga EION.",
   "token_transfer_sent": "Inviati {amount} EION",
-  "token_received": "Ricevuti {amount} EION da {nick}"
+  "token_received": "Ricevuti {amount} EION da {nick}",
+  "wallet_other_device": "Il portafoglio di questo account è stato creato su un altro dispositivo. Da qui deposito e trasferimento non sono possibili: la chiave è rimasta lì. Inserisci la frase di recupero di quel dispositivo oppure rendi principale questo portafoglio — gli EION sul vecchio indirizzo resteranno lì.",
+  "wallet_import_seed": "Inserisci frase",
+  "wallet_use_this_device": "Portafoglio di questo dispositivo",
+  "wallet_rebind_warn": "Il portafoglio di questo dispositivo diventerà quello principale. Gli EION sul vecchio indirizzo resteranno lì: solo la frase di recupero di quel dispositivo può raggiungerli.",
+  "wallet_restore_title": "Ripristina portafoglio",
+  "wallet_restore_hint": "Inserisci le 12 o 24 parole di recupero dell’altro dispositivo. Il portafoglio di questo dispositivo verrà sostituito da quello.",
+  "wallet_restore_bad": "Frase non valida — controlla parole e spazi",
+  "wallet_restored": "Portafoglio ripristinato"
 }

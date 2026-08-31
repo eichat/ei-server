@@ -751,5 +751,13 @@
   "token_transfer_to": "Biệt danh hoặc địa chỉ",
   "token_transfer_body": "Nhập biệt danh người dùng hoặc địa chỉ ví. Phí mạng do EION trả.",
   "token_transfer_sent": "Đã gửi {amount} EION",
-  "token_received": "Đã nhận {amount} EION từ {nick}"
+  "token_received": "Đã nhận {amount} EION từ {nick}",
+  "wallet_other_device": "Ví của tài khoản này được tạo trên thiết bị khác. Không thể nạp hay chuyển từ đây: khoá vẫn ở đó. Hãy nhập cụm từ khôi phục của thiết bị đó, hoặc đặt ví này làm ví chính — EION ở địa chỉ cũ sẽ vẫn nằm ở đó.",
+  "wallet_import_seed": "Nhập cụm từ",
+  "wallet_use_this_device": "Ví của thiết bị này",
+  "wallet_rebind_warn": "Ví của thiết bị này sẽ trở thành ví chính. EION ở địa chỉ trước vẫn nằm ở đó — chỉ cụm từ khôi phục của thiết bị kia mới lấy được.",
+  "wallet_restore_title": "Khôi phục ví",
+  "wallet_restore_hint": "Nhập 12 hoặc 24 từ khôi phục từ thiết bị kia. Ví của thiết bị này sẽ được thay bằng ví đó.",
+  "wallet_restore_bad": "Cụm từ không hợp lệ — hãy kiểm tra các từ và khoảng trắng",
+  "wallet_restored": "Đã khôi phục ví"
 }

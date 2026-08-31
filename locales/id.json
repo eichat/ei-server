@@ -751,5 +751,13 @@
   "token_transfer_to": "Nama pengguna atau alamat",
   "token_transfer_body": "Masukkan nama pengguna atau alamat dompet. Biaya jaringan dibayar EION.",
   "token_transfer_sent": "{amount} EION terkirim",
-  "token_received": "Menerima {amount} EION dari {nick}"
+  "token_received": "Menerima {amount} EION dari {nick}",
+  "wallet_other_device": "Dompet akun ini dibuat di perangkat lain. Setor dan transfer tidak bisa dari sini: kuncinya ada di sana. Masukkan frasa pemulihan perangkat itu, atau jadikan dompet ini yang utama — EION di alamat lama akan tetap di sana.",
+  "wallet_import_seed": "Masukkan frasa",
+  "wallet_use_this_device": "Dompet perangkat ini",
+  "wallet_rebind_warn": "Dompet perangkat ini akan menjadi yang utama. EION di alamat sebelumnya tetap di sana — hanya frasa pemulihan perangkat itu yang bisa menjangkaunya.",
+  "wallet_restore_title": "Pulihkan dompet",
+  "wallet_restore_hint": "Masukkan 12 atau 24 kata pemulihan dari perangkat Anda yang lain. Dompet perangkat ini akan digantikan olehnya.",
+  "wallet_restore_bad": "Frasa tidak valid — periksa kata dan spasinya",
+  "wallet_restored": "Dompet dipulihkan"
 }

@@ -751,5 +751,13 @@
   "token_transfer_to": "Palayaw o address",
   "token_transfer_body": "Ilagay ang palayaw ng user o address ng wallet. Ang bayad sa network ay sagot ng EION.",
   "token_transfer_sent": "Naipadala ang {amount} EION",
-  "token_received": "Nakatanggap ng {amount} EION mula kay {nick}"
+  "token_received": "Nakatanggap ng {amount} EION mula kay {nick}",
+  "wallet_other_device": "Ang wallet ng account na ito ay ginawa sa ibang device. Hindi maaaring mag-deposito o maglipat mula rito: naiwan doon ang susi. Ilagay ang recovery phrase ng device na iyon, o gawing pangunahin ang wallet na ito — mananatili sa lumang address ang EION doon.",
+  "wallet_import_seed": "Ilagay ang parirala",
+  "wallet_use_this_device": "Wallet ng device na ito",
+  "wallet_rebind_warn": "Magiging pangunahin ang wallet ng device na ito. Mananatili sa dating address ang EION doon — ang recovery phrase lang ng device na iyon ang makakakuha ng mga ito.",
+  "wallet_restore_title": "Ibalik ang wallet",
+  "wallet_restore_hint": "Ilagay ang 12 o 24 recovery words mula sa iyong ibang device. Papalitan nito ang wallet ng device na ito.",
+  "wallet_restore_bad": "Di-wastong parirala — suriin ang mga salita at espasyo",
+  "wallet_restored": "Naibalik ang wallet"
 }
