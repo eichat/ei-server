@@ -734,5 +734,14 @@
   "deposit_amount": "Bedrag",
   "deposit_open_wallet": "Wallet openen",
   "deposit_manual": "Of stuur handmatig naar dit adres:",
-  "deposit_no_wallet": "Geen wallet-app op dit apparaat gevonden"
+  "deposit_no_wallet": "Geen wallet-app op dit apparaat gevonden",
+  "wallet_created": "Er is een wallet voor je aangemaakt in de app",
+  "wallet_seed_title": "Herstelzin",
+  "wallet_seed_warn": "Schrijf deze woorden op en bewaar ze veilig. Wie ze kent, bezit de tokens; kwijt is voorgoed kwijt — wij kunnen ze niet herstellen.",
+  "wallet_show_seed": "Herstelzin tonen",
+  "err_relay_expired": "De overdracht is verlopen, probeer opnieuw",
+  "err_relay_prepare": "Kon de overdracht niet voorbereiden",
+  "err_relay_failed": "De overdracht is mislukt",
+  "err_relay_signature": "Ongeldige handtekening",
+  "deposit_body3": "Wissel tokens hier direct in voor munten. Wij betalen de kosten — je hebt geen SOL nodig."
 }

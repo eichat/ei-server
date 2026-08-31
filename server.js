@@ -3096,6 +3096,100 @@ async function scanTokenDeposits() {
   return { ok: true, checked: sigs.length, credited };
 }
 
+// ── Поповнення вбудованим гаманцем: сервер платить комісію ───────────────
+// У нового користувача немає SOL, тож самостійно надіслати токени він не може.
+// Тому транзакцію збирає й оплачує сервер (feePayer — гаманець обміну), а
+// користувач лише ПІДПИСУЄ: без його підпису токени не зрушать, тобто
+// розпоряджається ними тільки він.
+//
+// Сервер будує транзакцію сам навмисно: так він точно знає, що підписує, і не
+// може бути використаний як безкоштовний оплатник чужих переказів — інструкції
+// тут фіксовані, з клієнта приходить лише сума.
+const pendingRelay = new Map();   // nick → { message, amount, blockhash, ts }
+
+app.post('/token/deposit-prepare', async (req, res) => {
+  if (!payoutReady()) return res.json({ ok: false, error: 'Виплати недоступні', code: 'err_payout_disabled' });
+  const amount = Number(req.body.amount);
+  if (!Number.isFinite(amount) || amount <= 0 || amount > TOKEN_DEPOSIT_MAX) {
+    return res.json({ ok: false, error: 'Невірна сума', code: 'err_invalid_params' });
+  }
+  const { data: user } = await supabase.from('users').select('solana_address').eq('nick', req.nick).single();
+  const owner = user && user.solana_address;
+  if (!owner) return res.json({ ok: false, error: 'Спершу вкажіть адресу Solana', code: 'err_payout_no_address' });
+
+  try {
+    const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
+    const { getMint, getAssociatedTokenAddress, createTransferInstruction,
+            createAssociatedTokenAccountIdempotentInstruction } = require('@solana/spl-token');
+    const c = new Connection(SOLANA_RPC, 'confirmed');
+    const kp = getPayoutKeypair();
+    const mint = new PublicKey(SOLANA_TOKEN_MINT);
+    const ownerPk = new PublicKey(owner);
+    const info = await getMint(c, mint);
+    const raw = BigInt(Math.round(amount)) * (10n ** BigInt(info.decimals));
+    const from = await getAssociatedTokenAddress(mint, ownerPk);
+    const to = await getAssociatedTokenAddress(mint, kp.publicKey);
+    const { blockhash, lastValidBlockHeight } = await c.getLatestBlockhash('confirmed');
+    const tx = new Transaction({ feePayer: kp.publicKey, blockhash, lastValidBlockHeight })
+      .add(createAssociatedTokenAccountIdempotentInstruction(kp.publicKey, to, kp.publicKey, mint))
+      .add(createTransferInstruction(from, to, ownerPk, raw));
+    // Клієнт підписує саме message, а не всю транзакцію: так підпис не залежить
+    // від того, у якому порядку ми потім складемо підписи.
+    const message = tx.serializeMessage();
+    pendingRelay.set(req.nick, {
+      message: message.toString('base64'), amount, owner,
+      blockhash, lastValidBlockHeight, ts: Date.now(),
+    });
+    res.json({ ok: true, message: message.toString('base64'), amount });
+  } catch (e) {
+    console.error('[relay] prepare:', e.message);
+    res.json({ ok: false, error: 'Не вдалося підготувати переказ', code: 'err_relay_prepare' });
+  }
+});
+
+app.post('/token/deposit-submit', async (req, res) => {
+  const pending = pendingRelay.get(req.nick);
+  if (!pending) return res.json({ ok: false, error: 'Переказ не підготовано', code: 'err_relay_expired' });
+  // Blockhash живе ~60–90 с; протермінований підпис усе одно не пройде, тож
+  // краще сказати про це одразу, ніж ловити помилку мережі.
+  if (Date.now() - pending.ts > 90000) {
+    pendingRelay.delete(req.nick);
+    return res.json({ ok: false, error: 'Переказ протерміновано, спробуйте ще', code: 'err_relay_expired' });
+  }
+  try {
+    const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
+    const c = new Connection(SOLANA_RPC, 'confirmed');
+    const kp = getPayoutKeypair();
+    const tx = Transaction.populate(
+      require('@solana/web3.js').Message.from(Buffer.from(pending.message, 'base64')), []);
+    tx.addSignature(new PublicKey(pending.owner), Buffer.from(req.body.signature, 'base64'));
+    tx.partialSign(kp);
+    if (!tx.verifySignatures()) {
+      return res.json({ ok: false, error: 'Підпис недійсний', code: 'err_relay_signature' });
+    }
+    const signature = await c.sendRawTransaction(tx.serialize());
+    await c.confirmTransaction({ signature, blockhash: pending.blockhash, lastValidBlockHeight: pending.lastValidBlockHeight }, 'confirmed');
+    pendingRelay.delete(req.nick);
+
+    // Зараховуємо одразу: ми знаємо і суму, і хто підписав. Запис у
+    // token_deposits із тим самим ключем-підписом — щоб періодичний сканер
+    // побачив його своїм і не нарахував удруге.
+    const coins = Math.floor(pending.amount / TOKEN_PAYOUT_RATE);
+    const { error: insErr } = await supabase.from('token_deposits').insert({
+      signature, nick: req.nick, address: pending.owner,
+      tokens: pending.amount, coins, status: 'credited',
+    });
+    if (insErr) return res.json({ ok: true, signature, credited: 0 });
+    await supabase.rpc('add_coins', { p_nick: req.nick, p_amount: coins });
+    logTx({ fromNick: null, toNick: req.nick, amount: coins, kind: 'token_deposit', ref: signature });
+    const { data: u } = await supabase.from('users').select('coins').eq('nick', req.nick).single();
+    res.json({ ok: true, signature, credited: coins, balance: u ? u.coins : null });
+  } catch (e) {
+    console.error('[relay] submit:', e.message);
+    res.json({ ok: false, error: 'Переказ не пройшов', code: 'err_relay_failed' });
+  }
+});
+
 // Куди надсилати + ручна перевірка. Автоматичний скан теж є (раз на 5 хв), але
 // чекати п'ять хвилин, дивлячись на порожній екран, — погана перша вражіння.
 app.get('/token/deposit-address', async (req, res) => {

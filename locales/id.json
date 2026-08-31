@@ -734,5 +734,14 @@
   "deposit_amount": "Jumlah",
   "deposit_open_wallet": "Buka dompet",
   "deposit_manual": "Atau kirim manual ke alamat ini:",
-  "deposit_no_wallet": "Tidak ada aplikasi dompet di perangkat ini"
+  "deposit_no_wallet": "Tidak ada aplikasi dompet di perangkat ini",
+  "wallet_created": "Dompet Anda dibuat di dalam aplikasi",
+  "wallet_seed_title": "Frasa pemulihan",
+  "wallet_seed_warn": "Catat kata-kata ini dan simpan dengan aman. Siapa pun yang tahu, dialah pemilik token; jika hilang, hilang selamanya — kami tidak bisa memulihkannya.",
+  "wallet_show_seed": "Tampilkan frasa pemulihan",
+  "err_relay_expired": "Transfer kedaluwarsa, coba lagi",
+  "err_relay_prepare": "Gagal menyiapkan transfer",
+  "err_relay_failed": "Transfer tidak berhasil",
+  "err_relay_signature": "Tanda tangan tidak valid",
+  "deposit_body3": "Ubah token jadi koin di sini. Biayanya kami tanggung — Anda tidak perlu SOL."
 }

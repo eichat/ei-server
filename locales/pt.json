@@ -734,5 +734,14 @@
   "deposit_amount": "Valor",
   "deposit_open_wallet": "Abrir carteira",
   "deposit_manual": "Ou envie manualmente para este endereço:",
-  "deposit_no_wallet": "Nenhuma carteira encontrada neste dispositivo"
+  "deposit_no_wallet": "Nenhuma carteira encontrada neste dispositivo",
+  "wallet_created": "Criamos uma carteira para você no aplicativo",
+  "wallet_seed_title": "Frase de recuperação",
+  "wallet_seed_warn": "Anote estas palavras e guarde-as bem. Quem as souber é dono dos tokens; se você perdê-las, perde para sempre — não podemos recuperá-las.",
+  "wallet_show_seed": "Mostrar frase de recuperação",
+  "err_relay_expired": "A transferência expirou, tente de novo",
+  "err_relay_prepare": "Não foi possível preparar a transferência",
+  "err_relay_failed": "A transferência não foi concluída",
+  "err_relay_signature": "Assinatura inválida",
+  "deposit_body3": "Converta tokens em moedas aqui mesmo. A taxa é por nossa conta — você não precisa de SOL."
 }

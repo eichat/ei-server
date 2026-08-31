@@ -734,5 +734,14 @@
   "deposit_amount": "Betrag",
   "deposit_open_wallet": "Wallet öffnen",
   "deposit_manual": "Oder manuell an diese Adresse senden:",
-  "deposit_no_wallet": "Keine Wallet auf dem Gerät gefunden"
+  "deposit_no_wallet": "Keine Wallet auf dem Gerät gefunden",
+  "wallet_created": "Wir haben dir eine Wallet in der App angelegt",
+  "wallet_seed_title": "Wiederherstellungsphrase",
+  "wallet_seed_warn": "Schreib diese Wörter auf und bewahre sie sicher auf. Wer sie kennt, besitzt die Token; wer sie verliert, verliert sie für immer — wir können sie nicht wiederherstellen.",
+  "wallet_show_seed": "Wiederherstellungsphrase anzeigen",
+  "err_relay_expired": "Der Transfer ist abgelaufen, versuch es erneut",
+  "err_relay_prepare": "Transfer konnte nicht vorbereitet werden",
+  "err_relay_failed": "Der Transfer ist fehlgeschlagen",
+  "err_relay_signature": "Ungültige Signatur",
+  "deposit_body3": "Token direkt in der App in Coins tauschen. Die Gebühr zahlen wir — du brauchst kein SOL."
 }

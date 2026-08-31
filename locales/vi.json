@@ -734,5 +734,14 @@
   "deposit_amount": "Số lượng",
   "deposit_open_wallet": "Mở ví",
   "deposit_manual": "Hoặc gửi thủ công tới địa chỉ này:",
-  "deposit_no_wallet": "Không tìm thấy ứng dụng ví trên thiết bị"
+  "deposit_no_wallet": "Không tìm thấy ứng dụng ví trên thiết bị",
+  "wallet_created": "Đã tạo ví cho bạn ngay trong ứng dụng",
+  "wallet_seed_title": "Cụm từ khôi phục",
+  "wallet_seed_warn": "Hãy ghi lại các từ này và cất giữ an toàn. Ai biết chúng thì sở hữu token; mất là mất vĩnh viễn — chúng tôi không thể khôi phục.",
+  "wallet_show_seed": "Hiện cụm từ khôi phục",
+  "err_relay_expired": "Giao dịch đã hết hạn, hãy thử lại",
+  "err_relay_prepare": "Không chuẩn bị được giao dịch",
+  "err_relay_failed": "Giao dịch không thành công",
+  "err_relay_signature": "Chữ ký không hợp lệ",
+  "deposit_body3": "Đổi token sang xu ngay tại đây. Phí do chúng tôi trả — bạn không cần SOL."
 }

@@ -734,5 +734,14 @@
   "deposit_amount": "Kwota",
   "deposit_open_wallet": "Otwórz portfel",
   "deposit_manual": "Albo wyślij ręcznie na ten adres:",
-  "deposit_no_wallet": "Nie znaleziono portfela na tym urządzeniu"
+  "deposit_no_wallet": "Nie znaleziono portfela na tym urządzeniu",
+  "wallet_created": "Utworzyliśmy dla Ciebie portfel w aplikacji",
+  "wallet_seed_title": "Fraza odzyskiwania",
+  "wallet_seed_warn": "Zapisz te słowa i przechowuj je bezpiecznie. Kto je zna, ten ma tokeny; utrata oznacza utratę na zawsze — nie odzyskamy ich.",
+  "wallet_show_seed": "Pokaż frazę odzyskiwania",
+  "err_relay_expired": "Przelew wygasł, spróbuj ponownie",
+  "err_relay_prepare": "Nie udało się przygotować przelewu",
+  "err_relay_failed": "Przelew się nie powiódł",
+  "err_relay_signature": "Nieprawidłowy podpis",
+  "deposit_body3": "Zamień tokeny na monety tutaj. Opłatę pokrywamy my — SOL nie jest potrzebny."
 }

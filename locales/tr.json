@@ -734,5 +734,14 @@
   "deposit_amount": "Tutar",
   "deposit_open_wallet": "Cüzdanı aç",
   "deposit_manual": "Ya da bu adrese elle gönderin:",
-  "deposit_no_wallet": "Bu cihazda cüzdan uygulaması bulunamadı"
+  "deposit_no_wallet": "Bu cihazda cüzdan uygulaması bulunamadı",
+  "wallet_created": "Uygulama içinde size bir cüzdan oluşturduk",
+  "wallet_seed_title": "Kurtarma ifadesi",
+  "wallet_seed_warn": "Bu kelimeleri yazın ve güvende tutun. Onları bilen tokenların sahibidir; kaybederseniz sonsuza dek gider — geri getiremeyiz.",
+  "wallet_show_seed": "Kurtarma ifadesini göster",
+  "err_relay_expired": "Transfer zaman aşımına uğradı, tekrar deneyin",
+  "err_relay_prepare": "Transfer hazırlanamadı",
+  "err_relay_failed": "Transfer gerçekleşmedi",
+  "err_relay_signature": "Geçersiz imza",
+  "deposit_body3": "Tokenları burada coine çevirin. Ücreti biz karşılıyoruz — SOL gerekmez."
 }

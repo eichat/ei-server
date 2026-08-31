@@ -734,5 +734,14 @@
   "deposit_amount": "Amount",
   "deposit_open_wallet": "Open wallet",
   "deposit_manual": "Or send manually to this address:",
-  "deposit_no_wallet": "No wallet app found on this device"
+  "deposit_no_wallet": "No wallet app found on this device",
+  "wallet_created": "A wallet has been created for you in the app",
+  "wallet_seed_title": "Recovery phrase",
+  "wallet_seed_warn": "Write these words down and keep them safe. Whoever knows them owns the tokens; if you lose them they are gone for good — we cannot restore them.",
+  "wallet_show_seed": "Show recovery phrase",
+  "err_relay_expired": "The transfer expired, try again",
+  "err_relay_prepare": "Couldn’t prepare the transfer",
+  "err_relay_failed": "The transfer didn’t go through",
+  "err_relay_signature": "Invalid signature",
+  "deposit_body3": "Turn tokens into coins right here. We cover the fee — you don’t need any SOL."
 }

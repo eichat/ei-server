@@ -734,5 +734,14 @@
   "deposit_amount": "金額",
   "deposit_open_wallet": "ウォレットを開く",
   "deposit_manual": "または、このアドレスへ手動で送金してください：",
-  "deposit_no_wallet": "端末にウォレットアプリが見つかりません"
+  "deposit_no_wallet": "端末にウォレットアプリが見つかりません",
+  "wallet_created": "アプリ内にウォレットを作成しました",
+  "wallet_seed_title": "リカバリーフレーズ",
+  "wallet_seed_warn": "この単語を書き留めて安全に保管してください。知っている人がトークンの持ち主になります。失うと二度と戻せません — 復元はできません。",
+  "wallet_show_seed": "リカバリーフレーズを表示",
+  "err_relay_expired": "送金の有効期限が切れました。もう一度お試しください",
+  "err_relay_prepare": "送金を準備できませんでした",
+  "err_relay_failed": "送金できませんでした",
+  "err_relay_signature": "署名が正しくありません",
+  "deposit_body3": "トークンをそのままコインに交換できます。手数料は当方が負担するので SOL は不要です。"
 }

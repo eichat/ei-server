@@ -734,5 +734,14 @@
   "deposit_amount": "Importo",
   "deposit_open_wallet": "Apri il wallet",
   "deposit_manual": "Oppure invia manualmente a questo indirizzo:",
-  "deposit_no_wallet": "Nessun wallet trovato sul dispositivo"
+  "deposit_no_wallet": "Nessun wallet trovato sul dispositivo",
+  "wallet_created": "Abbiamo creato un wallet per te nell’app",
+  "wallet_seed_title": "Frase di recupero",
+  "wallet_seed_warn": "Annota queste parole e conservale al sicuro. Chi le conosce possiede i token; se le perdi sono perse per sempre — non possiamo recuperarle.",
+  "wallet_show_seed": "Mostra la frase di recupero",
+  "err_relay_expired": "Il trasferimento è scaduto, riprova",
+  "err_relay_prepare": "Impossibile preparare il trasferimento",
+  "err_relay_failed": "Il trasferimento non è andato a buon fine",
+  "err_relay_signature": "Firma non valida",
+  "deposit_body3": "Converti i token in monete qui. La commissione la paghiamo noi: non ti serve SOL."
 }

@@ -734,5 +734,14 @@
   "deposit_amount": "金额",
   "deposit_open_wallet": "打开钱包",
   "deposit_manual": "或手动发送到该地址：",
-  "deposit_no_wallet": "未在此设备上找到钱包应用"
+  "deposit_no_wallet": "未在此设备上找到钱包应用",
+  "wallet_created": "已在应用内为你创建钱包",
+  "wallet_seed_title": "恢复短语",
+  "wallet_seed_warn": "请抄下这些词并妥善保管。知道它们的人就拥有代币；一旦丢失将永远无法找回——我们也无法恢复。",
+  "wallet_show_seed": "显示恢复短语",
+  "err_relay_expired": "转账已过期，请重试",
+  "err_relay_prepare": "无法准备转账",
+  "err_relay_failed": "转账未成功",
+  "err_relay_signature": "签名无效",
+  "deposit_body3": "直接在这里把代币换成金币。手续费由我们承担，你不需要 SOL。"
 }

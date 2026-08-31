@@ -734,5 +734,14 @@
   "deposit_amount": "Montant",
   "deposit_open_wallet": "Ouvrir le portefeuille",
   "deposit_manual": "Ou envoyez manuellement à cette adresse :",
-  "deposit_no_wallet": "Aucun portefeuille trouvé sur cet appareil"
+  "deposit_no_wallet": "Aucun portefeuille trouvé sur cet appareil",
+  "wallet_created": "Un portefeuille a été créé pour vous dans l’application",
+  "wallet_seed_title": "Phrase de récupération",
+  "wallet_seed_warn": "Notez ces mots et gardez-les en lieu sûr. Qui les connaît possède les jetons ; si vous les perdez, c’est définitif — nous ne pouvons pas les restaurer.",
+  "wallet_show_seed": "Afficher la phrase de récupération",
+  "err_relay_expired": "Le transfert a expiré, réessayez",
+  "err_relay_prepare": "Impossible de préparer le transfert",
+  "err_relay_failed": "Le transfert n’a pas abouti",
+  "err_relay_signature": "Signature invalide",
+  "deposit_body3": "Convertissez vos jetons en pièces ici même. Les frais sont pour nous — pas besoin de SOL."
 }

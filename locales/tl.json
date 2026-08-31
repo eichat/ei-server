@@ -734,5 +734,14 @@
   "deposit_amount": "Halaga",
   "deposit_open_wallet": "Buksan ang wallet",
   "deposit_manual": "O manu-manong magpadala sa address na ito:",
-  "deposit_no_wallet": "Walang wallet app na nakita sa device"
+  "deposit_no_wallet": "Walang wallet app na nakita sa device",
+  "wallet_created": "May ginawang wallet para sa iyo sa app",
+  "wallet_seed_title": "Recovery phrase",
+  "wallet_seed_warn": "Isulat ang mga salitang ito at itago nang ligtas. Ang nakakaalam nito ang may-ari ng tokens; kapag nawala, tuluyan na — hindi namin maibabalik.",
+  "wallet_show_seed": "Ipakita ang recovery phrase",
+  "err_relay_expired": "Nag-expire ang transfer, subukan ulit",
+  "err_relay_prepare": "Hindi mahanda ang transfer",
+  "err_relay_failed": "Hindi natuloy ang transfer",
+  "err_relay_signature": "Hindi wastong lagda",
+  "deposit_body3": "Palitan ang tokens sa barya dito mismo. Kami ang sasagot sa fee — hindi mo kailangan ng SOL."
 }

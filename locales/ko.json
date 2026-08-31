@@ -734,5 +734,14 @@
   "deposit_amount": "금액",
   "deposit_open_wallet": "지갑 열기",
   "deposit_manual": "또는 이 주소로 직접 보내세요:",
-  "deposit_no_wallet": "기기에서 지갑 앱을 찾을 수 없습니다"
+  "deposit_no_wallet": "기기에서 지갑 앱을 찾을 수 없습니다",
+  "wallet_created": "앱 안에 지갑을 만들었습니다",
+  "wallet_seed_title": "복구 문구",
+  "wallet_seed_warn": "이 단어들을 적어 안전하게 보관하세요. 이를 아는 사람이 토큰의 주인이며, 잃어버리면 영영 복구할 수 없습니다.",
+  "wallet_show_seed": "복구 문구 보기",
+  "err_relay_expired": "전송이 만료되었습니다. 다시 시도하세요",
+  "err_relay_prepare": "전송을 준비하지 못했습니다",
+  "err_relay_failed": "전송이 완료되지 않았습니다",
+  "err_relay_signature": "서명이 올바르지 않습니다",
+  "deposit_body3": "여기서 바로 토큰을 코인으로 바꾸세요. 수수료는 저희가 냅니다 — SOL이 없어도 됩니다."
 }
