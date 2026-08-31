@@ -729,5 +729,10 @@
   "deposit_none": "ยังไม่มียอดเข้ามาใหม่",
   "err_deposit_check": "ตรวจสอบยอดเข้าไม่สำเร็จ",
   "err_solana_internal_address": "นี่คือที่อยู่ของระบบ",
-  "err_solana_address_taken": "ที่อยู่นี้ผูกกับบัญชีอื่นแล้ว"
+  "err_solana_address_taken": "ที่อยู่นี้ผูกกับบัญชีอื่นแล้ว",
+  "deposit_body2": "ใส่จำนวนแล้วเปิดกระเป๋าเงิน ระบบจะกรอกที่อยู่และโทเคนให้เอง",
+  "deposit_amount": "จำนวน",
+  "deposit_open_wallet": "เปิดกระเป๋าเงิน",
+  "deposit_manual": "หรือส่งเองไปยังที่อยู่นี้:",
+  "deposit_no_wallet": "ไม่พบแอปกระเป๋าเงินบนอุปกรณ์นี้"
 }

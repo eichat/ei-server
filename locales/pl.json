@@ -729,5 +729,10 @@
   "deposit_none": "Nic nowego jeszcze nie dotarło",
   "err_deposit_check": "Nie udało się sprawdzić wpłaty",
   "err_solana_internal_address": "To adres serwisowy",
-  "err_solana_address_taken": "Ten adres jest powiązany z innym kontem"
+  "err_solana_address_taken": "Ten adres jest powiązany z innym kontem",
+  "deposit_body2": "Podaj kwotę i otwórz portfel — adres i token wypełnią się same.",
+  "deposit_amount": "Kwota",
+  "deposit_open_wallet": "Otwórz portfel",
+  "deposit_manual": "Albo wyślij ręcznie na ten adres:",
+  "deposit_no_wallet": "Nie znaleziono portfela na tym urządzeniu"
 }

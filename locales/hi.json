@@ -729,5 +729,10 @@
   "deposit_none": "अभी कुछ नया नहीं आया",
   "err_deposit_check": "आवक जाँची नहीं जा सकी",
   "err_solana_internal_address": "यह एक सेवा पता है",
-  "err_solana_address_taken": "यह पता किसी और खाते से जुड़ा है"
+  "err_solana_address_taken": "यह पता किसी और खाते से जुड़ा है",
+  "deposit_body2": "राशि डालें और अपना वॉलेट खोलें — पता और टोकन अपने आप भर जाएँगे।",
+  "deposit_amount": "राशि",
+  "deposit_open_wallet": "वॉलेट खोलें",
+  "deposit_manual": "या इस पते पर खुद भेजें:",
+  "deposit_no_wallet": "डिवाइस पर कोई वॉलेट नहीं मिला"
 }

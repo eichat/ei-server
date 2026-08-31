@@ -729,5 +729,10 @@
   "deposit_none": "لا توجد مبالغ جديدة بعد",
   "err_deposit_check": "تعذّر التحقق من الوصول",
   "err_solana_internal_address": "هذا عنوان خدمي",
-  "err_solana_address_taken": "هذا العنوان مرتبط بحساب آخر"
+  "err_solana_address_taken": "هذا العنوان مرتبط بحساب آخر",
+  "deposit_body2": "أدخل المبلغ وافتح محفظتك — العنوان والتوكن سيُملآن تلقائيًا.",
+  "deposit_amount": "المبلغ",
+  "deposit_open_wallet": "فتح المحفظة",
+  "deposit_manual": "أو أرسل يدويًا إلى هذا العنوان:",
+  "deposit_no_wallet": "لم يتم العثور على محفظة على الجهاز"
 }

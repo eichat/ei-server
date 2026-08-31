@@ -729,5 +729,10 @@
   "deposit_none": "Belum ada yang baru masuk",
   "err_deposit_check": "Gagal memeriksa dana masuk",
   "err_solana_internal_address": "Itu alamat layanan",
-  "err_solana_address_taken": "Alamat itu tertaut ke akun lain"
+  "err_solana_address_taken": "Alamat itu tertaut ke akun lain",
+  "deposit_body2": "Masukkan jumlah dan buka dompet — alamat dan token terisi otomatis.",
+  "deposit_amount": "Jumlah",
+  "deposit_open_wallet": "Buka dompet",
+  "deposit_manual": "Atau kirim manual ke alamat ini:",
+  "deposit_no_wallet": "Tidak ada aplikasi dompet di perangkat ini"
 }

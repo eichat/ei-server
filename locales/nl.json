@@ -729,5 +729,10 @@
   "deposit_none": "Er is nog niets nieuws binnengekomen",
   "err_deposit_check": "Kon ontvangst niet controleren",
   "err_solana_internal_address": "Dat is een serviceadres",
-  "err_solana_address_taken": "Dat adres hoort bij een ander account"
+  "err_solana_address_taken": "Dat adres hoort bij een ander account",
+  "deposit_body2": "Vul een bedrag in en open je wallet — adres en token worden ingevuld.",
+  "deposit_amount": "Bedrag",
+  "deposit_open_wallet": "Wallet openen",
+  "deposit_manual": "Of stuur handmatig naar dit adres:",
+  "deposit_no_wallet": "Geen wallet-app op dit apparaat gevonden"
 }

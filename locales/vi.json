@@ -729,5 +729,10 @@
   "deposit_none": "Chưa có khoản nào mới",
   "err_deposit_check": "Không kiểm tra được tiền vào",
   "err_solana_internal_address": "Đây là địa chỉ dịch vụ",
-  "err_solana_address_taken": "Địa chỉ này đã liên kết với tài khoản khác"
+  "err_solana_address_taken": "Địa chỉ này đã liên kết với tài khoản khác",
+  "deposit_body2": "Nhập số lượng rồi mở ví — địa chỉ và token sẽ tự điền.",
+  "deposit_amount": "Số lượng",
+  "deposit_open_wallet": "Mở ví",
+  "deposit_manual": "Hoặc gửi thủ công tới địa chỉ này:",
+  "deposit_no_wallet": "Không tìm thấy ứng dụng ví trên thiết bị"
 }

@@ -729,5 +729,10 @@
   "deposit_none": "Non è ancora arrivato nulla di nuovo",
   "err_deposit_check": "Impossibile verificare la ricezione",
   "err_solana_internal_address": "È un indirizzo di servizio",
-  "err_solana_address_taken": "Questo indirizzo è collegato a un altro account"
+  "err_solana_address_taken": "Questo indirizzo è collegato a un altro account",
+  "deposit_body2": "Inserisci l’importo e apri il wallet: indirizzo e token sono già compilati.",
+  "deposit_amount": "Importo",
+  "deposit_open_wallet": "Apri il wallet",
+  "deposit_manual": "Oppure invia manualmente a questo indirizzo:",
+  "deposit_no_wallet": "Nessun wallet trovato sul dispositivo"
 }

@@ -729,5 +729,10 @@
   "deposit_none": "Пока ничего не поступило",
   "err_deposit_check": "Не удалось проверить поступление",
   "err_solana_internal_address": "Это служебный адрес",
-  "err_solana_address_taken": "Этот адрес привязан к другому аккаунту"
+  "err_solana_address_taken": "Этот адрес привязан к другому аккаунту",
+  "deposit_body2": "Укажите сумму и откройте кошелёк — адрес и токен подставятся сами.",
+  "deposit_amount": "Сумма",
+  "deposit_open_wallet": "Открыть кошелёк",
+  "deposit_manual": "Или отправьте вручную на этот адрес:",
+  "deposit_no_wallet": "Кошелёк на устройстве не найден"
 }

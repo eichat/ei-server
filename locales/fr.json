@@ -729,5 +729,10 @@
   "deposit_none": "Rien de nouveau pour l’instant",
   "err_deposit_check": "Impossible de vérifier la réception",
   "err_solana_internal_address": "Cette adresse est interne",
-  "err_solana_address_taken": "Cette adresse est liée à un autre compte"
+  "err_solana_address_taken": "Cette adresse est liée à un autre compte",
+  "deposit_body2": "Indiquez un montant et ouvrez votre portefeuille — l’adresse et le jeton sont pré-remplis.",
+  "deposit_amount": "Montant",
+  "deposit_open_wallet": "Ouvrir le portefeuille",
+  "deposit_manual": "Ou envoyez manuellement à cette adresse :",
+  "deposit_no_wallet": "Aucun portefeuille trouvé sur cet appareil"
 }

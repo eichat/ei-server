@@ -729,5 +729,10 @@
   "deposit_none": "暂无新的入账",
   "err_deposit_check": "无法查询到账",
   "err_solana_internal_address": "这是服务地址",
-  "err_solana_address_taken": "该地址已绑定到其他账号"
+  "err_solana_address_taken": "该地址已绑定到其他账号",
+  "deposit_body2": "输入金额并打开钱包——地址和代币会自动填好。",
+  "deposit_amount": "金额",
+  "deposit_open_wallet": "打开钱包",
+  "deposit_manual": "或手动发送到该地址：",
+  "deposit_no_wallet": "未在此设备上找到钱包应用"
 }

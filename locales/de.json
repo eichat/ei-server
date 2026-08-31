@@ -729,5 +729,10 @@
   "deposit_none": "Noch nichts Neues eingegangen",
   "err_deposit_check": "Eingang konnte nicht geprüft werden",
   "err_solana_internal_address": "Das ist eine interne Adresse",
-  "err_solana_address_taken": "Diese Adresse gehört zu einem anderen Konto"
+  "err_solana_address_taken": "Diese Adresse gehört zu einem anderen Konto",
+  "deposit_body2": "Betrag eingeben und Wallet öffnen — Adresse und Token werden automatisch eingetragen.",
+  "deposit_amount": "Betrag",
+  "deposit_open_wallet": "Wallet öffnen",
+  "deposit_manual": "Oder manuell an diese Adresse senden:",
+  "deposit_no_wallet": "Keine Wallet auf dem Gerät gefunden"
 }

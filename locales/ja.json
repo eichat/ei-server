@@ -729,5 +729,10 @@
   "deposit_none": "新しい入金はまだありません",
   "err_deposit_check": "入金を確認できませんでした",
   "err_solana_internal_address": "これは運営用のアドレスです",
-  "err_solana_address_taken": "このアドレスは別のアカウントに登録されています"
+  "err_solana_address_taken": "このアドレスは別のアカウントに登録されています",
+  "deposit_body2": "金額を入力してウォレットを開いてください。アドレスとトークンは自動で入ります。",
+  "deposit_amount": "金額",
+  "deposit_open_wallet": "ウォレットを開く",
+  "deposit_manual": "または、このアドレスへ手動で送金してください：",
+  "deposit_no_wallet": "端末にウォレットアプリが見つかりません"
 }

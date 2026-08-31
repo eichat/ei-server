@@ -729,5 +729,10 @@
   "deposit_none": "Todavía no llegó nada nuevo",
   "err_deposit_check": "No se pudo comprobar la entrada",
   "err_solana_internal_address": "Esa es una dirección de servicio",
-  "err_solana_address_taken": "Esa dirección está vinculada a otra cuenta"
+  "err_solana_address_taken": "Esa dirección está vinculada a otra cuenta",
+  "deposit_body2": "Indica el importe y abre tu cartera: la dirección y el token se rellenan solos.",
+  "deposit_amount": "Importe",
+  "deposit_open_wallet": "Abrir cartera",
+  "deposit_manual": "O envía manualmente a esta dirección:",
+  "deposit_no_wallet": "No se encontró ninguna cartera en el dispositivo"
 }

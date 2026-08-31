@@ -729,5 +729,10 @@
   "deposit_none": "এখনো নতুন কিছু আসেনি",
   "err_deposit_check": "আগমন যাচাই করা যায়নি",
   "err_solana_internal_address": "এটি একটি সিস্টেম ঠিকানা",
-  "err_solana_address_taken": "এই ঠিকানা অন্য অ্যাকাউন্টে যুক্ত"
+  "err_solana_address_taken": "এই ঠিকানা অন্য অ্যাকাউন্টে যুক্ত",
+  "deposit_body2": "পরিমাণ লিখে ওয়ালেট খুলুন — ঠিকানা ও টোকেন নিজেই বসে যাবে।",
+  "deposit_amount": "পরিমাণ",
+  "deposit_open_wallet": "ওয়ালেট খুলুন",
+  "deposit_manual": "অথবা এই ঠিকানায় নিজে পাঠান:",
+  "deposit_no_wallet": "ডিভাইসে কোনো ওয়ালেট পাওয়া যায়নি"
 }

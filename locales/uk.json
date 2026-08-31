@@ -729,5 +729,10 @@
   "deposit_none": "Поки нічого не надійшло",
   "err_deposit_check": "Не вдалося перевірити надходження",
   "err_solana_internal_address": "Ця адреса службова",
-  "err_solana_address_taken": "Ця адреса прив'язана до іншого акаунта"
+  "err_solana_address_taken": "Ця адреса прив'язана до іншого акаунта",
+  "deposit_body2": "Вкажіть суму й відкрийте гаманець — адреса й токен підставляться самі.",
+  "deposit_amount": "Сума",
+  "deposit_open_wallet": "Відкрити гаманець",
+  "deposit_manual": "Або надішліть вручну на цю адресу:",
+  "deposit_no_wallet": "Гаманця на пристрої не знайдено"
 }

@@ -729,5 +729,10 @@
   "deposit_none": "Henüz yeni bir giriş yok",
   "err_deposit_check": "Gelen işlem kontrol edilemedi",
   "err_solana_internal_address": "Bu bir servis adresi",
-  "err_solana_address_taken": "Bu adres başka bir hesaba bağlı"
+  "err_solana_address_taken": "Bu adres başka bir hesaba bağlı",
+  "deposit_body2": "Tutarı girin ve cüzdanınızı açın — adres ve token otomatik dolar.",
+  "deposit_amount": "Tutar",
+  "deposit_open_wallet": "Cüzdanı aç",
+  "deposit_manual": "Ya da bu adrese elle gönderin:",
+  "deposit_no_wallet": "Bu cihazda cüzdan uygulaması bulunamadı"
 }

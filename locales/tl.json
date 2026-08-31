@@ -729,5 +729,10 @@
   "deposit_none": "Wala pang bagong dumating",
   "err_deposit_check": "Hindi ma-check ang papasok",
   "err_solana_internal_address": "Service address iyan",
-  "err_solana_address_taken": "Naka-link ang address na iyan sa ibang account"
+  "err_solana_address_taken": "Naka-link ang address na iyan sa ibang account",
+  "deposit_body2": "Maglagay ng halaga at buksan ang wallet — kusang mapupunan ang address at token.",
+  "deposit_amount": "Halaga",
+  "deposit_open_wallet": "Buksan ang wallet",
+  "deposit_manual": "O manu-manong magpadala sa address na ito:",
+  "deposit_no_wallet": "Walang wallet app na nakita sa device"
 }
