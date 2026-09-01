@@ -611,10 +611,42 @@ begin
 end;
 $function$
 ;
+-- Списання з поділом класів: повертає, скільки з витраченого було «зароблене».
+-- Без цього переказ між людьми перетворював би внутрішні монети на виведені,
+-- і бонус новачка знову ставав краном токена (migrations/coin_class_transfer).
+CREATE OR REPLACE FUNCTION public.spend_coins_split(p_nick text, p_amount integer)
+ RETURNS json
+ LANGUAGE plpgsql
+AS $function$
+declare
+  cur_coins   int;
+  cur_earned  int;
+  internal    int;
+  spent_earned int;
+  new_balance int;
+begin
+  select coins, coins_earned into cur_coins, cur_earned
+    from users where nick = p_nick for update;
+  if cur_coins is null or p_amount <= 0 or cur_coins < p_amount then
+    return json_build_object('balance', -1, 'earned_spent', 0);
+  end if;
+  internal := greatest(0, cur_coins - cur_earned);
+  spent_earned := greatest(0, p_amount - internal);
+  update users
+     set coins = coins - p_amount,
+         coins_earned = greatest(0, coins_earned - spent_earned)
+   where nick = p_nick
+   returning coins into new_balance;
+  return json_build_object('balance', new_balance, 'earned_spent', spent_earned);
+end;
+$function$
+;
 revoke all on function public.add_coins_earned(text, integer) from public, anon, authenticated;
 revoke all on function public.spend_coins_earned(text, integer) from public, anon, authenticated;
+revoke all on function public.spend_coins_split(text, integer) from public, anon, authenticated;
 grant execute on function public.add_coins_earned(text, integer) to postgres, service_role;
 grant execute on function public.spend_coins_earned(text, integer) to postgres, service_role;
+grant execute on function public.spend_coins_split(text, integer) to postgres, service_role;
 
 -- ─────────────────────────────────────────────────────────────────
 -- 5. ROW LEVEL SECURITY

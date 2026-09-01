@@ -140,6 +140,59 @@ app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120 }));
 const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
 app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/request-code', '/phone/verify-code'], authLimiter);
 
+// ── Класи монет при переказі між людьми ─────────────────────────────────────
+// Виводиться в токен лише «зароблене» — те, за що заплатила ІНША людина.
+// Але сам переказ мусить клас ПЕРЕНОСИТИ, а не створювати: інакше бонус
+// новачка ставав виведеним через один зайвий крок (зареєструвався → переказав
+// собі на основний акаунт → вивів), і два класи не давали б нічого.
+//
+/// Списати монети й дізнатись, скільки з витраченого було «зароблене».
+/// Внутрішнє витрачається першим — виведене лишається за власником.
+async function spendCoinsSplit(nick, amount) {
+  const { data, error } = await supabase.rpc('spend_coins_split', { p_nick: nick, p_amount: amount });
+  if (error) {
+    // Міграції ще немає. Тоді списуємо старою функцією, але «зароблене» з
+    // повітря НЕ вигадуємо: краще недодати виведеного, ніж відкрити кран.
+    console.error('[coins] spend_coins_split недоступна:', error.message);
+    const { data: bal, error: e2 } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: amount });
+    if (e2) return { ok: false, code: 'err_charge_failed', error: 'Помилка списання' };
+    if (bal === -1) return { ok: false, code: 'err_not_enough_coins', error: 'Недостатньо монет' };
+    return { ok: true, balance: bal, earnedSpent: 0 };
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  const balance = Number(row && row.balance);
+  if (!Number.isFinite(balance) || balance < 0) {
+    return { ok: false, code: 'err_not_enough_coins', error: 'Недостатньо монет' };
+  }
+  return { ok: true, balance, earnedSpent: Math.max(0, Number(row.earned_spent) || 0) };
+}
+
+/// Нарахувати отримувачу: «зароблених» рівно стільки, скільки заплатив
+/// відправник зі свого заробленого (але не більше самої суми), решта —
+/// внутрішніми. Повертає новий баланс або null, якщо нарахувати не вдалось.
+async function creditSplit(nick, amount, earnedPart) {
+  const earned = Math.max(0, Math.min(Math.floor(earnedPart || 0), amount));
+  const internal = amount - earned;
+  let balance = null;
+  if (earned > 0) {
+    const { data } = await supabase.rpc('add_coins_earned', { p_nick: nick, p_amount: earned });
+    if (data != null) balance = data;
+  }
+  if (internal > 0) {
+    const { data } = await supabase.rpc('add_coins', { p_nick: nick, p_amount: internal });
+    if (data != null) balance = data;
+  }
+  return balance;
+}
+
+/// Повернути відправнику рівно те, що з нього зняли — з тих самих класів.
+async function refundSplit(nick, amount, earnedPart) {
+  const earned = Math.max(0, Math.min(Math.floor(earnedPart || 0), amount));
+  const internal = amount - earned;
+  if (earned > 0) await supabase.rpc('add_coins_earned', { p_nick: nick, p_amount: earned });
+  if (internal > 0) await supabase.rpc('add_coins', { p_nick: nick, p_amount: internal });
+}
+
 // ── Пароль акаунта на грошових шляхах ───────────────────────────────────────
 // Сесійний токен ≠ дозвіл рухати гроші. Пароль на клієнті НЕ зберігається
 // (аудит #16), тож із вкраденого пристрою його не дістати — саме це й робить
@@ -882,7 +935,7 @@ function eionFactsPrompt() {
     '- The EION token is a separate thing from coins: coins live inside the app, the token on a blockchain. The wallet can convert one into the other. Do not name the blockchain network.',
     `- The wallet is NOT created automatically. In profile settings there are two buttons: create a wallet, or restore one from its 12-word recovery phrase. On a second device the user must RESTORE, otherwise they get a second, separate wallet. Opening a wallet costs ${WALLET_OPEN_FEE} coins once (free for premium) and covers the on-chain account rent we pay.`,
     '- The wallet key never leaves the device and is encrypted with a wallet password, which is separate from the account password. We cannot recover either the password or the phrase; losing both means losing the tokens.',
-    '- Only coins someone else paid you can be converted into tokens: a transfer from another user, an author share from a paid channel or from a paid contact, or a deposit of tokens. Coins we granted (the signup bonus, refunds) can be spent inside EION but not withdrawn.',
+    '- Only coins someone else paid you can be converted into tokens: a transfer from another user, an author share from a paid channel or from a paid contact, or a deposit of tokens. Coins we granted (the signup bonus, refunds) can be spent inside EION but not withdrawn. A transfer carries the class over rather than creating it: if the sender paid out of their own granted coins, the recipient also receives granted (non-withdrawable) coins. Inside an account the granted part is always spent first, so the withdrawable part stays.',
     `- Premium costs ${PREMIUM_PRICES.monthly} coins per month or ${PREMIUM_PRICES.yearly} per year.`,
     `- Free daily allowance: ${FREE_QUOTA.ai} AI requests, ${FREE_QUOTA.storage} MB of uploads, ${FREE_QUOTA.turn} relayed calls, ${FREE_QUOTA.translate} translations.`,
     `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5, and a stronger AI model.`,
@@ -3549,20 +3602,21 @@ app.post('/transfer-coins', async (req, res) => {
   // ДО першого руху монет.
   const pwErr = await requireAccountPassword(req);
   if (pwErr) return res.json(pwErr);
-  // Атомарне списання у відправника (повна сума).
-  const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: amount });
-  if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (senderBalance === -1) return res.json({ ok: false, error: 'Недостатньо монет', code: 'err_not_enough_coins' });
+  // Атомарне списання у відправника (повна сума) з поділом на класи.
+  const spend = await spendCoinsSplit(fromNick, amount);
+  if (!spend.ok) return res.json({ ok: false, error: spend.error, code: spend.code });
+  const senderBalance = spend.balance;
   // Комісія відраховується ІЗ суми: отримувач отримує net, решта → компанії.
   const fee = Math.floor(amount * TRANSFER_FEE_PCT / 100);
   const netAmount = amount - fee;
-  // Атомарне нарахування отримувачу (net). Якщо провалиться — повертаємо повну суму.
-  // Отримувач переказу: це гроші ВІД ІНШОЇ ЛЮДИНИ, тож їх можна виводити.
-  const { data: newReceiverCoins, error: addErr } = await supabase.rpc('add_coins_earned', { p_nick: toNick, p_amount: netAmount });
-  if (addErr || newReceiverCoins === null) {
-    // Повертаємо ВНУТРІШНІМИ навмисно: інакше «витратив внутрішні → домігся
-    // збою → отримав виведені» перетворило б відкат на спосіб відмити бонус.
-    await supabase.rpc('add_coins', { p_nick: fromNick, p_amount: amount });
+  // Нарахування отримувачу (net) з ПЕРЕНЕСЕННЯМ класу: виведеним стає лише те,
+  // що відправник заплатив зі свого заробленого. Інакше переказ сам по собі
+  // перетворював би внутрішні монети на виведені (див. spendCoinsSplit).
+  const newReceiverCoins = await creditSplit(toNick, netAmount, spend.earnedSpent);
+  if (newReceiverCoins === null) {
+    // Відкат повертає рівно ті класи, які зняли: тепер це безпечно, бо
+    // «зароблене» з нічого не виникає — відмити бонус через збій не вийде.
+    await refundSplit(fromNick, amount, spend.earnedSpent);
     await logTx({ fromNick: null, toNick: fromNick, amount, kind: 'transfer_refund', ref: toNick });
     return res.json({ ok: false, error: 'Помилка переказу', code: 'err_transfer_failed' });
   }
@@ -4743,11 +4797,12 @@ app.post('/channel/contact-owner', async (req, res) => {
   const pwErr = await requireAccountPassword(req);
   if (pwErr) return res.json(pwErr);
   // Атомарне списання у покупця.
-  const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: CONTACT_PRICE });
-  if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (senderBalance === -1) return res.json({ ok: false, error: `Недостатньо EION монет (потрібно ${CONTACT_PRICE})`, code: 'err_not_enough_coins' });
-  // Розподіл: власнику (атомарно) + компанії (creditCompany з live+журнал).
-  const { data: ownerBalance } = await supabase.rpc('add_coins_earned', { p_nick: channel.owner_nick, p_amount: OWNER_SHARE });
+  const spend = await spendCoinsSplit(fromNick, CONTACT_PRICE);
+  if (!spend.ok) return res.json({ ok: false, error: spend.error, code: spend.code });
+  const senderBalance = spend.balance;
+  // Розподіл: власнику (з перенесенням класу — інакше внутрішні монети
+  // покупця ставали б у власника виведеними) + компанії.
+  const ownerBalance = await creditSplit(channel.owner_nick, OWNER_SHARE, spend.earnedSpent);
   await logTx({ fromNick, toNick: channel.owner_nick, amount: OWNER_SHARE, kind: 'contact_owner', ref: String(channelId) });
   await creditCompany(COMPANY_SHARE, 'contact_fee', { fromNick, ref: String(channelId) });
   sendToUser(fromNick, { type: 'coins_update', amount: -CONTACT_PRICE, total: senderBalance });
@@ -4775,12 +4830,12 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   if (pwErr) return res.json(pwErr);
   const companyShare = Math.floor(price * FEE_PCT / 100);
   const ownerShare = price - companyShare;
-  // Атомарне списання.
-  const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
-  if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})`, code: 'err_not_enough_coins' });
+  // Атомарне списання з поділом на класи.
+  const spend = await spendCoinsSplit(nick, price);
+  if (!spend.ok) return res.json({ ok: false, error: spend.error, code: spend.code });
+  const newBalance = spend.balance;
   if (ch.owner_nick && ch.owner_nick !== nick) {
-    const { data: ownerNew } = await supabase.rpc('add_coins_earned', { p_nick: ch.owner_nick, p_amount: ownerShare });
+    const ownerNew = await creditSplit(ch.owner_nick, ownerShare, spend.earnedSpent);
     await logTx({ fromNick: nick, toNick: ch.owner_nick, amount: ownerShare, kind: 'paid_sub', ref: String(channelId) });
     if (ownerNew != null) sendToUser(ch.owner_nick, { type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew });
   }
