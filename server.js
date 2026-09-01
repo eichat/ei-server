@@ -5101,22 +5101,58 @@ app.post('/channel/stream/stop', async (req, res) => {
   res.json({ ok: true });
 });
 
+/// Видалити канал разом з усім, що на нього посилається.
+/// Винесено з endpoint'а, бо тепер має ДВА входи: власник і адміністратор.
+async function deleteChannelById(channelId) {
+  // Збираємо файли постів і коментарів перед видаленням — щоб прибрати зі Storage.
+  const { data: chPosts } = await supabase.from('channel_messages').select('id, image_url, file_data').eq('channel_id', channelId);
+  const { data: chComments } = await supabase.from('channel_comments').select('id, file_data').eq('channel_id', channelId);
+  await supabase.from('channel_comment_reactions').delete().in('comment_id', (chComments || []).map(c => c.id));
+  await supabase.from('channel_comments').delete().eq('channel_id', channelId);
+  await supabase.from('channel_reactions').delete().in('post_id', (chPosts || []).map(m => m.id));
+  await supabase.from('channel_post_views').delete().in('post_id', (chPosts || []).map(m => m.id));
+  await supabase.from('channel_messages').delete().eq('channel_id', channelId);
+  await supabase.from('channel_members').delete().eq('channel_id', channelId);
+  await supabase.from('channel_blocked').delete().eq('channel_id', channelId);
+  await supabase.from('channel_paid_subs').delete().eq('channel_id', channelId);
+  await supabase.from('pending_channel_invites').delete().eq('channel_id', channelId);
+  await supabase.from('channels').delete().eq('id', channelId);
+  for (const p of (chPosts || [])) await removeChannelFile(p.image_url, p.file_data);
+  for (const c of (chComments || [])) await removeChannelFile(c.file_data);
+}
+
 app.post('/channel/delete', async (req, res) => {
   const { channelId } = req.body; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Тільки власник може видалити канал', code: 'err_only_owner_delete_channel' });
-  // Збираємо файли постів і коментарів перед видаленням — щоб прибрати зі Storage.
-  const { data: chPosts } = await supabase.from('channel_messages').select('id, image_url, file_data').eq('channel_id', channelId);
-  const { data: chComments } = await supabase.from('channel_comments').select('file_data').eq('channel_id', channelId);
-  await supabase.from('channel_comments').delete().eq('channel_id', channelId);
-  await supabase.from('channel_reactions').delete().in('post_id', (chPosts || []).map(m => m.id));
-  await supabase.from('channel_messages').delete().eq('channel_id', channelId);
-  await supabase.from('channel_members').delete().eq('channel_id', channelId);
-  await supabase.from('channel_blocked').delete().eq('channel_id', channelId);
-  await supabase.from('channels').delete().eq('id', channelId);
-  for (const p of (chPosts || [])) await removeChannelFile(p.image_url, p.file_data);
-  for (const c of (chComments || [])) await removeChannelFile(c.file_data);
+  await deleteChannelById(channelId);
   res.json({ ok: true });
+});
+
+// Канал, власник якого видалив акаунт, лишається без жодного власника — і тоді
+// на скаргу про нього не може відреагувати НІХТО. Це єдиний шлях прибрати такий
+// канал; звичайне видалення так і лишається доступним тільки власнику.
+app.post('/admin/channel/delete', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  const channelId = Number(req.body.channelId);
+  if (!Number.isFinite(channelId)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { data: ch } = await supabase.from('channels').select('id, name, owner_nick').eq('id', channelId).single();
+  if (!ch) return res.json({ ok: false, error: 'Канал не знайдено', code: 'err_channel_not_found' });
+  await deleteChannelById(channelId);
+  console.log('[admin] channel deleted:', channelId, ch.name, 'owner:', ch.owner_nick);
+  res.json({ ok: true, deleted: { id: ch.id, name: ch.name, ownerNick: ch.owner_nick } });
+});
+
+// Канали без живого власника — щоб їх було видно, а не шукати наосліп.
+app.get('/admin/orphan-channels', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  const { data: chans } = await supabase.from('channels').select('id, name, owner_nick, created_at');
+  const out = [];
+  for (const ch of (chans || [])) {
+    const { data: owner } = await supabase.from('users').select('nick').eq('nick', ch.owner_nick).maybeSingle();
+    if (!owner) out.push({ id: ch.id, name: ch.name, ownerNick: ch.owner_nick });
+  }
+  res.json({ ok: true, total: (chans || []).length, orphans: out });
 });
 
 // ── Модерація платформи ────────────────────────

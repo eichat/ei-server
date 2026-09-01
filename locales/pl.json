@@ -800,5 +800,6 @@
   "pw_confirm_body": "Ta operacja przenosi monety. Wpisz hasło konta, a nie hasło portfela.",
   "wallet_open_fee_note": "Otwarcie portfela to jednorazowo 🪙 {n}. Z premium za darmo.",
   "premium_feat_translate": "Autotłumaczenie: 1000 dziennie zamiast 200",
-  "premium_feat_wallet": "Otwarcie portfela za darmo"
+  "premium_feat_wallet": "Otwarcie portfela za darmo",
+  "err_nick_bad_chars": "Nick zawiera niedozwolone znaki"
 }

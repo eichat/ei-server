@@ -18475,6 +18475,29 @@
    "uk": "Гаманець відкривається безкоштовно",
    "vi": "Mở ví miễn phí",
    "zh": "免费开通钱包"
+  },
+  "err_nick_bad_chars": {
+   "ar": "الاسم المستعار يحتوي على رموز غير مسموح بها",
+   "bn": "ডাকনামে অনুমোদিত নয় এমন অক্ষর আছে",
+   "de": "Der Spitzname enthält unzulässige Zeichen",
+   "en": "The nickname contains characters that are not allowed",
+   "es": "El apodo contiene caracteres no permitidos",
+   "fr": "Le pseudo contient des caractères non autorisés",
+   "hi": "उपनाम में अनुमति न दिए गए वर्ण हैं",
+   "id": "Nama panggilan berisi karakter yang tidak diizinkan",
+   "it": "Il nickname contiene caratteri non consentiti",
+   "ja": "ニックネームに使用できない文字が含まれています",
+   "ko": "닉네임에 사용할 수 없는 문자가 있습니다",
+   "nl": "De bijnaam bevat niet-toegestane tekens",
+   "pl": "Nick zawiera niedozwolone znaki",
+   "pt": "A alcunha contém caracteres não permitidos",
+   "ru": "Ник содержит недопустимые символы",
+   "th": "ชื่อเล่นมีอักขระที่ไม่อนุญาต",
+   "tl": "May hindi pinapayagang karakter ang palayaw",
+   "tr": "Takma ad izin verilmeyen karakterler içeriyor",
+   "uk": "Нік містить недопустимі символи",
+   "vi": "Biệt danh chứa ký tự không được phép",
+   "zh": "昵称包含不允许的字符"
   }
  }
 }

@@ -800,5 +800,6 @@
   "pw_confirm_body": "コインを動かす操作です。ウォレットではなくアカウントのパスワードを入力してください。",
   "wallet_open_fee_note": "ウォレットの開設は一度きり 🪙 {n} です。プレミアムなら無料。",
   "premium_feat_translate": "自動翻訳：1日200件から1000件へ",
-  "premium_feat_wallet": "ウォレットの開設が無料"
+  "premium_feat_wallet": "ウォレットの開設が無料",
+  "err_nick_bad_chars": "ニックネームに使用できない文字が含まれています"
 }

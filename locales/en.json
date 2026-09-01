@@ -800,5 +800,6 @@
   "pw_confirm_body": "This moves coins. Enter your account password — not the wallet password.",
   "wallet_open_fee_note": "Opening a wallet is a one-off 🪙 {n}. Free with premium.",
   "premium_feat_translate": "Auto-translate: 1000 a day instead of 200",
-  "premium_feat_wallet": "Opening a wallet is free"
+  "premium_feat_wallet": "Opening a wallet is free",
+  "err_nick_bad_chars": "The nickname contains characters that are not allowed"
 }

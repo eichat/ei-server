@@ -800,5 +800,6 @@
   "pw_confirm_body": "Cette opération déplace des pièces. Saisissez le mot de passe du compte, pas celui du portefeuille.",
   "wallet_open_fee_note": "L’ouverture du portefeuille coûte 🪙 {n} une seule fois. Gratuite avec premium.",
   "premium_feat_translate": "Traduction auto : 1000 par jour au lieu de 200",
-  "premium_feat_wallet": "Ouverture du portefeuille gratuite"
+  "premium_feat_wallet": "Ouverture du portefeuille gratuite",
+  "err_nick_bad_chars": "Le pseudo contient des caractères non autorisés"
 }

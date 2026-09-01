@@ -800,5 +800,6 @@
   "pw_confirm_body": "Thao tác này chuyển xu. Nhập mật khẩu tài khoản — không phải mật khẩu ví.",
   "wallet_open_fee_note": "Mở ví tốn một lần 🪙 {n}. Miễn phí với premium.",
   "premium_feat_translate": "Dịch tự động: 1000 mỗi ngày thay vì 200",
-  "premium_feat_wallet": "Mở ví miễn phí"
+  "premium_feat_wallet": "Mở ví miễn phí",
+  "err_nick_bad_chars": "Biệt danh chứa ký tự không được phép"
 }

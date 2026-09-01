@@ -800,5 +800,6 @@
   "pw_confirm_body": "Esta operação move moedas. Digite a senha da conta, não a da carteira.",
   "wallet_open_fee_note": "Abrir a carteira custa 🪙 {n} uma vez. Grátis com premium.",
   "premium_feat_translate": "Tradução automática: 1000 por dia em vez de 200",
-  "premium_feat_wallet": "Abrir a carteira é grátis"
+  "premium_feat_wallet": "Abrir a carteira é grátis",
+  "err_nick_bad_chars": "A alcunha contém caracteres não permitidos"
 }

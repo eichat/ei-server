@@ -800,5 +800,6 @@
   "pw_confirm_body": "Deze handeling verplaatst munten. Voer het accountwachtwoord in, niet dat van de portemonnee.",
   "wallet_open_fee_note": "De portemonnee openen kost eenmalig 🪙 {n}. Gratis met premium.",
   "premium_feat_translate": "Automatisch vertalen: 1000 per dag in plaats van 200",
-  "premium_feat_wallet": "Portemonnee openen is gratis"
+  "premium_feat_wallet": "Portemonnee openen is gratis",
+  "err_nick_bad_chars": "De bijnaam bevat niet-toegestane tekens"
 }

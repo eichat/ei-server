@@ -800,5 +800,6 @@
   "pw_confirm_body": "Operasi ini memindahkan koin. Masukkan kata sandi akun — bukan kata sandi dompet.",
   "wallet_open_fee_note": "Membuka dompet dikenakan 🪙 {n} sekali. Gratis dengan premium.",
   "premium_feat_translate": "Terjemahan otomatis: 1000 per hari, bukan 200",
-  "premium_feat_wallet": "Membuka dompet gratis"
+  "premium_feat_wallet": "Membuka dompet gratis",
+  "err_nick_bad_chars": "Nama panggilan berisi karakter yang tidak diizinkan"
 }
