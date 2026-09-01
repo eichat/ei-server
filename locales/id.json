@@ -793,5 +793,9 @@
   "donate_w_btc": "Kirim hanya BTC di jaringan Bitcoin.",
   "donate_w_usdt": "Kirim hanya USDT (TRC-20) di TRON. USDT dari Ethereum atau BNB Chain akan hilang.",
   "donate_w_sol": "Jaringan Solana: SOL dan token SPL apa pun (USDC, USDT) masuk ke alamat yang sama.",
-  "donate_w_eth": "Hanya jaringan Ethereum: ETH dan token ERC-20. Jangan kirim TRC-20 atau BEP-20."
+  "donate_w_eth": "Hanya jaringan Ethereum: ETH dan token ERC-20. Jangan kirim TRC-20 atau BEP-20.",
+  "err_password_required": "Kata sandi diperlukan",
+  "err_password_locked": "Terlalu banyak percobaan, coba lagi dalam 15 menit",
+  "pw_confirm_title": "Konfirmasi dengan kata sandi",
+  "pw_confirm_body": "Operasi ini memindahkan koin. Masukkan kata sandi akun — bukan kata sandi dompet."
 }

@@ -793,5 +793,9 @@
   "donate_w_btc": "Bitcoin 네트워크의 BTC만 보내세요.",
   "donate_w_usdt": "TRON의 USDT(TRC-20)만 보내세요. Ethereum이나 BNB Chain의 USDT는 사라집니다.",
   "donate_w_sol": "Solana 네트워크: SOL과 모든 SPL 토큰(USDC, USDT)이 같은 주소로 갑니다.",
-  "donate_w_eth": "Ethereum 네트워크만: ETH와 ERC-20 토큰. TRC-20이나 BEP-20은 보내지 마세요."
+  "donate_w_eth": "Ethereum 네트워크만: ETH와 ERC-20 토큰. TRC-20이나 BEP-20은 보내지 마세요.",
+  "err_password_required": "비밀번호가 필요합니다",
+  "err_password_locked": "시도 횟수가 너무 많습니다. 15분 후에 다시 시도하세요",
+  "pw_confirm_title": "비밀번호로 확인",
+  "pw_confirm_body": "코인을 옮기는 작업입니다. 지갑 비밀번호가 아니라 계정 비밀번호를 입력하세요."
 }

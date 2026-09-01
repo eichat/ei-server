@@ -793,5 +793,9 @@
   "donate_w_btc": "Надсилайте лише BTC у мережі Bitcoin.",
   "donate_w_usdt": "Надсилайте лише USDT (TRC-20) у мережі TRON. USDT з Ethereum чи BNB Chain буде втрачено.",
   "donate_w_sol": "Мережа Solana: на цю саму адресу йдуть і SOL, і будь-який SPL-токен (USDC, USDT).",
-  "donate_w_eth": "Лише мережа Ethereum: ETH і токени ERC-20. Не надсилайте TRC-20 чи BEP-20."
+  "donate_w_eth": "Лише мережа Ethereum: ETH і токени ERC-20. Не надсилайте TRC-20 чи BEP-20.",
+  "err_password_required": "Потрібен пароль",
+  "err_password_locked": "Забагато спроб, спробуйте за 15 хвилин",
+  "pw_confirm_title": "Підтвердіть паролем",
+  "pw_confirm_body": "Операція з монетами. Введіть пароль акаунта — не пароль гаманця."
 }

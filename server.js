@@ -140,6 +140,62 @@ app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120 }));
 const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
 app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/request-code', '/phone/verify-code'], authLimiter);
 
+// ── Пароль акаунта на грошових шляхах ───────────────────────────────────────
+// Сесійний токен ≠ дозвіл рухати гроші. Пароль на клієнті НЕ зберігається
+// (аудит #16), тож із вкраденого пристрою його не дістати — саме це й робить
+// його другим рубежем: токен дає читати переписку, але не спорожнити баланс.
+// Прикрито рівно три шляхи, якими гроші виходять з-під контролю власника:
+//   /transfer-coins          — монети на інший акаунт;
+//   /token/payout            — монети → токен на привʼязану адресу;
+//   /profile/solana-address  — підміна САМОЇ адреси виплати (наступна виплата
+//                              власника пішла б злодію, і пароль тут не спитали б).
+// Токенні перекази й поповнення сюди НЕ входять: там транзакцію підписує ключ
+// із пристрою, а він лежить під паролем гаманця (Argon2id) — окремий рубіж.
+// Стеля ціни платної підписки на канал (монет за період).
+const CHANNEL_PRICE_MAX = 10000;
+const PW_FAIL_MAX = 5;              // невдалих спроб поспіль
+const PW_LOCK_MS = 15 * 60 * 1000;  // пауза після вичерпання
+const pwFails = new Map(); // nick -> { count, lockedUntil, at }
+setInterval(() => {
+  const now = Date.now();
+  for (const [n, r] of pwFails) if (now - r.at > PW_LOCK_MS) pwFails.delete(n);
+}, PW_LOCK_MS).unref?.();
+
+/// Звірити пароль акаунта перед грошовою дією.
+/// Повертає null, якщо все гаразд; інакше — готове тіло відповіді для res.json.
+///
+/// ⚠️ Лічильник невдач тримаємо в памʼяті СВІДОМО (на відміну від кодів
+/// відновлення, які довелось переносити в БД). Втрата стану тут грає на користь
+/// власника, а не атакувальника: рестарт знімає лише блокування, а не сам
+/// захист, і активний перебір не дає Render заснути, тож само собою воно не
+/// обнулиться. При ввімкненому кластері це місце переїде в спільний шар разом
+/// із rate-limit.
+async function requireAccountPassword(req) {
+  const nick = req.nick;
+  if (!nick) return { ok: false, error: 'Не авторизовано', code: 'err_unauthorized' };
+  const now = Date.now();
+  const rec = pwFails.get(nick);
+  if (rec && rec.lockedUntil > now) {
+    return { ok: false, error: 'Забагато спроб, спробуйте за 15 хвилин', code: 'err_password_locked' };
+  }
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!password) return { ok: false, error: 'Потрібен пароль', code: 'err_password_required' };
+  const { data: user } = await supabase.from('users').select('password_hash').eq('nick', nick).single();
+  if (!user || !user.password_hash) return { ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' };
+  if (!(await bcrypt.compare(password, user.password_hash))) {
+    // Блокування минуло — рахуємо з чистого аркуша, інакше давня серія помилок
+    // складалась би з новою й замикала акаунт з другої спроби.
+    let cur = (rec && rec.lockedUntil && rec.lockedUntil <= now) ? null : rec;
+    cur = cur || { count: 0, lockedUntil: 0, at: now };
+    cur.count++; cur.at = now;
+    if (cur.count >= PW_FAIL_MAX) cur.lockedUntil = now + PW_LOCK_MS;
+    pwFails.set(nick, cur);
+    return { ok: false, error: 'Невірний пароль', code: 'err_wrong_password' };
+  }
+  pwFails.delete(nick); // успіх скидає лічильник
+  return null;
+}
+
 // ── Автентифікація (Фаза 1 аудиту): ЖОРСТКИЙ режим ──────────────────────────
 // Кожен непублічний HTTP-запит вимагає валідний сесійний токен (Bearer),
 // інакше 401. req.nick береться ЛИШЕ з токена — тілу запиту більше не довіряємо
@@ -190,8 +246,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.12',
-  code: 13,
+  version: '0.9.13',
+  code: 14,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -832,6 +888,7 @@ function eionFactsPrompt() {
     `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5, and a stronger AI model.`,
     `- Beyond the allowance the user pays coins: ${SINK_PRICE.ai} per AI request, ${SINK_PRICE.storage} per MB, ${SINK_PRICE.turn} per relayed call.`,
     `- Transfers between users carry a ${TRANSFER_FEE_PCT}% fee. Paid channels give 70% to the author.`,
+    '- Any action that moves coins out of the account asks for the ACCOUNT password (not the wallet password): transferring coins, converting coins into tokens, changing the wallet address, subscribing to a paid channel, paying to contact a channel owner. The password is never stored on the device, so a stolen phone cannot spend the balance. Buying stickers or premium does not ask, because those coins stay inside EION.',
     '- You have tools for the current user: balance, today\'s usage against the daily allowance, sticker packs, coin supply. Call them instead of guessing or asking the user to check.',
     '- If you do not know something about EION, say so instead of guessing.',
   ].join('\n');
@@ -2803,6 +2860,14 @@ app.post('/profile/solana-address', async (req, res) => {
   if (address && (SOLANA_INTERNAL.has(address) || address === payoutAddr)) {
     return res.json({ ok: false, error: 'Ця адреса службова', code: 'err_solana_internal_address' });
   }
+  // Пароль акаунта при ВСТАНОВЛЕННІ адреси: це адреса призначення виплат, тож
+  // її підміна з вкраденої сесії відправила б наступну виплату власника злодію.
+  // Відвʼязка (порожній рядок) лишається вільною — вона нічого не краде, а
+  // зворотна привʼязка пароль уже вимагає.
+  if (address) {
+    const pwErr = await requireAccountPassword(req);
+    if (pwErr) return res.json(pwErr);
+  }
   // Стеля прив'язок на добу: створення й відновлення гаманця — рідкісні дії,
   // а скрипт міг би ганяти їх нескінченно, щоразу списуючи ренту з нашого
   // гаманця через нові токен-рахунки.
@@ -3029,6 +3094,11 @@ app.post('/token/payout', async (req, res) => {
   if (used + coins > TOKEN_PAYOUT_DAILY) {
     return res.json({ ok: false, error: 'Денний ліміт виплат вичерпано', code: 'err_payout_daily_limit' });
   }
+
+  // Пароль акаунта: виплата — єдиний шлях, яким монети виходять за межі EION,
+  // і адреса призначення вже задана, тож підпису з пристрою тут не потрібно.
+  const pwErr = await requireAccountPassword(req);
+  if (pwErr) return res.json(pwErr);
 
   // Списання ПЕРШИМ і атомарно: два паралельні запити не витратять один баланс двічі.
   // 🔴 Саме з «заробленої» частини: міст працює 1:1, тож усе, що ми роздали
@@ -3474,6 +3544,11 @@ app.post('/transfer-coins', async (req, res) => {
   if (fromNick === toNick) return res.json({ ok: false, error: 'Не можна переказати собі', code: 'err_cannot_transfer_self' });
   const { data: receiver } = await supabase.from('users').select('nick').eq('nick', toNick).single();
   if (!receiver) return res.json({ ok: false, error: 'Отримувача не знайдено', code: 'err_recipient_not_found' });
+  // Пароль акаунта: вкрадена сесія не має спорожнювати баланс. Стоїть після
+  // дешевих перевірок (щоб через одруківку в ніку не питати пароль двічі), але
+  // ДО першого руху монет.
+  const pwErr = await requireAccountPassword(req);
+  if (pwErr) return res.json(pwErr);
   // Атомарне списання у відправника (повна сума).
   const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: amount });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
@@ -4662,6 +4737,11 @@ app.post('/channel/contact-owner', async (req, res) => {
   if (channel.owner_nick === fromNick) return res.json({ ok: false, error: 'Ви є власником каналу', code: 'err_you_are_owner' });
   const { data: owner } = await supabase.from('users').select('nick').eq('nick', channel.owner_nick).single();
   if (!owner) return res.json({ ok: false, error: 'Власника каналу не знайдено', code: 'err_owner_not_found' });
+  // Пароль: 70 монет ідуть власнику каналу в «зароблене», тобто виводяться в
+  // токен. Без пароля вкрадена сесія платила б власному каналу зловмисника —
+  // обхід захисту переказу тим самим результатом.
+  const pwErr = await requireAccountPassword(req);
+  if (pwErr) return res.json(pwErr);
   // Атомарне списання у покупця.
   const { data: senderBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: fromNick, p_amount: CONTACT_PRICE });
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
@@ -4688,6 +4768,11 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   const { data: curArr } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).order('expires_at', { ascending: false }).limit(1);
   if (curArr && curArr[0] && Number(curArr[0].expires_at) > Date.now()) return res.json({ ok: true, alreadySubscribed: true, expiresAt: Number(curArr[0].expires_at) });
   const price = ch.price || 0;
+  // Пароль: ownerShare теж іде в «зароблене». Тут ще гірше, ніж зі зверненням
+  // до власника, — ціну задає САМ власник, тож одна підписка могла винести
+  // весь баланс жертви (стеля ціни нижче, у /channel/set-paid).
+  const pwErr = await requireAccountPassword(req);
+  if (pwErr) return res.json(pwErr);
   const companyShare = Math.floor(price * FEE_PCT / 100);
   const ownerShare = price - companyShare;
   // Атомарне списання.
@@ -4727,7 +4812,10 @@ app.post('/channel/set-paid', async (req, res) => {
   if (!channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Лише власник', code: 'err_owner_only' });
-  await supabase.from('channels').update({ is_paid: !!isPaid, price: Math.max(0, parseInt(price) || 0), sub_days: Math.max(1, parseInt(subDays) || 30) }).eq('id', channelId);
+  // Стеля ціни. Була відсутня: власник міг поставити будь-яке число, і одна
+  // підписка виносила весь баланс підписника. Заразом ловить одруківку в нулях.
+  const priceCapped = Math.min(CHANNEL_PRICE_MAX, Math.max(0, parseInt(price) || 0));
+  await supabase.from('channels').update({ is_paid: !!isPaid, price: priceCapped, sub_days: Math.max(1, parseInt(subDays) || 30) }).eq('id', channelId);
   res.json({ ok: true });
 });
 

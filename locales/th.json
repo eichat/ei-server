@@ -793,5 +793,9 @@
   "donate_w_btc": "ส่งเฉพาะ BTC บนเครือข่าย Bitcoin เท่านั้น",
   "donate_w_usdt": "ส่งเฉพาะ USDT (TRC-20) บน TRON เท่านั้น USDT จาก Ethereum หรือ BNB Chain จะสูญหาย",
   "donate_w_sol": "เครือข่าย Solana: ทั้ง SOL และโทเคน SPL ใด ๆ (USDC, USDT) ส่งมาที่อยู่เดียวกันนี้",
-  "donate_w_eth": "เฉพาะเครือข่าย Ethereum: ETH และโทเคน ERC-20 อย่าส่ง TRC-20 หรือ BEP-20"
+  "donate_w_eth": "เฉพาะเครือข่าย Ethereum: ETH และโทเคน ERC-20 อย่าส่ง TRC-20 หรือ BEP-20",
+  "err_password_required": "ต้องใช้รหัสผ่าน",
+  "err_password_locked": "พยายามมากเกินไป ลองใหม่ใน 15 นาที",
+  "pw_confirm_title": "ยืนยันด้วยรหัสผ่าน",
+  "pw_confirm_body": "การดำเนินการนี้ย้ายเหรียญ ป้อนรหัสผ่านบัญชี ไม่ใช่รหัสผ่านกระเป๋าเงิน"
 }

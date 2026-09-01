@@ -793,5 +793,9 @@
   "donate_w_btc": "Bitcoin ネットワークの BTC のみ送ってください。",
   "donate_w_usdt": "TRON の USDT（TRC-20）のみ送ってください。Ethereum や BNB Chain の USDT は失われます。",
   "donate_w_sol": "Solana ネットワーク：SOL と任意の SPL トークン（USDC、USDT）は同じアドレスに届きます。",
-  "donate_w_eth": "Ethereum ネットワークのみ：ETH と ERC-20 トークン。TRC-20 や BEP-20 は送らないでください。"
+  "donate_w_eth": "Ethereum ネットワークのみ：ETH と ERC-20 トークン。TRC-20 や BEP-20 は送らないでください。",
+  "err_password_required": "パスワードが必要です",
+  "err_password_locked": "試行回数が多すぎます。15分後にお試しください",
+  "pw_confirm_title": "パスワードで確認",
+  "pw_confirm_body": "コインを動かす操作です。ウォレットではなくアカウントのパスワードを入力してください。"
 }

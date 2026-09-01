@@ -793,5 +793,9 @@
   "donate_w_btc": "Wysyłaj wyłącznie BTC w sieci Bitcoin.",
   "donate_w_usdt": "Wysyłaj wyłącznie USDT (TRC-20) w sieci TRON. USDT z Ethereum lub BNB Chain przepadnie.",
   "donate_w_sol": "Sieć Solana: SOL i dowolny token SPL (USDC, USDT) trafiają na ten sam adres.",
-  "donate_w_eth": "Tylko sieć Ethereum: ETH i tokeny ERC-20. Nie wysyłaj TRC-20 ani BEP-20."
+  "donate_w_eth": "Tylko sieć Ethereum: ETH i tokeny ERC-20. Nie wysyłaj TRC-20 ani BEP-20.",
+  "err_password_required": "Wymagane hasło",
+  "err_password_locked": "Zbyt wiele prób, spróbuj za 15 minut",
+  "pw_confirm_title": "Potwierdź hasłem",
+  "pw_confirm_body": "Ta operacja przenosi monety. Wpisz hasło konta, a nie hasło portfela."
 }

@@ -793,5 +793,9 @@
   "donate_w_btc": "N’envoyez que du BTC sur le réseau Bitcoin.",
   "donate_w_usdt": "N’envoyez que de l’USDT (TRC-20) sur TRON. L’USDT d’Ethereum ou BNB Chain sera perdu.",
   "donate_w_sol": "Réseau Solana : le SOL et tout jeton SPL (USDC, USDT) vont à cette même adresse.",
-  "donate_w_eth": "Réseau Ethereum uniquement : ETH et jetons ERC-20. N’envoyez pas de TRC-20 ni BEP-20."
+  "donate_w_eth": "Réseau Ethereum uniquement : ETH et jetons ERC-20. N’envoyez pas de TRC-20 ni BEP-20.",
+  "err_password_required": "Mot de passe requis",
+  "err_password_locked": "Trop de tentatives, réessayez dans 15 minutes",
+  "pw_confirm_title": "Confirmer avec le mot de passe",
+  "pw_confirm_body": "Cette opération déplace des pièces. Saisissez le mot de passe du compte, pas celui du portefeuille."
 }

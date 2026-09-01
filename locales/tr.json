@@ -793,5 +793,9 @@
   "donate_w_btc": "Yalnızca Bitcoin ağında BTC gönderin.",
   "donate_w_usdt": "Yalnızca TRON ağında USDT (TRC-20) gönderin. Ethereum veya BNB Chain’den gelen USDT kaybolur.",
   "donate_w_sol": "Solana ağı: SOL ve her SPL token (USDC, USDT) aynı adrese gider.",
-  "donate_w_eth": "Yalnızca Ethereum ağı: ETH ve ERC-20 tokenlar. TRC-20 veya BEP-20 göndermeyin."
+  "donate_w_eth": "Yalnızca Ethereum ağı: ETH ve ERC-20 tokenlar. TRC-20 veya BEP-20 göndermeyin.",
+  "err_password_required": "Şifre gerekli",
+  "err_password_locked": "Çok fazla deneme, 15 dakika sonra tekrar deneyin",
+  "pw_confirm_title": "Şifreyle onaylayın",
+  "pw_confirm_body": "Bu işlem jeton taşır. Cüzdan şifresini değil, hesap şifresini girin."
 }

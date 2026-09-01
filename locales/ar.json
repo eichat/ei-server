@@ -793,5 +793,9 @@
   "donate_w_btc": "أرسل BTC فقط على شبكة Bitcoin.",
   "donate_w_usdt": "أرسل USDT (TRC-20) على شبكة TRON فقط. أي USDT من Ethereum أو BNB Chain سيُفقد.",
   "donate_w_sol": "شبكة Solana: يصل SOL وأي رمز SPL (USDC، USDT) إلى العنوان نفسه.",
-  "donate_w_eth": "شبكة Ethereum فقط: ETH ورموز ERC-20. لا ترسل TRC-20 أو BEP-20."
+  "donate_w_eth": "شبكة Ethereum فقط: ETH ورموز ERC-20. لا ترسل TRC-20 أو BEP-20.",
+  "err_password_required": "مطلوب كلمة المرور",
+  "err_password_locked": "محاولات كثيرة، حاول بعد 15 دقيقة",
+  "pw_confirm_title": "أكِّد بكلمة المرور",
+  "pw_confirm_body": "عملية بالعملات. أدخل كلمة مرور الحساب — وليس كلمة مرور المحفظة."
 }

@@ -793,5 +793,9 @@
   "donate_w_btc": "仅可发送 Bitcoin 网络的 BTC。",
   "donate_w_usdt": "仅可发送 TRON 网络的 USDT（TRC-20）。来自 Ethereum 或 BNB Chain 的 USDT 将永久丢失。",
   "donate_w_sol": "Solana 网络：SOL 与任意 SPL 代币（USDC、USDT）都发往同一地址。",
-  "donate_w_eth": "仅限 Ethereum 网络：ETH 与 ERC-20 代币。请勿发送 TRC-20 或 BEP-20。"
+  "donate_w_eth": "仅限 Ethereum 网络：ETH 与 ERC-20 代币。请勿发送 TRC-20 或 BEP-20。",
+  "err_password_required": "需要密码",
+  "err_password_locked": "尝试次数过多，请在 15 分钟后重试",
+  "pw_confirm_title": "用密码确认",
+  "pw_confirm_body": "此操作会转移金币。请输入账户密码，而不是钱包密码。"
 }

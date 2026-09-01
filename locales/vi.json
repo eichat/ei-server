@@ -793,5 +793,9 @@
   "donate_w_btc": "Chỉ gửi BTC trên mạng Bitcoin.",
   "donate_w_usdt": "Chỉ gửi USDT (TRC-20) trên TRON. USDT từ Ethereum hay BNB Chain sẽ mất.",
   "donate_w_sol": "Mạng Solana: SOL và mọi token SPL (USDC, USDT) đều vào cùng địa chỉ này.",
-  "donate_w_eth": "Chỉ mạng Ethereum: ETH và token ERC-20. Đừng gửi TRC-20 hay BEP-20."
+  "donate_w_eth": "Chỉ mạng Ethereum: ETH và token ERC-20. Đừng gửi TRC-20 hay BEP-20.",
+  "err_password_required": "Cần mật khẩu",
+  "err_password_locked": "Quá nhiều lần thử, hãy thử lại sau 15 phút",
+  "pw_confirm_title": "Xác nhận bằng mật khẩu",
+  "pw_confirm_body": "Thao tác này chuyển xu. Nhập mật khẩu tài khoản — không phải mật khẩu ví."
 }

@@ -793,5 +793,9 @@
   "donate_w_btc": "Stuur alleen BTC via het Bitcoin-netwerk.",
   "donate_w_usdt": "Stuur alleen USDT (TRC-20) via TRON. USDT van Ethereum of BNB Chain gaat verloren.",
   "donate_w_sol": "Solana-netwerk: SOL en elke SPL-token (USDC, USDT) gaan naar hetzelfde adres.",
-  "donate_w_eth": "Alleen Ethereum-netwerk: ETH en ERC-20-tokens. Stuur geen TRC-20 of BEP-20."
+  "donate_w_eth": "Alleen Ethereum-netwerk: ETH en ERC-20-tokens. Stuur geen TRC-20 of BEP-20.",
+  "err_password_required": "Wachtwoord vereist",
+  "err_password_locked": "Te veel pogingen, probeer het over 15 minuten opnieuw",
+  "pw_confirm_title": "Bevestig met wachtwoord",
+  "pw_confirm_body": "Deze handeling verplaatst munten. Voer het accountwachtwoord in, niet dat van de portemonnee."
 }
