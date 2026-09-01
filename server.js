@@ -140,6 +140,17 @@ app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120 }));
 const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
 app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/request-code', '/phone/verify-code'], authLimiter);
 
+// 🔴 Нік потрапляє у фільтри PostgREST, де кома й дужки — РОЗДІЛЬНИКИ. Нік
+// `x,id.gt.0` перетворював `or=(from_nick.eq.x,to_nick.eq.x)` на умову, що
+// збігається з УСІЄЮ таблицею: «видалити свій акаунт» стирало переписку всіх.
+// Значення ми більше не вставляємо у фільтр рядком (див. /delete-account і
+// /call-logs), але забороняємо їх і на вході — другий рубіж, бо нік їде ще й
+// у шляхи сховища та в підписи.
+const NICK_FORBIDDEN = /[,()"'\\]|[\u0000-\u001f\u007f]/;
+function nickLooksSafe(nick) {
+  return typeof nick === 'string' && !NICK_FORBIDDEN.test(nick);
+}
+
 // ── Класи монет при переказі між людьми ─────────────────────────────────────
 // Виводиться в токен лише «зароблене» — те, за що заплатила ІНША людина.
 // Але сам переказ мусить клас ПЕРЕНОСИТИ, а не створювати: інакше бонус
@@ -2493,6 +2504,7 @@ async function sendGroupInvite(groupId, groupName, inviterNick, targetNick) {
 app.post('/register', async (req, res) => {
   const { nick, password, email, color, phone, phoneNormalized } = req.body;
   if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)', code: 'err_nick_too_short' });
+  if (!nickLooksSafe(nick)) return res.json({ ok: false, error: 'Нік містить недопустимі символи', code: 'err_nick_bad_chars' });
   if (!password || password.length < 8) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 8 символів)', code: 'err_password_too_short' });
   if (email && !email.includes('@')) return res.json({ ok: false, error: 'Невірний email', code: 'err_invalid_email' });
   const { data: existing } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
@@ -2632,6 +2644,7 @@ app.post('/update-nick', async (req, res) => {
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
   if (!newNick || newNick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий', code: 'err_nick_too_short' });
+  if (!nickLooksSafe(newNick)) return res.json({ ok: false, error: 'Нік містить недопустимі символи', code: 'err_nick_bad_chars' });
   const { data: exists } = await supabase.from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
   if (exists) return res.json({ ok: false, error: 'Нік вже зайнятий', code: 'err_nick_taken' });
   const oldNick = user.nick;
@@ -2814,12 +2827,146 @@ app.get('/turn-credentials', async (req, res) => {
   });
 });
 
+
+// ── Повне видалення акаунта (GDPR ст. 17) ───────────────────────────────────
+// Раніше `/delete-account` прибирав рівно дві речі — `messages` і рядок
+// `users` — тоді як політика обіцяла видалення профілю, повідомлень, файлів і
+// сесій. Усе інше, привʼязане до ніка (підписки, членства, реакції, лічильники
+// норм, коди, заявки на виплату), лишалось у базі назавжди.
+//
+// Три класи даних, і поводимось з ними по-різному:
+//
+//  • ВИДАЛЯЄМО — те, що бачить лише сам користувач або що без нього не має
+//    сенсу: членства, підписки, реакції, позначки прочитання, лічильники,
+//    коди, запрошення, чернетки блокувань.
+//  • ЗНЕОСОБЛЮЄМО (нік → null) — те, що потрібне НЕ як дані людини, а як
+//    облік: журнал монет (інакше «попливе» баланс емісії) і `token_deposits`
+//    (його первинний ключ — підпис транзакції, і саме він не дає зарахувати
+//    той самий депозит удруге; видалення рядка відкрило б повторне зарахування).
+//    Плюс `reports.reporter_nick`: сама скарга лишається робочою для модерації.
+//  • ЛИШАЄМО — повідомлення в групах, пости й коментарі каналів: їх бачать
+//    інші учасники, і саме це написано в політиці. І `platform_bans` — інакше
+//    видалення акаунта стало б способом зняти блокування.
+//
+// ⚠️ Канал чи група, які створив видалений акаунт, лишаються без власника.
+// Це свідомо: сам вміст належить учасникам, а вигадувати спадкоємця гірше, ніж
+// лишити його як є.
+//
+// Колонки з ніком, які лишаються НАВМИСНО (звірено зі схемою — інших немає):
+//   channel_comments.from_nick, .reply_to_nick · channel_messages.from_nick ·
+//   group_messages.from_nick   — вміст, який бачать інші;
+//   channels.owner_nick · groups.creator_nick — те саме, див. вище;
+//   platform_bans.nick         — інакше видалення знімало б бан;
+//   reports.target_nick        — скарга описує вміст, який лишився.
+
+/// Шлях у бакеті `avatars` з публічного або підписаного URL.
+function avatarPathFromUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  let tail = null;
+  if (url.startsWith('eion://avatars/')) tail = url.slice('eion://avatars/'.length);
+  else for (const marker of ['/object/sign/avatars/', '/object/public/avatars/']) {
+    const i = url.indexOf(marker);
+    if (i !== -1) { tail = url.slice(i + marker.length); break; }
+  }
+  if (tail === null) return null;
+  const q = tail.indexOf('?');
+  if (q !== -1) tail = tail.slice(0, q);
+  try { return decodeURIComponent(tail); } catch (_) { return tail; }
+}
+
+/// Прибрати все, що привʼязане до ніка. Повертає звіт для логу.
+/// Помилка в одній таблиці не зупиняє решту: недоприбране краще за
+/// напівживий акаунт, у якого зник профіль, але лишились членства.
+async function purgeAccountData(nick, user) {
+  const report = { deleted: {}, anonymized: {}, files: 0, errors: [] };
+
+  const del = async (table, col, value) => {
+    const { error, count } = await supabase.from(table).delete({ count: 'exact' }).eq(col, value);
+    if (error) { report.errors.push(`${table}.${col}: ${error.message}`); return; }
+    report.deleted[table] = (report.deleted[table] || 0) + (count || 0);
+  };
+  const anon = async (table, col) => {
+    const { error, count } = await supabase.from(table).update({ [col]: null }, { count: 'exact' }).eq(col, nick);
+    if (error) { report.errors.push(`${table}.${col}(anon): ${error.message}`); return; }
+    report.anonymized[`${table}.${col}`] = count || 0;
+  };
+
+  // 1. Файли з особистих переписок — ЗБИРАЄМО ДО видалення рядків, інакше
+  //    посилання зникне разом із повідомленням і об'єкт лишиться сиротою
+  //    назавжди: періодична чистка ходить по повідомленнях, яких уже не буде.
+  const fileData = new Set();
+  const msgIds = new Set();
+  for (const col of ['from_nick', 'to_nick']) {
+    const { data } = await supabase.from('messages').select('id, file_data').eq(col, nick);
+    for (const r of (data || [])) { msgIds.add(r.id); if (r.file_data) fileData.add(r.file_data); }
+  }
+
+  // 2. Особисті переписки. Два окремі .eq замість рядкового or= — див.
+  //    NICK_FORBIDDEN: нік із комою робив із цього «видалити все».
+  await del('messages', 'from_nick', nick);
+  await del('messages', 'to_nick', nick);
+
+  // 3. Решта рядків, привʼязаних до ніка.
+  const byNick = [
+    'channel_blocked', 'channel_comment_reactions', 'channel_members', 'channel_paid_subs',
+    'channel_post_views', 'channel_reactions', 'chat_reads', 'email_codes', 'group_bans',
+    'group_history_cleared', 'group_join_requests', 'group_members', 'group_message_reactions',
+    'token_payouts', 'usage_counters', 'user_sticker_packs',
+  ];
+  for (const t of byNick) await del(t, 'nick', nick);
+
+  for (const [t, cols] of [
+    ['block_allowlist', ['owner_nick', 'allowed_nick']],
+    ['blocked_contacts', ['blocker_nick', 'blocked_nick']],
+    ['call_logs', ['from_nick', 'to_nick']],
+    ['deleted_messages', ['from_nick', 'to_nick']],
+    ['direct_message_reactions', ['from_nick']],
+    ['pending_channel_invites', ['inviter_nick', 'target_nick']],
+    ['pending_group_invites', ['inviter_nick', 'target_nick']],
+    ['pending_reactions', ['from_nick', 'to_nick', 'chat_nick']],
+  ]) for (const c of cols) await del(t, c, nick);
+
+  // Коди телефону лежать під самим номером; у користувача він у двох формах.
+  for (const ph of [user && user.phone_normalized, user && user.phone]) {
+    if (ph) await del('phone_codes', 'phone', ph);
+  }
+
+  // 4. Знеособлення — там, де рядок потрібен без людини.
+  await anon('coin_transactions', 'from_nick');
+  await anon('coin_transactions', 'to_nick');
+  await anon('token_deposits', 'nick');
+  await anon('reports', 'reporter_nick');
+
+  // 5. Файли. Прибираємо лише те, на що більше ніхто не посилається: та сама
+  //    перевірка, що захищає переслані копії від чистки за TTL. 2C тут НЕ
+  //    чекаємо — людина попросила стерти свої дані, а не «коли всі заберуть».
+  for (const fd of fileData) {
+    const path = storagePathFromUrl(fd);
+    if (!path) continue;
+    if (await fileStillReferenced(fd, msgIds, new Set())) continue;
+    try {
+      await supabase.storage.from('files').remove([path]);
+      await supabase.from('file_objects').delete().eq('storage_path', path);
+      report.files++;
+    } catch (e) { report.errors.push(`storage ${path}: ${e.message}`); }
+  }
+  const avatarPath = avatarPathFromUrl(user && user.avatar_url);
+  if (avatarPath) {
+    try { await supabase.storage.from('avatars').remove([avatarPath]); report.files++; }
+    catch (e) { report.errors.push(`avatar ${avatarPath}: ${e.message}`); }
+  }
+  return report;
+}
+
 app.post('/delete-account', async (req, res) => {
   const { password } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
   const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
-  await supabase.from('messages').delete().or(`from_nick.eq.${nick},to_nick.eq.${nick}`);
+  // Спершу все привʼязане до ніка, і лише потім сам рядок users: якщо на
+  // півдорозі щось упаде, акаунт іще існує і видалення можна повторити.
+  const purge = await purgeAccountData(user.nick, user);
+  console.log('[delete-account]', user.nick, JSON.stringify(purge));
   await supabase.from('users').delete().eq('nick_lower', nick.toLowerCase());
   onlineUsers.delete(nick); busPublish({ t: 'down', nick }); await clearFcmToken(nick);
   await destroySessionsForNick(nick);
@@ -3649,13 +3796,19 @@ app.post('/call-log', async (req, res) => {
 
 app.get('/call-logs', async (req, res) => {
   const { nick, otherNick } = req.query; if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
-  const { data } = await supabase.from('call_logs').select('*').or(`and(from_nick.eq.${nick},to_nick.eq.${otherNick}),and(from_nick.eq.${otherNick},to_nick.eq.${nick})`).order('started_at', { ascending: true });
+  // Пара ніків через .in(): значення екрануються клієнтом, тоді як рядковий
+  // `or=(...)` дозволяв дописати умову — обидва ніки приходять із запиту.
+  // from і to з одного набору = рівно розмова цієї пари.
+  const { data } = await supabase.from('call_logs').select('*')
+    .in('from_nick', [nick, otherNick]).in('to_nick', [nick, otherNick])
+    .order('started_at', { ascending: true });
   res.json({ ok: true, logs: data || [] });
 });
 
 app.delete('/call-logs', async (req, res) => {
   const { nick, otherNick } = req.query; if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
-  await supabase.from('call_logs').delete().or(`and(from_nick.eq.${nick},to_nick.eq.${otherNick}),and(from_nick.eq.${otherNick},to_nick.eq.${nick})`);
+  await supabase.from('call_logs').delete()
+    .in('from_nick', [nick, otherNick]).in('to_nick', [nick, otherNick]);
   res.json({ ok: true });
 });
 
