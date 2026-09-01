@@ -41,6 +41,11 @@ const PREMIUM_PRICES = { monthly: 1000, yearly: 8400 };
 // Стартовий баланс нового акаунта. Задається ТУТ (у /register), колонка в БД
 // має свій DEFAULT лише як запобіжник.
 const NEW_USER_COINS = 200;
+// Гаманець створюється НЕ автоматично, а кнопкою — і його відкриття коштує
+// монет: наша реальна витрата тут одна, рента токен-рахунку (~0,002 SOL ≈
+// $0,37 на mainnet), і платить її наш гаманець. Преміум звільняється.
+const WALLET_OPEN_FEE = Number(process.env.WALLET_OPEN_FEE || 50);
+const WALLET_BIND_DAILY = Number(process.env.WALLET_BIND_DAILY || 3);
 // Render стоїть за балансувальником: реальний IP клієнта — у X-Forwarded-For.
 // Без цього rate-limit бачив би один IP проксі для всіх і різав би всіх гуртом.
 app.set('trust proxy', 1);
@@ -185,8 +190,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.10',
-  code: 11,
+  version: '0.9.11',
+  code: 12,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -819,6 +824,9 @@ function eionFactsPrompt() {
     '- Calls are end-to-end encrypted (WebRTC). Messages are NOT end-to-end encrypted yet; that is planned.',
     `- Coins are the in-app unit, not money and not cryptocurrency. New accounts get ${NEW_USER_COINS}.`,
     '- The EION token is a separate thing from coins: coins live inside the app, the token on a blockchain. The wallet can convert one into the other. Do not name the blockchain network.',
+    `- The wallet is NOT created automatically. In profile settings there are two buttons: create a wallet, or restore one from its 12-word recovery phrase. On a second device the user must RESTORE, otherwise they get a second, separate wallet. Opening a wallet costs ${WALLET_OPEN_FEE} coins once (free for premium) and covers the on-chain account rent we pay.`,
+    '- The wallet key never leaves the device and is encrypted with a wallet password, which is separate from the account password. We cannot recover either the password or the phrase; losing both means losing the tokens.',
+    '- Only coins someone else paid you can be converted into tokens: a transfer from another user, an author share from a paid channel or from a paid contact, or a deposit of tokens. Coins we granted (the signup bonus, refunds) can be spent inside EION but not withdrawn.',
     `- Premium costs ${PREMIUM_PRICES.monthly} coins per month or ${PREMIUM_PRICES.yearly} per year.`,
     `- Free daily allowance: ${FREE_QUOTA.ai} AI requests, ${FREE_QUOTA.storage} MB of uploads, ${FREE_QUOTA.turn} relayed calls, ${FREE_QUOTA.translate} translations.`,
     `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5, and a stronger AI model.`,
@@ -2731,11 +2739,27 @@ app.post('/online-users', (req, res) => {
   res.json({ ok: true, users: online });
 });
 
+// Виведена частина балансу окремим запитом: доки міграція `coin_classes_wallet`
+// не виконана, колонок ще немає — і тоді профіль має працювати як раніше, а не
+// падати цілком через одне додаткове поле.
+async function earnedInfo(nick, coins) {
+  const { data, error } = await supabase.from('users')
+    .select('coins_earned, wallet_opened').eq('nick', nick).single();
+  if (error || !data) return {};
+  return {
+    coins_earned: Math.min(data.coins_earned || 0, coins),
+    wallet_opened: data.wallet_opened === true,
+  };
+}
+
 app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий', code: 'err_param_nick' });
   const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming, invisible, solana_address').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true, solana_address: user.solana_address || null });
+  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true, solana_address: user.solana_address || null,
+    // Скільки з балансу дозволено виводити в токен і чи вже сплачено відкриття
+    // гаманця — клієнт має показувати це чесно, а не обіцяти вивід усього.
+    ...(await earnedInfo(nick, user.coins || 0)), wallet_open_fee: WALLET_OPEN_FEE });
 });
 
 // ── Гаманець Solana: тільки АДРЕСА, без ключів ───────────────────────────
@@ -2779,6 +2803,14 @@ app.post('/profile/solana-address', async (req, res) => {
   if (address && (SOLANA_INTERNAL.has(address) || address === payoutAddr)) {
     return res.json({ ok: false, error: 'Ця адреса службова', code: 'err_solana_internal_address' });
   }
+  // Стеля прив'язок на добу: створення й відновлення гаманця — рідкісні дії,
+  // а скрипт міг би ганяти їх нескінченно, щоразу списуючи ренту з нашого
+  // гаманця через нові токен-рахунки.
+  const bindsToday = await usageToday(req.nick, 'wallet_bind');
+  if (bindsToday !== null && bindsToday >= WALLET_BIND_DAILY) {
+    return res.json({ ok: false, error: 'Забагато спроб за добу', code: 'err_wallet_bind_limit' });
+  }
+
   // Одна адреса — один акаунт. Інакше надходження з неї не зарахувалось би
   // НІКОМУ: запит `.eq('solana_address', …).single()` на двох рядках падає, і
   // депозит тихо ставав би «нерозпізнаним». Плюс це відкривало б плутанину,
@@ -2790,10 +2822,36 @@ app.post('/profile/solana-address', async (req, res) => {
       return res.json({ ok: false, error: 'Ця адреса вже прив\'язана до іншого акаунта', code: 'err_solana_address_taken' });
     }
   }
+  // Плата за ВІДКРИТТЯ гаманця. Береться саме тут, бо реальна витрата в нас
+  // одна: рента токен-рахунку (~0,002 SOL) — її платить наш гаманець, коли на
+  // адресу вперше щось приходить. Створення ключа не коштує нічого, тож
+  // порожній гаманець лишається безкоштовним, а плата бере рівно те, що
+  // коштує грошей. Преміум звільняється: це перевага, а не бар'єр.
+  let charged = 0;
+  if (address) {
+    const { data: me, error: meErr } = await supabase.from('users')
+      .select('wallet_opened, coins, premium_expires_at').eq('nick', req.nick).single();
+    // Помилка тут = колонки ще немає (міграція не виконана). Тоді просто не
+    // беремо плату: краще недоотримати монети, ніж не дати прив'язати гаманець.
+    if (!meErr && me && !me.wallet_opened) {
+      const premium = me.premium_expires_at && new Date(me.premium_expires_at) > new Date();
+      if (!premium && WALLET_OPEN_FEE > 0) {
+        const { data: left } = await supabase.rpc('spend_coins', { p_nick: req.nick, p_amount: WALLET_OPEN_FEE });
+        if (left === -1 || left === null) {
+          return res.json({ ok: false, error: 'Недостатньо монет', code: 'err_not_enough_coins' });
+        }
+        charged = WALLET_OPEN_FEE;
+        creditCompany(WALLET_OPEN_FEE, 'wallet_open', { fromNick: req.nick });
+      }
+      await supabase.from('users').update({ wallet_opened: true }).eq('nick', req.nick);
+    }
+  }
+
   const { error } = await supabase.from('users')
     .update({ solana_address: address || null }).eq('nick', req.nick);
   if (error) return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
-  res.json({ ok: true, address: address || null });
+  await bumpUsage(req.nick, 'wallet_bind');
+  res.json({ ok: true, address: address || null, charged });
 });
 
 // Баланс токена читаємо НА СЕРВЕРІ: так адресу RPC (і платний ключ, якщо він
@@ -2937,7 +2995,7 @@ async function resumePendingPayouts() {
       if (!p.signature) {
         // Підпису немає — транзакція не будувалась, тож і токенів не було.
         await supabase.from('token_payouts').update({ status: 'refunded', error: 'обірвано до відправки' }).eq('id', p.id);
-        await supabase.rpc('add_coins', { p_nick: p.nick, p_amount: p.coins });
+        await supabase.rpc('add_coins_earned', { p_nick: p.nick, p_amount: p.coins });
         console.log('[payout] повернуто бали за заявкою', p.id);
         continue;
       }
@@ -2947,7 +3005,7 @@ async function resumePendingPayouts() {
         console.log('[payout] заявка', p.id, 'насправді пройшла');
       } else if (st === 'failed') {
         await supabase.from('token_payouts').update({ status: 'refunded', error: 'транзакція відхилена мережею' }).eq('id', p.id);
-        await supabase.rpc('add_coins', { p_nick: p.nick, p_amount: p.coins });
+        await supabase.rpc('add_coins_earned', { p_nick: p.nick, p_amount: p.coins });
         console.log('[payout] заявка', p.id, 'відхилена, бали повернуто');
       }
       // 'unknown' лишаємо як є: транзакція може ще підтвердитись. Повторна
@@ -2973,17 +3031,20 @@ app.post('/token/payout', async (req, res) => {
   }
 
   // Списання ПЕРШИМ і атомарно: два паралельні запити не витратять один баланс двічі.
-  const { data: left, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: req.nick, p_amount: coins });
+  // 🔴 Саме з «заробленої» частини: міст працює 1:1, тож усе, що ми роздали
+  // самі (бонус новачка, компенсації), інакше було б прямою емісією токена.
+  // Виводиться лише те, за що вже заплатила інша людина.
+  const { data: left, error: spendErr } = await supabase.rpc('spend_coins_earned', { p_nick: req.nick, p_amount: coins });
   if (spendErr || left === -1 || left === null) {
-    return res.json({ ok: false, error: 'Недостатньо монет', code: 'err_not_enough_coins' });
+    return res.json({ ok: false, error: 'Недостатньо монет до виведення', code: 'err_not_enough_earned' });
   }
 
   const tokens = coins * TOKEN_PAYOUT_RATE;
   const { data: row, error: insErr } = await supabase.from('token_payouts')
     .insert({ nick: req.nick, address, coins, tokens, status: 'pending' }).select('id').single();
   if (insErr) {
-    // Заявку не записали — тоді й бали не мають зникнути.
-    await supabase.rpc('add_coins', { p_nick: req.nick, p_amount: coins });
+    // Заявку не записали — тоді й бали не мають зникнути (повертаємо в ту саму частину).
+    await supabase.rpc('add_coins_earned', { p_nick: req.nick, p_amount: coins });
     return res.json({ ok: false, error: 'Не вдалося створити заявку', code: 'err_payout_create' });
   }
 
@@ -3088,7 +3149,9 @@ async function scanTokenDeposits() {
       });
       if (insErr) continue;   // найімовірніше гонка — інший інстанс уже записав
       if (user && coins > 0) {
-        await supabase.rpc('add_coins', { p_nick: user.nick, p_amount: coins });
+        // Токени прийшли ззовні — отже це «зароблене»: інакше поповнення
+        // стало б пасткою (внести можна, вивести назад — ні).
+        await supabase.rpc('add_coins_earned', { p_nick: user.nick, p_amount: coins });
         logTx({ fromNick: null, toNick: user.nick, amount: coins, kind: 'token_deposit', ref: s.signature });
         credited++;
       }
@@ -3181,7 +3244,7 @@ app.post('/token/deposit-submit', async (req, res) => {
       tokens: pending.amount, coins, status: 'credited',
     });
     if (insErr) return res.json({ ok: true, signature, credited: 0 });
-    await supabase.rpc('add_coins', { p_nick: req.nick, p_amount: coins });
+    await supabase.rpc('add_coins_earned', { p_nick: req.nick, p_amount: coins });
     logTx({ fromNick: null, toNick: req.nick, amount: coins, kind: 'token_deposit', ref: signature });
     const { data: u } = await supabase.from('users').select('coins').eq('nick', req.nick).single();
     res.json({ ok: true, signature, credited: coins, balance: u ? u.coins : null });
@@ -3419,9 +3482,12 @@ app.post('/transfer-coins', async (req, res) => {
   const fee = Math.floor(amount * TRANSFER_FEE_PCT / 100);
   const netAmount = amount - fee;
   // Атомарне нарахування отримувачу (net). Якщо провалиться — повертаємо повну суму.
-  const { data: newReceiverCoins, error: addErr } = await supabase.rpc('add_coins', { p_nick: toNick, p_amount: netAmount });
+  // Отримувач переказу: це гроші ВІД ІНШОЇ ЛЮДИНИ, тож їх можна виводити.
+  const { data: newReceiverCoins, error: addErr } = await supabase.rpc('add_coins_earned', { p_nick: toNick, p_amount: netAmount });
   if (addErr || newReceiverCoins === null) {
-    await supabase.rpc('add_coins', { p_nick: fromNick, p_amount: amount }); // повертаємо кошти
+    // Повертаємо ВНУТРІШНІМИ навмисно: інакше «витратив внутрішні → домігся
+    // збою → отримав виведені» перетворило б відкат на спосіб відмити бонус.
+    await supabase.rpc('add_coins', { p_nick: fromNick, p_amount: amount });
     await logTx({ fromNick: null, toNick: fromNick, amount, kind: 'transfer_refund', ref: toNick });
     return res.json({ ok: false, error: 'Помилка переказу', code: 'err_transfer_failed' });
   }
@@ -4601,7 +4667,7 @@ app.post('/channel/contact-owner', async (req, res) => {
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
   if (senderBalance === -1) return res.json({ ok: false, error: `Недостатньо EION монет (потрібно ${CONTACT_PRICE})`, code: 'err_not_enough_coins' });
   // Розподіл: власнику (атомарно) + компанії (creditCompany з live+журнал).
-  const { data: ownerBalance } = await supabase.rpc('add_coins', { p_nick: channel.owner_nick, p_amount: OWNER_SHARE });
+  const { data: ownerBalance } = await supabase.rpc('add_coins_earned', { p_nick: channel.owner_nick, p_amount: OWNER_SHARE });
   await logTx({ fromNick, toNick: channel.owner_nick, amount: OWNER_SHARE, kind: 'contact_owner', ref: String(channelId) });
   await creditCompany(COMPANY_SHARE, 'contact_fee', { fromNick, ref: String(channelId) });
   sendToUser(fromNick, { type: 'coins_update', amount: -CONTACT_PRICE, total: senderBalance });
@@ -4629,7 +4695,7 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
   if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})`, code: 'err_not_enough_coins' });
   if (ch.owner_nick && ch.owner_nick !== nick) {
-    const { data: ownerNew } = await supabase.rpc('add_coins', { p_nick: ch.owner_nick, p_amount: ownerShare });
+    const { data: ownerNew } = await supabase.rpc('add_coins_earned', { p_nick: ch.owner_nick, p_amount: ownerShare });
     await logTx({ fromNick: nick, toNick: ch.owner_nick, amount: ownerShare, kind: 'paid_sub', ref: String(channelId) });
     if (ownerNew != null) sendToUser(ch.owner_nick, { type: 'coins_received', fromNick: nick, amount: ownerShare, total: ownerNew });
   }
@@ -4995,6 +5061,30 @@ app.get('/admin/mail-test', async (req, res) => {
 // Доти дивитись доводилось руками по таблицях Supabase, логах Render, Sentry і
 // GitHub — тобто в чотирьох місцях, і жодне не давало відповіді «скільки людей
 // користується». Тут усе разом; `?format=html` — щоб відкрити з телефона.
+// Скільки ще операцій витримає гаманець релея. Рента токен-рахунку (~0,00204
+// SOL) — найдорожча з них, тож рахуємо в «перших надходженнях»: саме вони
+// закінчаться першими.
+const ATA_RENT_SOL = 0.00204;
+async function relayerStatus() {
+  if (!payoutReady()) return { enabled: false };
+  try {
+    const kp = getPayoutKeypair();
+    const r = await httpPostJson(SOLANA_RPC, {}, {
+      jsonrpc: '2.0', id: 1, method: 'getBalance', params: [kp.publicKey.toBase58()],
+    });
+    const body = JSON.parse(r.body || '{}');
+    if (body.error) throw new Error(body.error.message || 'RPC error');
+    const sol = (body.result && body.result.value ? body.result.value : 0) / 1e9;
+    const newWallets = Math.floor(sol / ATA_RENT_SOL);
+    return {
+      enabled: true, address: kp.publicKey.toBase58(), sol: Number(sol.toFixed(6)),
+      newWalletsLeft: newWallets, low: newWallets < 50, cluster: SOLANA_CLUSTER,
+    };
+  } catch (e) {
+    return { enabled: true, error: e.message };
+  }
+}
+
 async function collectOverview() {
   const iso = (ms) => new Date(Date.now() - ms).toISOString();
   const DAY = 86400000;
@@ -5122,6 +5212,10 @@ async function collectOverview() {
     },
     quotasToday: { ...quotas, users: quotaUsers },
     coins,
+    // SOL гаманця, з якого ми платимо комісії й ренту токен-рахунків. Коли він
+    // вичерпається, перекази почнуть падати з err_relay_failed — і дізнаємось
+    // ми про це від користувачів. Тому число має бути перед очима.
+    relayer: await relayerStatus(),
     recentTransactions: recentTx,
     downloads,
     runtime: {
@@ -5167,6 +5261,11 @@ ${card('Люди', [
     ['Заблоковані', o.users.banned],
     ['Без дати реєстрації (старі)', o.users.withoutCreatedAt],
   ])}
+${o.relayer && o.relayer.enabled ? card('Гаманець комісій' + (o.relayer.low ? ' ⚠️ МАЛО' : ''), [
+    ['SOL', o.relayer.sol ?? o.relayer.error ?? '—'],
+    ['Вистачить нових гаманців', o.relayer.newWalletsLeft ?? '—'],
+    ['Мережа', o.relayer.cluster || '—'],
+  ]) : ''}
 ${card('Завантаження', [
     ['APK за тиждень', d.week.apk || 0],
     ['— із сайту', d.week['apk:site'] || 0],

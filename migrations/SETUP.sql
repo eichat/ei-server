@@ -450,6 +450,11 @@ create table if not exists public.users (
   avatar_url text,
   block_incoming boolean NOT NULL DEFAULT false,
   coins integer DEFAULT 200,
+  -- Частина coins, яку дозволено виводити в токен. Міст працює 1:1, тож усе,
+  -- що роздали ми самі, лишається внутрішнім — інакше кожна роздача була б
+  -- прямою емісією токена (реєстрація давала 200 при мінімумі виводу 100).
+  coins_earned integer NOT NULL DEFAULT 0,
+  wallet_opened boolean NOT NULL DEFAULT false,
   created_at timestamptz default now(),
   last_seen timestamptz,
   color bigint DEFAULT '4280391411'::bigint,
@@ -566,10 +571,50 @@ begin
     return -1;
   end if;
 
+  -- Витрачається спершу внутрішнє: «зароблене» зменшуємо лише тоді, коли воно
+  -- інакше перевищило б загальний баланс.
+  update users set coins_earned = least(coins_earned, new_balance) where nick = p_nick;
+
   return new_balance;
 end;
 $function$
 ;
+
+CREATE OR REPLACE FUNCTION public.add_coins_earned(p_nick text, p_amount integer)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+declare new_balance int;
+begin
+  update users
+     set coins = coins + p_amount,
+         coins_earned = coins_earned + p_amount
+   where nick = p_nick
+   returning coins into new_balance;
+  return coalesce(new_balance, -1);
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.spend_coins_earned(p_nick text, p_amount integer)
+ RETURNS integer
+ LANGUAGE plpgsql
+AS $function$
+declare new_balance int;
+begin
+  update users
+     set coins = coins - p_amount,
+         coins_earned = coins_earned - p_amount
+   where nick = p_nick and coins >= p_amount and coins_earned >= p_amount
+   returning coins into new_balance;
+  return coalesce(new_balance, -1);
+end;
+$function$
+;
+revoke all on function public.add_coins_earned(text, integer) from public, anon, authenticated;
+revoke all on function public.spend_coins_earned(text, integer) from public, anon, authenticated;
+grant execute on function public.add_coins_earned(text, integer) to postgres, service_role;
+grant execute on function public.spend_coins_earned(text, integer) to postgres, service_role;
 
 -- ─────────────────────────────────────────────────────────────────
 -- 5. ROW LEVEL SECURITY
