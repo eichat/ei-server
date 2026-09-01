@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "L’ouverture du portefeuille coûte 🪙 {n} une seule fois. Gratuite avec premium.",
   "premium_feat_translate": "Traduction auto : 1000 par jour au lieu de 200",
   "premium_feat_wallet": "Ouverture du portefeuille gratuite",
-  "err_nick_bad_chars": "Le pseudo contient des caractères non autorisés"
+  "err_nick_bad_chars": "Le pseudo contient des caractères non autorisés",
+  "e2ee_undecryptable": "🔒 Déchiffrement impossible — envoyé à un autre appareil"
 }

@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "Ang pagbubukas ng wallet ay minsanang 🪙 {n}. Libre kung premium.",
   "premium_feat_translate": "Awtomatikong pagsasalin: 1000 kada araw sa halip na 200",
   "premium_feat_wallet": "Libre ang pagbubukas ng wallet",
-  "err_nick_bad_chars": "May hindi pinapayagang karakter ang palayaw"
+  "err_nick_bad_chars": "May hindi pinapayagang karakter ang palayaw",
+  "e2ee_undecryptable": "🔒 Hindi ma-decrypt — ipinadala sa ibang device"
 }

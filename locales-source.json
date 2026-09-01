@@ -18498,6 +18498,29 @@
    "uk": "Нік містить недопустимі символи",
    "vi": "Biệt danh chứa ký tự không được phép",
    "zh": "昵称包含不允许的字符"
+  },
+  "e2ee_undecryptable": {
+   "ar": "🔒 تعذّر فك التشفير — أُرسلت إلى جهاز آخر",
+   "bn": "🔒 ডিক্রিপ্ট করা যায়নি — অন্য ডিভাইসে পাঠানো হয়েছে",
+   "de": "🔒 Entschlüsselung fehlgeschlagen — an ein anderes Gerät gesendet",
+   "en": "🔒 Could not decrypt — sent to a different device",
+   "es": "🔒 No se pudo descifrar: se envió a otro dispositivo",
+   "fr": "🔒 Déchiffrement impossible — envoyé à un autre appareil",
+   "hi": "🔒 डिक्रिप्ट नहीं हो सका — किसी अन्य डिवाइस के लिए भेजा गया",
+   "id": "🔒 Tidak bisa didekripsi — dikirim ke perangkat lain",
+   "it": "🔒 Impossibile decifrare — inviato a un altro dispositivo",
+   "ja": "🔒 復号できません — 別の端末宛てに送信されています",
+   "ko": "🔒 복호화할 수 없습니다 — 다른 기기로 보낸 메시지입니다",
+   "nl": "🔒 Ontsleutelen mislukt — naar een ander apparaat gestuurd",
+   "pl": "🔒 Nie udało się odszyfrować — wysłano na inne urządzenie",
+   "pt": "🔒 Não foi possível descifrar — enviado para outro dispositivo",
+   "ru": "🔒 Не удалось расшифровать — отправлено для другого устройства",
+   "th": "🔒 ถอดรหัสไม่ได้ — ส่งไปยังอุปกรณ์อื่น",
+   "tl": "🔒 Hindi ma-decrypt — ipinadala sa ibang device",
+   "tr": "🔒 Şifre çözülemedi — başka bir cihaza gönderilmiş",
+   "uk": "🔒 Не вдалося розшифрувати — надіслано для іншого пристрою",
+   "vi": "🔒 Không giải mã được — đã gửi tới thiết bị khác",
+   "zh": "🔒 无法解密——发送给了另一台设备"
   }
  }
 }

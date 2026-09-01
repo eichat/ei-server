@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "Abrir a carteira custa 🪙 {n} uma vez. Grátis com premium.",
   "premium_feat_translate": "Tradução automática: 1000 por dia em vez de 200",
   "premium_feat_wallet": "Abrir a carteira é grátis",
-  "err_nick_bad_chars": "A alcunha contém caracteres não permitidos"
+  "err_nick_bad_chars": "A alcunha contém caracteres não permitidos",
+  "e2ee_undecryptable": "🔒 Não foi possível descifrar — enviado para outro dispositivo"
 }

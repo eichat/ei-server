@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "Cüzdan açmak bir defaya mahsus 🪙 {n}. Premium ile ücretsiz.",
   "premium_feat_translate": "Otomatik çeviri: 200 yerine günde 1000",
   "premium_feat_wallet": "Cüzdan açmak ücretsiz",
-  "err_nick_bad_chars": "Takma ad izin verilmeyen karakterler içeriyor"
+  "err_nick_bad_chars": "Takma ad izin verilmeyen karakterler içeriyor",
+  "e2ee_undecryptable": "🔒 Şifre çözülemedi — başka bir cihaza gönderilmiş"
 }

@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "Otwarcie portfela to jednorazowo 🪙 {n}. Z premium za darmo.",
   "premium_feat_translate": "Autotłumaczenie: 1000 dziennie zamiast 200",
   "premium_feat_wallet": "Otwarcie portfela za darmo",
-  "err_nick_bad_chars": "Nick zawiera niedozwolone znaki"
+  "err_nick_bad_chars": "Nick zawiera niedozwolone znaki",
+  "e2ee_undecryptable": "🔒 Nie udało się odszyfrować — wysłano na inne urządzenie"
 }

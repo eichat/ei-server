@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "L’apertura del portafoglio costa una tantum 🪙 {n}. Gratuita con il premium.",
   "premium_feat_translate": "Traduzione automatica: 1000 al giorno invece di 200",
   "premium_feat_wallet": "Apertura del portafoglio gratuita",
-  "err_nick_bad_chars": "Il nickname contiene caratteri non consentiti"
+  "err_nick_bad_chars": "Il nickname contiene caratteri non consentiti",
+  "e2ee_undecryptable": "🔒 Impossibile decifrare — inviato a un altro dispositivo"
 }

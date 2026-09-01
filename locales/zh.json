@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "开通钱包一次性收取 🪙 {n}。会员免费。",
   "premium_feat_translate": "自动翻译：每天 1000 次而非 200 次",
   "premium_feat_wallet": "免费开通钱包",
-  "err_nick_bad_chars": "昵称包含不允许的字符"
+  "err_nick_bad_chars": "昵称包含不允许的字符",
+  "e2ee_undecryptable": "🔒 无法解密——发送给了另一台设备"
 }

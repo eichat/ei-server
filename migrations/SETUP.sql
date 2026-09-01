@@ -473,6 +473,7 @@ create table if not exists public.users (
   premium_expires_at timestamp with time zone,
   premium_plan text,
   solana_address text,
+  e2ee_pubkey text,
   status text,
   tokens_valid_from bigint,
   primary key (id),

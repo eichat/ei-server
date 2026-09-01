@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "Die Wallet-Eröffnung kostet einmalig 🪙 {n}. Mit Premium kostenlos.",
   "premium_feat_translate": "Auto-Übersetzung: 1000 pro Tag statt 200",
   "premium_feat_wallet": "Wallet-Eröffnung kostenlos",
-  "err_nick_bad_chars": "Der Spitzname enthält unzulässige Zeichen"
+  "err_nick_bad_chars": "Der Spitzname enthält unzulässige Zeichen",
+  "e2ee_undecryptable": "🔒 Entschlüsselung fehlgeschlagen — an ein anderes Gerät gesendet"
 }

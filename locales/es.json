@@ -801,5 +801,6 @@
   "wallet_open_fee_note": "Abrir la cartera cuesta una vez 🪙 {n}. Gratis con premium.",
   "premium_feat_translate": "Traducción automática: 1000 al día en lugar de 200",
   "premium_feat_wallet": "Abrir la cartera es gratis",
-  "err_nick_bad_chars": "El apodo contiene caracteres no permitidos"
+  "err_nick_bad_chars": "El apodo contiene caracteres no permitidos",
+  "e2ee_undecryptable": "🔒 No se pudo descifrar: se envió a otro dispositivo"
 }

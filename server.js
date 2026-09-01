@@ -3720,6 +3720,43 @@ app.post('/update-nick-color', async (req, res) => {
   res.json({ ok: true });
 });
 
+
+// ── Наскрізне шифрування особистих чатів: обмін публічними ключами ─────────
+// Сервер бачить лише ПУБЛІЧНІ ключі й шифротекст. Приватний ключ живе у
+// сховищі ОС на пристрої й сюди не потрапляє — тому «відновити переписку» ми
+// не можемо навіть на запит власника, і це навмисно.
+//
+// Опортуністично: у кого ключа немає (стара збірка), тому пишуть відкритим
+// текстом. Тобто перехід не потребує дня переходу — щойно обидві сторони
+// оновились, їхні повідомлення починають шифруватись самі.
+//
+// ⚠️ Чесна межа: публічні ключі роздаємо МИ. Проти крадіжки бази, інсайдера й
+// запиту органів це працює; проти нас самих — ні, доки немає кодів звірки.
+const E2EE_PUBKEY_RE = /^[A-Za-z0-9_-]{43}$/;   // 32 байти в base64url без padding
+
+app.post('/keys/publish', async (req, res) => {
+  const pubkey = typeof req.body.pubkey === 'string' ? req.body.pubkey.trim() : '';
+  if (!E2EE_PUBKEY_RE.test(pubkey)) {
+    return res.json({ ok: false, error: 'Невірний ключ', code: 'err_invalid_params' });
+  }
+  const { error } = await supabase.from('users').update({ e2ee_pubkey: pubkey }).eq('nick', req.nick);
+  if (error) {
+    // Колонки ще немає (міграція не виконана) — не падаємо: клієнт просто
+    // лишиться на відкритому тексті, як до шифрування.
+    console.error('[e2ee] publish:', error.message);
+    return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  }
+  res.json({ ok: true });
+});
+
+app.get('/keys', async (req, res) => {
+  const nick = typeof req.query.nick === 'string' ? req.query.nick : '';
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { data, error } = await supabase.from('users').select('e2ee_pubkey').eq('nick', nick).maybeSingle();
+  if (error) { console.error('[e2ee] fetch:', error.message); return res.json({ ok: true, pubkey: null }); }
+  res.json({ ok: true, pubkey: (data && data.e2ee_pubkey) || null });
+});
+
 app.post('/update-avatar', async (req, res) => {
   const { avatarUrl } = req.body; const nick = req.nick; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий', code: 'err_param_nick' });
   await supabase.from('users').update({ avatar_url: avatarUrl || null }).eq('nick', nick);
