@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "Siningil ng 🪙 {n} para buksan ang wallet",
   "coins_withdrawable": "Maaaring i-withdraw: 🪙 {n}",
   "err_not_enough_earned": "Kulang ang maaaring i-withdraw na barya",
-  "err_wallet_bind_limit": "Masyadong maraming pagsubok ngayong araw"
+  "err_wallet_bind_limit": "Masyadong maraming pagsubok ngayong araw",
+  "donate_title": "Suportahan ang pagbuo",
+  "donate_sub": "Mga server, storage at bayarin sa network",
+  "donate_body": "Ginagawa ang EION ng isang malayang developer, walang investor. Ang mga donasyon ay para sa server, storage at sa mga bayarin sa network na sinasagot ng app para sa mga user. Suporta ito sa pagbuo — hindi pagbili ng EION coins, hindi pagbebenta ng token at hindi pamumuhunan.",
+  "donate_note": "Makikita rin ang mga address na ito sa eion.network — ihambing bago magpadala. Hindi maibabalik ang mga donasyon at walang ibinibigay na karapatan, bahagi o token sa hinaharap.",
+  "donate_w_btc": "BTC lamang sa Bitcoin network ang ipadala.",
+  "donate_w_usdt": "USDT (TRC-20) lamang sa TRON ang ipadala. Mawawala ang USDT mula sa Ethereum o BNB Chain.",
+  "donate_w_sol": "Solana network: SOL at anumang SPL token (USDC, USDT) ay papunta sa parehong address.",
+  "donate_w_eth": "Ethereum network lang: ETH at ERC-20 tokens. Huwag magpadala ng TRC-20 o BEP-20."
 }

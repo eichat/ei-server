@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "Đã trừ 🪙 {n} để mở ví",
   "coins_withdrawable": "Có thể rút: 🪙 {n}",
   "err_not_enough_earned": "Không đủ xu có thể rút",
-  "err_wallet_bind_limit": "Quá nhiều lần thử hôm nay"
+  "err_wallet_bind_limit": "Quá nhiều lần thử hôm nay",
+  "donate_title": "Ủng hộ phát triển",
+  "donate_sub": "Máy chủ, lưu trữ và phí mạng",
+  "donate_body": "EION do một nhà phát triển độc lập xây dựng, không có nhà đầu tư. Các khoản ủng hộ trả cho máy chủ, lưu trữ và phí mạng mà ứng dụng trả thay người dùng. Đây là ủng hộ phát triển — không phải mua xu EION, không phải bán token và không phải đầu tư.",
+  "donate_note": "Các địa chỉ này cũng hiển thị trên eion.network — hãy đối chiếu trước khi gửi. Khoản ủng hộ không hoàn lại và không đem lại quyền lợi, cổ phần hay token tương lai.",
+  "donate_w_btc": "Chỉ gửi BTC trên mạng Bitcoin.",
+  "donate_w_usdt": "Chỉ gửi USDT (TRC-20) trên TRON. USDT từ Ethereum hay BNB Chain sẽ mất.",
+  "donate_w_sol": "Mạng Solana: SOL và mọi token SPL (USDC, USDT) đều vào cùng địa chỉ này.",
+  "donate_w_eth": "Chỉ mạng Ethereum: ETH và token ERC-20. Đừng gửi TRC-20 hay BEP-20."
 }

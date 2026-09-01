@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "🪙 {n} in rekening gebracht voor het openen van de wallet",
   "coins_withdrawable": "Opneembaar: 🪙 {n}",
   "err_not_enough_earned": "Niet genoeg opneembare munten",
-  "err_wallet_bind_limit": "Te veel pogingen vandaag"
+  "err_wallet_bind_limit": "Te veel pogingen vandaag",
+  "donate_title": "Steun de ontwikkeling",
+  "donate_sub": "Servers, opslag en netwerkkosten",
+  "donate_body": "EION wordt gebouwd door een onafhankelijke ontwikkelaar, zonder investeerders. Donaties betalen servers, opslag en de netwerkkosten die de app voor gebruikers dekt. Dit is steun voor de ontwikkeling — geen aankoop van EION-munten, geen tokenverkoop en geen investering.",
+  "donate_note": "Dezelfde adressen staan op eion.network — vergelijk ze voor je verzendt. Donaties zijn niet terugvorderbaar en geven geen rechten, aandelen of toekomstige tokens.",
+  "donate_w_btc": "Stuur alleen BTC via het Bitcoin-netwerk.",
+  "donate_w_usdt": "Stuur alleen USDT (TRC-20) via TRON. USDT van Ethereum of BNB Chain gaat verloren.",
+  "donate_w_sol": "Solana-netwerk: SOL en elke SPL-token (USDC, USDT) gaan naar hetzelfde adres.",
+  "donate_w_eth": "Alleen Ethereum-netwerk: ETH en ERC-20-tokens. Stuur geen TRC-20 of BEP-20."
 }

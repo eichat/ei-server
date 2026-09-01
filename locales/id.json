@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "Dikenakan 🪙 {n} untuk membuka dompet",
   "coins_withdrawable": "Bisa ditarik: 🪙 {n}",
   "err_not_enough_earned": "Koin yang bisa ditarik tidak cukup",
-  "err_wallet_bind_limit": "Terlalu banyak percobaan hari ini"
+  "err_wallet_bind_limit": "Terlalu banyak percobaan hari ini",
+  "donate_title": "Dukung pengembangan",
+  "donate_sub": "Server, penyimpanan, dan biaya jaringan",
+  "donate_body": "EION dibuat oleh pengembang independen, tanpa investor. Donasi membayar server, penyimpanan, dan biaya jaringan yang ditanggung aplikasi untuk penggunanya. Ini dukungan untuk pengembangan — bukan pembelian koin EION, bukan penjualan token, dan bukan investasi.",
+  "donate_note": "Alamat yang sama juga ada di eion.network — bandingkan sebelum mengirim. Donasi tidak dapat dikembalikan dan tidak memberi hak, saham, atau token di masa depan.",
+  "donate_w_btc": "Kirim hanya BTC di jaringan Bitcoin.",
+  "donate_w_usdt": "Kirim hanya USDT (TRC-20) di TRON. USDT dari Ethereum atau BNB Chain akan hilang.",
+  "donate_w_sol": "Jaringan Solana: SOL dan token SPL apa pun (USDC, USDT) masuk ke alamat yang sama.",
+  "donate_w_eth": "Hanya jaringan Ethereum: ETH dan token ERC-20. Jangan kirim TRC-20 atau BEP-20."
 }

@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "🪙 {n} débités pour l’ouverture du portefeuille",
   "coins_withdrawable": "Retirable : 🪙 {n}",
   "err_not_enough_earned": "Pas assez de pièces retirables",
-  "err_wallet_bind_limit": "Trop de tentatives aujourd’hui"
+  "err_wallet_bind_limit": "Trop de tentatives aujourd’hui",
+  "donate_title": "Soutenir le développement",
+  "donate_sub": "Serveurs, stockage et frais de réseau",
+  "donate_body": "EION est développé par une personne indépendante, sans investisseurs. Les dons paient les serveurs, le stockage et les frais de réseau que l’application prend en charge pour ses utilisateurs. C’est un soutien au développement — ni un achat de pièces EION, ni une vente de jetons, ni un investissement.",
+  "donate_note": "Ces mêmes adresses figurent sur eion.network — comparez-les avant d’envoyer. Les dons ne sont pas remboursables et ne donnent aucun droit, part ou jeton futur.",
+  "donate_w_btc": "N’envoyez que du BTC sur le réseau Bitcoin.",
+  "donate_w_usdt": "N’envoyez que de l’USDT (TRC-20) sur TRON. L’USDT d’Ethereum ou BNB Chain sera perdu.",
+  "donate_w_sol": "Réseau Solana : le SOL et tout jeton SPL (USDC, USDT) vont à cette même adresse.",
+  "donate_w_eth": "Réseau Ethereum uniquement : ETH et jetons ERC-20. N’envoyez pas de TRC-20 ni BEP-20."
 }

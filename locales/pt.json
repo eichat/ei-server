@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "Cobrados 🪙 {n} pela abertura da carteira",
   "coins_withdrawable": "Levantável: 🪙 {n}",
   "err_not_enough_earned": "Moedas levantáveis insuficientes",
-  "err_wallet_bind_limit": "Demasiadas tentativas hoje"
+  "err_wallet_bind_limit": "Demasiadas tentativas hoje",
+  "donate_title": "Apoiar o desenvolvimento",
+  "donate_sub": "Servidores, armazenamento e taxas de rede",
+  "donate_body": "O EION é feito por um programador independente, sem investidores. Os donativos pagam servidores, armazenamento e as taxas de rede que a app cobre pelos utilizadores. Isto é apoio ao desenvolvimento — não é compra de moedas EION, venda de tokens nem investimento.",
+  "donate_note": "Os mesmos endereços estão em eion.network — compare-os antes de enviar. Os donativos não são reembolsáveis e não dão direitos, participações ou tokens futuros.",
+  "donate_w_btc": "Envie apenas BTC na rede Bitcoin.",
+  "donate_w_usdt": "Envie apenas USDT (TRC-20) na TRON. USDT do Ethereum ou BNB Chain será perdido.",
+  "donate_w_sol": "Rede Solana: SOL e qualquer token SPL (USDC, USDT) vão para este mesmo endereço.",
+  "donate_w_eth": "Apenas rede Ethereum: ETH e tokens ERC-20. Não envie TRC-20 nem BEP-20."
 }

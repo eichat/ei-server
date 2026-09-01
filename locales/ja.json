@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "ウォレット開設のため 🪙 {n} を差し引きました",
   "coins_withdrawable": "出金可能: 🪙 {n}",
   "err_not_enough_earned": "出金可能なコインが足りません",
-  "err_wallet_bind_limit": "本日の試行回数が多すぎます"
+  "err_wallet_bind_limit": "本日の試行回数が多すぎます",
+  "donate_title": "開発を支援",
+  "donate_sub": "サーバー・ストレージ・ネットワーク手数料",
+  "donate_body": "EION は独立した開発者が作っており、投資家はいません。寄付はサーバー、ストレージ、アプリが利用者の代わりに負担するネットワーク手数料に使われます。これは開発への支援であり、EION コインの購入でもトークン販売でも投資でもありません。",
+  "donate_note": "同じアドレスは eion.network にも掲載しています。送る前に照合してください。寄付は返金されず、いかなる権利・持分・将来のトークンも生じません。",
+  "donate_w_btc": "Bitcoin ネットワークの BTC のみ送ってください。",
+  "donate_w_usdt": "TRON の USDT（TRC-20）のみ送ってください。Ethereum や BNB Chain の USDT は失われます。",
+  "donate_w_sol": "Solana ネットワーク：SOL と任意の SPL トークン（USDC、USDT）は同じアドレスに届きます。",
+  "donate_w_eth": "Ethereum ネットワークのみ：ETH と ERC-20 トークン。TRC-20 や BEP-20 は送らないでください。"
 }

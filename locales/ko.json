@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "지갑 개설로 🪙 {n} 차감",
   "coins_withdrawable": "출금 가능: 🪙 {n}",
   "err_not_enough_earned": "출금 가능한 코인이 부족합니다",
-  "err_wallet_bind_limit": "오늘 시도 횟수가 너무 많습니다"
+  "err_wallet_bind_limit": "오늘 시도 횟수가 너무 많습니다",
+  "donate_title": "개발 후원",
+  "donate_sub": "서버, 저장소, 네트워크 수수료",
+  "donate_body": "EION은 독립 개발자가 만들며 투자자가 없습니다. 후원금은 서버, 저장소, 그리고 앱이 사용자를 대신해 내는 네트워크 수수료에 쓰입니다. 이는 개발 후원이며 EION 코인 구매나 토큰 판매, 투자가 아닙니다.",
+  "donate_note": "같은 주소가 eion.network에도 표시됩니다 — 보내기 전에 비교하세요. 후원금은 환불되지 않으며 어떤 권리나 지분, 미래의 토큰도 부여하지 않습니다.",
+  "donate_w_btc": "Bitcoin 네트워크의 BTC만 보내세요.",
+  "donate_w_usdt": "TRON의 USDT(TRC-20)만 보내세요. Ethereum이나 BNB Chain의 USDT는 사라집니다.",
+  "donate_w_sol": "Solana 네트워크: SOL과 모든 SPL 토큰(USDC, USDT)이 같은 주소로 갑니다.",
+  "donate_w_eth": "Ethereum 네트워크만: ETH와 ERC-20 토큰. TRC-20이나 BEP-20은 보내지 마세요."
 }

@@ -785,5 +785,13 @@
   "wallet_open_fee_charged": "开通钱包已扣除 🪙 {n}",
   "coins_withdrawable": "可提取：🪙 {n}",
   "err_not_enough_earned": "可提取的金币不足",
-  "err_wallet_bind_limit": "今天尝试次数过多"
+  "err_wallet_bind_limit": "今天尝试次数过多",
+  "donate_title": "支持开发",
+  "donate_sub": "服务器、存储与网络手续费",
+  "donate_body": "EION 由一位独立开发者构建，没有投资人。捐赠用于服务器、存储，以及应用替用户承担的网络手续费。这是对开发的支持——不是购买 EION 金币，不是代币销售，也不是投资。",
+  "donate_note": "这些地址同样公布在 eion.network 上——发送前请核对。捐赠不可退还，也不带来任何权利、股份或未来代币。",
+  "donate_w_btc": "仅可发送 Bitcoin 网络的 BTC。",
+  "donate_w_usdt": "仅可发送 TRON 网络的 USDT（TRC-20）。来自 Ethereum 或 BNB Chain 的 USDT 将永久丢失。",
+  "donate_w_sol": "Solana 网络：SOL 与任意 SPL 代币（USDC、USDT）都发往同一地址。",
+  "donate_w_eth": "仅限 Ethereum 网络：ETH 与 ERC-20 代币。请勿发送 TRC-20 或 BEP-20。"
 }
