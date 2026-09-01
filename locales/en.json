@@ -797,5 +797,8 @@
   "err_password_required": "Password required",
   "err_password_locked": "Too many attempts, try again in 15 minutes",
   "pw_confirm_title": "Confirm with password",
-  "pw_confirm_body": "This moves coins. Enter your account password — not the wallet password."
+  "pw_confirm_body": "This moves coins. Enter your account password — not the wallet password.",
+  "wallet_open_fee_note": "Opening a wallet is a one-off 🪙 {n}. Free with premium.",
+  "premium_feat_translate": "Auto-translate: 1000 a day instead of 200",
+  "premium_feat_wallet": "Opening a wallet is free"
 }

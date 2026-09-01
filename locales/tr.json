@@ -797,5 +797,8 @@
   "err_password_required": "Şifre gerekli",
   "err_password_locked": "Çok fazla deneme, 15 dakika sonra tekrar deneyin",
   "pw_confirm_title": "Şifreyle onaylayın",
-  "pw_confirm_body": "Bu işlem jeton taşır. Cüzdan şifresini değil, hesap şifresini girin."
+  "pw_confirm_body": "Bu işlem jeton taşır. Cüzdan şifresini değil, hesap şifresini girin.",
+  "wallet_open_fee_note": "Cüzdan açmak bir defaya mahsus 🪙 {n}. Premium ile ücretsiz.",
+  "premium_feat_translate": "Otomatik çeviri: 200 yerine günde 1000",
+  "premium_feat_wallet": "Cüzdan açmak ücretsiz"
 }

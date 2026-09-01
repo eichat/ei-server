@@ -797,5 +797,8 @@
   "err_password_required": "Kailangan ang password",
   "err_password_locked": "Masyadong maraming subok, subukan muli sa loob ng 15 minuto",
   "pw_confirm_title": "Kumpirmahin gamit ang password",
-  "pw_confirm_body": "Naglilipat ito ng coins. Ilagay ang password ng account — hindi ang sa wallet."
+  "pw_confirm_body": "Naglilipat ito ng coins. Ilagay ang password ng account — hindi ang sa wallet.",
+  "wallet_open_fee_note": "Ang pagbubukas ng wallet ay minsanang 🪙 {n}. Libre kung premium.",
+  "premium_feat_translate": "Awtomatikong pagsasalin: 1000 kada araw sa halip na 200",
+  "premium_feat_wallet": "Libre ang pagbubukas ng wallet"
 }

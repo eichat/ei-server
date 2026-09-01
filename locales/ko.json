@@ -797,5 +797,8 @@
   "err_password_required": "비밀번호가 필요합니다",
   "err_password_locked": "시도 횟수가 너무 많습니다. 15분 후에 다시 시도하세요",
   "pw_confirm_title": "비밀번호로 확인",
-  "pw_confirm_body": "코인을 옮기는 작업입니다. 지갑 비밀번호가 아니라 계정 비밀번호를 입력하세요."
+  "pw_confirm_body": "코인을 옮기는 작업입니다. 지갑 비밀번호가 아니라 계정 비밀번호를 입력하세요.",
+  "wallet_open_fee_note": "지갑 개설은 1회 🪙 {n}입니다. 프리미엄은 무료.",
+  "premium_feat_translate": "자동 번역: 하루 200회 대신 1000회",
+  "premium_feat_wallet": "지갑 개설 무료"
 }

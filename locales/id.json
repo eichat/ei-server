@@ -797,5 +797,8 @@
   "err_password_required": "Kata sandi diperlukan",
   "err_password_locked": "Terlalu banyak percobaan, coba lagi dalam 15 menit",
   "pw_confirm_title": "Konfirmasi dengan kata sandi",
-  "pw_confirm_body": "Operasi ini memindahkan koin. Masukkan kata sandi akun — bukan kata sandi dompet."
+  "pw_confirm_body": "Operasi ini memindahkan koin. Masukkan kata sandi akun — bukan kata sandi dompet.",
+  "wallet_open_fee_note": "Membuka dompet dikenakan 🪙 {n} sekali. Gratis dengan premium.",
+  "premium_feat_translate": "Terjemahan otomatis: 1000 per hari, bukan 200",
+  "premium_feat_wallet": "Membuka dompet gratis"
 }

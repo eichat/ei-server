@@ -797,5 +797,8 @@
   "err_password_required": "パスワードが必要です",
   "err_password_locked": "試行回数が多すぎます。15分後にお試しください",
   "pw_confirm_title": "パスワードで確認",
-  "pw_confirm_body": "コインを動かす操作です。ウォレットではなくアカウントのパスワードを入力してください。"
+  "pw_confirm_body": "コインを動かす操作です。ウォレットではなくアカウントのパスワードを入力してください。",
+  "wallet_open_fee_note": "ウォレットの開設は一度きり 🪙 {n} です。プレミアムなら無料。",
+  "premium_feat_translate": "自動翻訳：1日200件から1000件へ",
+  "premium_feat_wallet": "ウォレットの開設が無料"
 }

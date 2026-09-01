@@ -797,5 +797,8 @@
   "err_password_required": "Se requiere contraseña",
   "err_password_locked": "Demasiados intentos, inténtalo en 15 minutos",
   "pw_confirm_title": "Confirmar con contraseña",
-  "pw_confirm_body": "Esta operación mueve monedas. Introduce la contraseña de la cuenta, no la de la cartera."
+  "pw_confirm_body": "Esta operación mueve monedas. Introduce la contraseña de la cuenta, no la de la cartera.",
+  "wallet_open_fee_note": "Abrir la cartera cuesta una vez 🪙 {n}. Gratis con premium.",
+  "premium_feat_translate": "Traducción automática: 1000 al día en lugar de 200",
+  "premium_feat_wallet": "Abrir la cartera es gratis"
 }

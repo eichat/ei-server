@@ -797,5 +797,8 @@
   "err_password_required": "Passwort erforderlich",
   "err_password_locked": "Zu viele Versuche, versuche es in 15 Minuten erneut",
   "pw_confirm_title": "Mit Passwort bestätigen",
-  "pw_confirm_body": "Dieser Vorgang bewegt Coins. Gib das Konto-Passwort ein, nicht das Wallet-Passwort."
+  "pw_confirm_body": "Dieser Vorgang bewegt Coins. Gib das Konto-Passwort ein, nicht das Wallet-Passwort.",
+  "wallet_open_fee_note": "Die Wallet-Eröffnung kostet einmalig 🪙 {n}. Mit Premium kostenlos.",
+  "premium_feat_translate": "Auto-Übersetzung: 1000 pro Tag statt 200",
+  "premium_feat_wallet": "Wallet-Eröffnung kostenlos"
 }

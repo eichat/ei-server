@@ -797,5 +797,8 @@
   "err_password_required": "Mot de passe requis",
   "err_password_locked": "Trop de tentatives, réessayez dans 15 minutes",
   "pw_confirm_title": "Confirmer avec le mot de passe",
-  "pw_confirm_body": "Cette opération déplace des pièces. Saisissez le mot de passe du compte, pas celui du portefeuille."
+  "pw_confirm_body": "Cette opération déplace des pièces. Saisissez le mot de passe du compte, pas celui du portefeuille.",
+  "wallet_open_fee_note": "L’ouverture du portefeuille coûte 🪙 {n} une seule fois. Gratuite avec premium.",
+  "premium_feat_translate": "Traduction auto : 1000 par jour au lieu de 200",
+  "premium_feat_wallet": "Ouverture du portefeuille gratuite"
 }

@@ -797,5 +797,8 @@
   "err_password_required": "Cần mật khẩu",
   "err_password_locked": "Quá nhiều lần thử, hãy thử lại sau 15 phút",
   "pw_confirm_title": "Xác nhận bằng mật khẩu",
-  "pw_confirm_body": "Thao tác này chuyển xu. Nhập mật khẩu tài khoản — không phải mật khẩu ví."
+  "pw_confirm_body": "Thao tác này chuyển xu. Nhập mật khẩu tài khoản — không phải mật khẩu ví.",
+  "wallet_open_fee_note": "Mở ví tốn một lần 🪙 {n}. Miễn phí với premium.",
+  "premium_feat_translate": "Dịch tự động: 1000 mỗi ngày thay vì 200",
+  "premium_feat_wallet": "Mở ví miễn phí"
 }

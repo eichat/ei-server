@@ -797,5 +797,8 @@
   "err_password_required": "需要密码",
   "err_password_locked": "尝试次数过多，请在 15 分钟后重试",
   "pw_confirm_title": "用密码确认",
-  "pw_confirm_body": "此操作会转移金币。请输入账户密码，而不是钱包密码。"
+  "pw_confirm_body": "此操作会转移金币。请输入账户密码，而不是钱包密码。",
+  "wallet_open_fee_note": "开通钱包一次性收取 🪙 {n}。会员免费。",
+  "premium_feat_translate": "自动翻译：每天 1000 次而非 200 次",
+  "premium_feat_wallet": "免费开通钱包"
 }
