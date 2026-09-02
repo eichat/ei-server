@@ -941,7 +941,7 @@ function eionFactsPrompt() {
     'Facts about EION, the messenger this assistant lives in. Use them when asked; do not invent features.',
     '- Platforms: Android and Linux (beta). iOS and Windows are planned.',
     '- Chats, groups, channels with comments and streams, HD calls, sticker packs.',
-    '- Calls are end-to-end encrypted (WebRTC). Messages are NOT end-to-end encrypted yet; that is planned.',
+    '- Calls are end-to-end encrypted (WebRTC), and so is the TEXT of direct one-to-one chats: the key is created on the device and never leaves it, so the server holds only ciphertext and we cannot read or restore those messages. Groups, channels and attachments (photos, video, voice, documents) are NOT encrypted yet — that is the next step. Two honest limits: our server distributes the public keys, so without verification codes it does not formally protect against us; and the key is static, so there is no forward secrecy. The key is not backed up: reinstalling the app makes undelivered messages encrypted for the old key unreadable.',
     `- Coins are the in-app unit, not money and not cryptocurrency. New accounts get ${NEW_USER_COINS}.`,
     '- The EION token is a separate thing from coins: coins live inside the app, the token on a blockchain. The wallet can convert one into the other. Do not name the blockchain network.',
     `- The wallet is NOT created automatically. In profile settings there are two buttons: create a wallet, or restore one from its 12-word recovery phrase. On a second device the user must RESTORE, otherwise they get a second, separate wallet. Opening a wallet costs ${WALLET_OPEN_FEE} coins once (free for premium) and covers the on-chain account rent we pay.`,
