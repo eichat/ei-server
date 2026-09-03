@@ -2246,7 +2246,13 @@ async function creditCompany(amount, kind, { fromNick = null, ref = null } = {})
     } catch (e) { console.log('[burn] error:', e.message); }
   }
   if (keep <= 0) return;
-  const { data: newTotal } = await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: keep });
+  // 🔴 «Зароблене», а не внутрішнє. Раніше тут був `add_coins`, і скарбниця
+  // показувала «до виведення: 0» — тобто виглядала як гроші, які нікуди не
+  // ведуть. З 03.09 кожна монета забезпечена замкненим у мості токеном, і ці
+  // монети люди СПРАВДІ заплатили комісіями — отже вони виводяться, як і будь-яке
+  // інше зароблене. Клас тут уже не про емісію (вона неможлива), а лише про
+  // анти-Sybil: роздачі й далі йдуть внутрішніми.
+  const { data: newTotal } = await supabase.rpc('add_coins_earned', { p_nick: COMPANY_NICK, p_amount: keep });
   if (newTotal != null) {
     sendToUser(COMPANY_NICK, { type: 'coins_received', fromNick: fromNick || 'system', amount: keep, total: newTotal });
   }
@@ -5967,7 +5973,8 @@ app.post('/admin/treasury-credit', async (req, res) => {
       });
       if (insErr) return res.json({ ok: false, error: 'Цей підпис уже зараховано' });
     }
-    await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: coins });
+    // Влите з фондів теж забезпечене — його можна забрати назад тим самим мостом.
+    await supabase.rpc('add_coins_earned', { p_nick: COMPANY_NICK, p_amount: coins });
     await noteFlow('float_in', coins);
     await logTx({ fromNick: null, toNick: COMPANY_NICK, amount: coins, kind: 'treasury_float', ref: signature });
     const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
