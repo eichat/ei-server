@@ -234,6 +234,31 @@ setInterval(() => {
 /// захист, і активний перебір не дає Render заснути, тож само собою воно не
 /// обнулиться. При ввімкненому кластері це місце переїде в спільний шар разом
 /// із rate-limit.
+/// Ті самі лічильник і пауза, але для шляхів, які звіряють пароль самі
+/// (вхід і зміна даних акаунта). Раніше блокування було лише на грошових
+/// діях — тобто підбирати пароль можна було на `/login` без обмежень на нік,
+/// а звідти він відмикає й гроші.
+///
+/// ⚠️ Компроміс, свідомий: чужими невдалими спробами можна на 15 хв
+/// заблокувати вхід власнику. Тому для входу поріг вищий (10 проти 5) — там
+/// помиляється жива людина, а не той, хто вже знає половину пароля.
+function pwLocked(nick) {
+  const rec = pwFails.get(nick);
+  return !!(rec && rec.lockedUntil > Date.now());
+}
+
+function notePwFail(nick, max = PW_FAIL_MAX) {
+  const now = Date.now();
+  const rec = pwFails.get(nick);
+  let cur = (rec && rec.lockedUntil && rec.lockedUntil <= now) ? null : rec;
+  cur = cur || { count: 0, lockedUntil: 0, at: now };
+  cur.count++; cur.at = now;
+  if (cur.count >= max) cur.lockedUntil = now + PW_LOCK_MS;
+  pwFails.set(nick, cur);
+}
+
+const PW_LOCKED_BODY = { ok: false, error: 'Забагато спроб, спробуйте за 15 хвилин', code: 'err_password_locked' };
+
 async function requireAccountPassword(req) {
   const nick = req.nick;
   if (!nick) return { ok: false, error: 'Не авторизовано', code: 'err_unauthorized' };
@@ -310,8 +335,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.30',
-  code: 31,
+  version: '0.9.31',
+  code: 32,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -2560,10 +2585,15 @@ app.post('/login', async (req, res) => {
   const { nick, password } = req.body;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
+  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', user.nick).single();
   if (ban) return res.json({ ok: false, error: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` });
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
+  if (!valid) {
+    notePwFail(user.nick, 10);
+    return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
+  }
+  pwFails.delete(user.nick);
   // Сесійний токен (Фаза 1): клієнт зберігає його й шле в Authorization/WS замість ніка.
   const token = await createSession(user.nick, req.body.deviceId || null);
   res.json({ ok: true, token, nick: user.nick, color: user.color, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, block_incoming: user.block_incoming === true });
@@ -2642,7 +2672,10 @@ app.post('/update-nick', async (req, res) => {
   const { password, newNick } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
+  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  pwFails.delete(user.nick);
   if (!newNick || newNick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий', code: 'err_nick_too_short' });
   if (!nickLooksSafe(newNick)) return res.json({ ok: false, error: 'Нік містить недопустимі символи', code: 'err_nick_bad_chars' });
   const { data: exists } = await supabase.from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
@@ -2689,7 +2722,10 @@ app.post('/update-password', async (req, res) => {
   const { password, newPassword } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
+  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  pwFails.delete(user.nick);
   if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'Новий пароль занадто короткий (мін. 8 символів)', code: 'err_password_too_short' });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', nick.toLowerCase());
@@ -2704,7 +2740,10 @@ app.post('/update-phone', async (req, res) => {
   const { password, phone, phoneNormalized } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
+  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  pwFails.delete(user.nick);
   if (!phoneNormalized) return res.json({ ok: false, error: 'Невірний номер', code: 'err_invalid_phone' });
   // Унікальність номера (крім самого себе)
   const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
@@ -2787,7 +2826,10 @@ app.post('/update-email', async (req, res) => {
   const { password, newEmail } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
+  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  pwFails.delete(user.nick);
   if (!newEmail || !newEmail.includes('@')) return res.json({ ok: false, error: 'Невірний email', code: 'err_invalid_email' });
   const { data: emailExists } = await supabase.from('users').select('nick').eq('email', newEmail).single();
   if (emailExists) return res.json({ ok: false, error: 'Email вже використовується', code: 'err_email_taken' });
@@ -2962,7 +3004,10 @@ app.post('/delete-account', async (req, res) => {
   const { password } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  const valid = await bcrypt.compare(password, user.password_hash); if (!valid) return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
+  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  pwFails.delete(user.nick);
   // Спершу все привʼязане до ніка, і лише потім сам рядок users: якщо на
   // півдорозі щось упаде, акаунт іще існує і видалення можна повторити.
   const purge = await purgeAccountData(user.nick, user);
