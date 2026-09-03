@@ -292,6 +292,7 @@ create table if not exists public.group_message_reactions (
 
 create table if not exists public.group_messages (
   content text NOT NULL,
+  edited_at bigint,
   delivered_to text[] NOT NULL DEFAULT '{}'::text[],
   duration_sec integer,
   file_data text,
@@ -328,6 +329,7 @@ create table if not exists public.groups (
 
 create table if not exists public.messages (
   content text NOT NULL,
+  edited_at bigint,
   delivered boolean NOT NULL DEFAULT false,
   duration_sec integer,
   file_data text,
