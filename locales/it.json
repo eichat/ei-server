@@ -812,5 +812,7 @@
   "signup_age_accept": "Ho almeno 13 anni (16 nell’UE) e accetto i termini di utilizzo e l’informativa sulla privacy",
   "signup_accept_required": "Per continuare, conferma la tua età e accetta i termini",
   "legal_terms": "Termini di utilizzo",
-  "legal_privacy": "Informativa sulla privacy"
+  "legal_privacy": "Informativa sulla privacy",
+  "tg_channel_title": "Canale Telegram",
+  "tg_channel_sub": "Canale ufficiale del progetto — notizie e aggiornamenti"
 }

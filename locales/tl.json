@@ -812,5 +812,7 @@
   "signup_age_accept": "Ako ay hindi bababa sa 13 taong gulang (16 sa EU) at tinatanggap ko ang mga tuntunin ng paggamit at patakaran sa privacy",
   "signup_accept_required": "Upang magpatuloy, kumpirmahin ang iyong edad at tanggapin ang mga tuntunin",
   "legal_terms": "Mga tuntunin ng paggamit",
-  "legal_privacy": "Patakaran sa privacy"
+  "legal_privacy": "Patakaran sa privacy",
+  "tg_channel_title": "Telegram channel",
+  "tg_channel_sub": "Opisyal na channel ng proyekto — balita at update"
 }

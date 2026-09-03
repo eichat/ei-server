@@ -812,5 +812,7 @@
   "signup_age_accept": "저는 만 13세 이상(EU에서는 16세 이상)이며 이용약관과 개인정보처리방침에 동의합니다",
   "signup_accept_required": "계속하려면 나이를 확인하고 약관에 동의하세요",
   "legal_terms": "이용약관",
-  "legal_privacy": "개인정보처리방침"
+  "legal_privacy": "개인정보처리방침",
+  "tg_channel_title": "텔레그램 채널",
+  "tg_channel_sub": "프로젝트 공식 채널 — 소식과 업데이트"
 }

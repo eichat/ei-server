@@ -812,5 +812,7 @@
   "signup_age_accept": "我已年满13岁（欧盟为16岁），并接受使用条款和隐私政策",
   "signup_accept_required": "若要继续，请确认年龄并接受条款",
   "legal_terms": "使用条款",
-  "legal_privacy": "隐私政策"
+  "legal_privacy": "隐私政策",
+  "tg_channel_title": "Telegram 频道",
+  "tg_channel_sub": "项目官方频道 — 新闻与更新"
 }

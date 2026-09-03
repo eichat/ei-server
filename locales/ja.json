@@ -812,5 +812,7 @@
   "signup_age_accept": "私は13歳以上（EUでは16歳以上）であり、利用規約とプライバシーポリシーに同意します",
   "signup_accept_required": "続けるには、年齢を確認して規約に同意してください",
   "legal_terms": "利用規約",
-  "legal_privacy": "プライバシーポリシー"
+  "legal_privacy": "プライバシーポリシー",
+  "tg_channel_title": "Telegram チャンネル",
+  "tg_channel_sub": "プロジェクト公式チャンネル — お知らせと更新"
 }

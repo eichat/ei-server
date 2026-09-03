@@ -812,5 +812,7 @@
   "signup_age_accept": "Tôi đủ 13 tuổi (16 tuổi ở EU) và tôi chấp nhận điều khoản sử dụng và chính sách quyền riêng tư",
   "signup_accept_required": "Để tiếp tục, hãy xác nhận độ tuổi và chấp nhận điều khoản",
   "legal_terms": "Điều khoản sử dụng",
-  "legal_privacy": "Chính sách quyền riêng tư"
+  "legal_privacy": "Chính sách quyền riêng tư",
+  "tg_channel_title": "Kênh Telegram",
+  "tg_channel_sub": "Kênh chính thức của dự án — tin tức và cập nhật"
 }

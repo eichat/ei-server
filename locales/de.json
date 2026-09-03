@@ -812,5 +812,7 @@
   "signup_age_accept": "Ich bin mindestens 13 Jahre alt (16 in der EU) und akzeptiere die Nutzungsbedingungen und die Datenschutzerklärung",
   "signup_accept_required": "Bestätigen Sie zum Fortfahren Ihr Alter und akzeptieren Sie die Bedingungen",
   "legal_terms": "Nutzungsbedingungen",
-  "legal_privacy": "Datenschutzerklärung"
+  "legal_privacy": "Datenschutzerklärung",
+  "tg_channel_title": "Telegram-Kanal",
+  "tg_channel_sub": "Offizieller Projektkanal — Neuigkeiten und Updates"
 }

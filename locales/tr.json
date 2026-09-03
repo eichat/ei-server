@@ -812,5 +812,7 @@
   "signup_age_accept": "En az 13 yaşındayım (AB’de 16) ve kullanım şartlarını ve gizlilik politikasını kabul ediyorum",
   "signup_accept_required": "Devam etmek için yaşınızı onaylayın ve şartları kabul edin",
   "legal_terms": "Kullanım şartları",
-  "legal_privacy": "Gizlilik politikası"
+  "legal_privacy": "Gizlilik politikası",
+  "tg_channel_title": "Telegram kanalı",
+  "tg_channel_sub": "Projenin resmî kanalı — haberler ve güncellemeler"
 }

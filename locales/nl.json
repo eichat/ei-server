@@ -812,5 +812,7 @@
   "signup_age_accept": "Ik ben minstens 13 jaar (16 in de EU) en accepteer de gebruiksvoorwaarden en het privacybeleid",
   "signup_accept_required": "Bevestig je leeftijd en accepteer de voorwaarden om door te gaan",
   "legal_terms": "Gebruiksvoorwaarden",
-  "legal_privacy": "Privacybeleid"
+  "legal_privacy": "Privacybeleid",
+  "tg_channel_title": "Telegram-kanaal",
+  "tg_channel_sub": "Officieel projectkanaal — nieuws en updates"
 }
