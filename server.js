@@ -382,13 +382,27 @@ app.get('/coin/supply', async (req, res) => {
     // Заразом показуємо, чи живий облік використання: без нього сінки мовчки
     // роздають усе безкоштовно, і це не видно ні з чого іншого.
     const { error: ucErr } = await supabase.from('usage_counters').select('nick').limit(1);
-    const { data } = await supabase.from('coin_supply').select('minted, burned, updated_at').eq('id', 1).single();
+    // Толерантно до ще не виконаної міграції `coin_backing`: без нових колонок
+    // запит відхилився б цілком, і сайт показав би нулі замість справжніх чисел.
+    let { data } = await supabase.from('coin_supply')
+      .select('minted, burned, deposited, released, float_in, updated_at').eq('id', 1).single();
+    if (!data) {
+      const r = await supabase.from('coin_supply').select('minted, burned, updated_at').eq('id', 1).single();
+      data = r.data;
+    }
     const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
+    const { data: circ } = await supabase.rpc('coins_circulating');
     res.json({
       ok: true,
       minted: Number(data?.minted || 0),
       burned: Number(data?.burned || 0),
       treasury: Number(company?.coins || 0),
+      // Монета входить в обіг лише за замкнений у мості токен: `deposited` —
+      // вніс користувач, `float_in` — влили з фондів проєкту.
+      circulating: circ == null ? null : Number(circ),
+      deposited: Number(data?.deposited || 0),
+      released: Number(data?.released || 0),
+      floatIn: Number(data?.float_in || 0),
       quotasWorking: !ucErr,
       updatedAt: data?.updated_at || null,
     });
@@ -2179,6 +2193,42 @@ const BURN_PCT = {
   paid_sub_fee: 50,
 };
 
+/// Облік потоку монет. Монета входить в обіг лише за замкнений у мості токен
+/// (`deposited` — вніс користувач, `float_in` — влили з фондів проєкту) і
+/// виходить виплатою (`released`) чи спалюванням (`burned`). Тримаємо це в БД,
+/// а не в памʼяті: числа переживають рестарти й показуються публічно.
+async function noteFlow(kind, amount) {
+  if (!amount || amount <= 0) return;
+  try {
+    await supabase.rpc('note_coin_flow', { p_kind: kind, p_amount: amount });
+  } catch (e) { console.error('[supply] noteFlow:', e.message); }
+}
+
+/// Видати монети зі СКАРБНИЦІ, а не створити нові.
+///
+/// 🔴 Це і є те, що робить скарбницю справжньою: роздачі (бонус новачка,
+/// майбутні нагороди, компенсації) обмежені тим, що люди вже заплатили
+/// комісіями плюс тим, що ми самі влили з фондів. Порожня скарбниця = роздавати
+/// нічого, а не «намалювати ще». Повертає видану суму (0, якщо не вистачило).
+async function grantFromTreasury(toNick, amount, kind, { earned = false, ref = null } = {}) {
+  if (!amount || amount <= 0) return 0;
+  const { data: left, error } = await supabase.rpc('spend_coins', { p_nick: COMPANY_NICK, p_amount: amount });
+  if (error || left === -1 || left === null) {
+    console.log(`[treasury] порожньо: ${kind} ${amount} для ${toNick} не видано`);
+    return 0;
+  }
+  const rpc = earned ? 'add_coins_earned' : 'add_coins';
+  const { error: addErr } = await supabase.rpc(rpc, { p_nick: toNick, p_amount: amount });
+  if (addErr) {
+    // Не дійшло до отримувача — повертаємо в скарбницю, інакше монети зникли б
+    // з обігу без сліду в лічильнику спалювання.
+    await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: amount });
+    return 0;
+  }
+  await logTx({ fromNick: COMPANY_NICK, toNick, amount, kind, ref });
+  return amount;
+}
+
 /// Дохід платформи: частина спалюється, решта йде на службовий рахунок.
 ///
 /// Спалене НЕ потрапляє на жоден рахунок — воно просто зникає з обігу, а
@@ -2546,7 +2596,7 @@ app.post('/register', async (req, res) => {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const userData = {
     nick, nick_lower: nick.toLowerCase(), password_hash: passwordHash,
-    email, color: color || 4280391411, coins: NEW_USER_COINS,
+    email, color: color || 4280391411, coins: 0,
     // Нік міг належати комусь раніше — відсікаємо його токени (див. destroySessionsForNick).
     tokens_valid_from: Date.now(),
     ...(phone ? { phone } : {}),
@@ -2560,6 +2610,10 @@ app.post('/register', async (req, res) => {
   } else {
     const { error } = await supabase.from('users').insert(userData);
     if (error) return res.json({ ok: false, error: 'Помилка створення акаунта', code: 'err_account_create' });
+    // Бонус — ЗІ СКАРБНИЦІ, а не з повітря. Внутрішніми (не «заробленими»):
+    // інакше реєстрація ставала б краном токена, і фальшиві акаунти виводили б
+    // по 200 за штуку. Порожня скарбниця → акаунт просто без бонусу.
+    await grantFromTreasury(nick, NEW_USER_COINS, 'signup_bonus');
     // Одразу видаємо токен — після реєстрації користувач залогінений.
     const token = await createSession(nick, req.body.deviceId || null);
     res.json({ ok: true, needVerification: false, token, nick });
@@ -2576,6 +2630,7 @@ app.post('/verify-email', async (req, res) => {
   const { code: _c, expires: _e, ...userData } = pending;
   const { error } = await supabase.from('users').insert(userData);
   if (error) return res.json({ ok: false, error: 'Помилка створення акаунта', code: 'err_account_create' });
+  await grantFromTreasury(pending.nick, NEW_USER_COINS, 'signup_bonus');
   pendingRegistrations.delete(email);
   const token = await createSession(pending.nick);
   res.json({ ok: true, token, nick: pending.nick });
@@ -3316,6 +3371,7 @@ async function resumePendingPayouts() {
       const st = await payoutTxStatus(p.signature);
       if (st === 'sent') {
         await supabase.from('token_payouts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', p.id);
+        await noteFlow('released', p.coins);
         console.log('[payout] заявка', p.id, 'насправді пройшла');
       } else if (st === 'failed') {
         await supabase.from('token_payouts').update({ status: 'refunded', error: 'транзакція відхилена мережею' }).eq('id', p.id);
@@ -3376,6 +3432,7 @@ app.post('/token/payout', async (req, res) => {
     await c.confirmTransaction({ signature, blockhash: tx.recentBlockhash, lastValidBlockHeight }, 'confirmed');
     await supabase.from('token_payouts')
       .update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', row.id);
+    await noteFlow('released', coins);   // монети вийшли з обігу, токени — з мосту
     logTx({ fromNick: req.nick, toNick: null, amount: coins, kind: 'token_payout', ref: signature });
     res.json({ ok: true, id: row.id, tokens, signature, balance: left, cluster: SOLANA_CLUSTER });
   } catch (e) {
@@ -3471,6 +3528,7 @@ async function scanTokenDeposits() {
         // Токени прийшли ззовні — отже це «зароблене»: інакше поповнення
         // стало б пасткою (внести можна, вивести назад — ні).
         await supabase.rpc('add_coins_earned', { p_nick: user.nick, p_amount: coins });
+        await noteFlow('deposited', coins);   // монети зʼявились за замкнені токени
         logTx({ fromNick: null, toNick: user.nick, amount: coins, kind: 'token_deposit', ref: s.signature });
         credited++;
       }
@@ -3564,6 +3622,7 @@ app.post('/token/deposit-submit', async (req, res) => {
     });
     if (insErr) return res.json({ ok: true, signature, credited: 0 });
     await supabase.rpc('add_coins_earned', { p_nick: req.nick, p_amount: coins });
+    await noteFlow('deposited', coins);
     logTx({ fromNick: null, toNick: req.nick, amount: coins, kind: 'token_deposit', ref: signature });
     const { data: u } = await supabase.from('users').select('coins').eq('nick', req.nick).single();
     res.json({ ok: true, signature, credited: coins, balance: u ? u.coins : null });
@@ -5795,6 +5854,147 @@ app.get('/admin/overview', async (req, res) => {
   } catch (e) {
     console.error('[admin/overview]', e.message);
     res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── Резерв: чи забезпечені монети токенами ───────────────────────────────
+//
+// Це головне число нової моделі: скільки монет існує проти того, скільки
+// токенів замкнено в мості. Якщо забезпечення менше за обіг — виводити зможуть
+// не всі, і це має бути видно ДО того, як хтось упреться в порожній гаманець.
+async function bridgeTokenBalance() {
+  if (!payoutReady()) return null;
+  const owner = getPayoutKeypair().publicKey.toBase58();
+  const r = await httpPostJson(SOLANA_RPC, {}, {
+    jsonrpc: '2.0', id: 1, method: 'getTokenAccountsByOwner',
+    params: [owner, { mint: SOLANA_TOKEN_MINT }, { encoding: 'jsonParsed' }],
+  });
+  const body = JSON.parse(r.body || '{}');
+  if (body.error) throw new Error(body.error.message || 'RPC error');
+  let total = 0;
+  for (const acc of body.result?.value || []) {
+    const ui = acc.account?.data?.parsed?.info?.tokenAmount?.uiAmount;
+    if (typeof ui === 'number') total += ui;
+  }
+  return total;
+}
+
+app.get('/admin/reserve', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
+  try {
+    const { data: circ } = await supabase.rpc('coins_circulating');
+    const { data: sup } = await supabase.from('coin_supply')
+      .select('burned, deposited, released, float_in').eq('id', 1).single();
+    const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
+    const circulating = Number(circ || 0);
+    const backing = await bridgeTokenBalance();
+    res.json({
+      ok: true,
+      circulating,                                   // скільки монет існує
+      backing,                                       // скільки токенів у мості
+      surplus: backing == null ? null : backing - circulating,
+      solvent: backing == null ? null : backing >= circulating,
+      treasury: Number(company?.coins || 0),
+      flows: {
+        deposited: Number(sup?.deposited || 0),
+        floatIn: Number(sup?.float_in || 0),
+        released: Number(sup?.released || 0),
+        burned: Number(sup?.burned || 0),
+      },
+      wallet: payoutReady() ? getPayoutKeypair().publicKey.toBase58() : null,
+      cluster: SOLANA_CLUSTER,
+    });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// Влити монети в скарбницю під токени, які вже надіслані в міст.
+//
+// ⚠️ Приймаємо не суму, а ПІДПИС транзакції: сервер сам питає мережу, скільки
+// саме токенів прийшло на гаманець мосту. Інакше це був би той самий кран,
+// лише під адмінським ключем. Запис у token_deposits робить дію ідемпотентною:
+// той самий підпис не зарахується двічі, і періодичний сканер його не підбере.
+app.post('/admin/treasury-credit', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+  if (!signature) return res.json({ ok: false, error: 'Потрібен підпис транзакції' });
+  if (!payoutReady()) return res.json({ ok: false, error: 'Гаманець мосту не налаштований' });
+  try {
+    const owner = getPayoutKeypair().publicKey.toBase58();
+    const r = await httpPostJson(SOLANA_RPC, {}, {
+      jsonrpc: '2.0', id: 1, method: 'getTransaction',
+      params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }],
+    });
+    const body = JSON.parse(r.body || '{}');
+    const tx = body.result;
+    if (!tx) return res.json({ ok: false, error: 'Транзакцію не знайдено' });
+    if (tx.meta?.err) return res.json({ ok: false, error: 'Транзакція відхилена мережею' });
+    // Приріст саме нашого токена саме на гаманці мосту — рахуємо з балансів
+    // до/після, як і для звичайних поповнень.
+    const pre = (tx.meta?.preTokenBalances || []).filter(b => b.owner === owner && b.mint === SOLANA_TOKEN_MINT);
+    const post = (tx.meta?.postTokenBalances || []).filter(b => b.owner === owner && b.mint === SOLANA_TOKEN_MINT);
+    const sum = arr => arr.reduce((a, b) => a + (b.uiTokenAmount?.uiAmount || 0), 0);
+    const gained = sum(post) - sum(pre);
+    if (!(gained > 0)) return res.json({ ok: false, error: 'Ця транзакція не поповнила гаманець мосту' });
+    const coins = Math.floor(gained / TOKEN_PAYOUT_RATE);
+    const { error: insErr } = await supabase.from('token_deposits').insert({
+      signature, nick: COMPANY_NICK, address: owner, tokens: gained, coins,
+      slot: tx.slot || null, status: 'credited',
+    });
+    if (insErr) return res.json({ ok: false, error: 'Цей підпис уже зараховано' });
+    await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: coins });
+    await noteFlow('float_in', coins);
+    await logTx({ fromNick: null, toNick: COMPANY_NICK, amount: coins, kind: 'treasury_float', ref: signature });
+    const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
+    res.json({ ok: true, credited: coins, tokens: gained, treasury: Number(company?.coins || 0) });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
+// Вивести зі скарбниці в токен — щоб платити реальні рахунки.
+//
+// Це НЕ емісія: монети скарбниці забезпечені токенами, які лежать у мості ще
+// відтоді, як їх туди внесли. Вивід звільняє рівно стільки, скільки знищує
+// монет, тож обіг і забезпечення зменшуються разом.
+app.post('/admin/treasury-payout', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено' });
+  const coins = Math.floor(Number(req.body?.coins));
+  const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+  if (!Number.isFinite(coins) || coins <= 0) return res.json({ ok: false, error: 'Потрібна сума' });
+  if (base58Len(address) !== 32) return res.json({ ok: false, error: 'Адреса недійсна' });
+  if (!payoutReady()) return res.json({ ok: false, error: 'Гаманець мосту не налаштований' });
+  // Не спорожнити міст: після виводу забезпечення має лишитись не меншим за
+  // те, що люди можуть зажадати назад.
+  try {
+    const { data: circ } = await supabase.rpc('coins_circulating');
+    const backing = await bridgeTokenBalance();
+    if (backing != null && backing - coins * TOKEN_PAYOUT_RATE < Number(circ || 0) - coins) {
+      return res.json({ ok: false, error: 'Після виводу забезпечення стало б меншим за обіг' });
+    }
+  } catch (e) { return res.json({ ok: false, error: 'Не вдалося перевірити резерв: ' + e.message }); }
+
+  const { data: left, error } = await supabase.rpc('spend_coins', { p_nick: COMPANY_NICK, p_amount: coins });
+  if (error || left === -1 || left === null) return res.json({ ok: false, error: 'У скарбниці недостатньо монет' });
+  const tokens = coins * TOKEN_PAYOUT_RATE;
+  const { data: row } = await supabase.from('token_payouts')
+    .insert({ nick: COMPANY_NICK, address, coins, tokens, status: 'pending' }).select('id').single();
+  try {
+    const { c, tx, signature, lastValidBlockHeight } = await buildPayoutTx(address, tokens);
+    if (row) await supabase.from('token_payouts').update({ signature }).eq('id', row.id);
+    await c.sendRawTransaction(tx.serialize(), { skipPreflight: false });
+    await c.confirmTransaction({ signature, blockhash: tx.recentBlockhash, lastValidBlockHeight }, 'confirmed');
+    if (row) await supabase.from('token_payouts')
+      .update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', row.id);
+    await noteFlow('released', coins);
+    await logTx({ fromNick: COMPANY_NICK, toNick: null, amount: coins, kind: 'treasury_payout', ref: signature });
+    res.json({ ok: true, tokens, signature, treasury: left, cluster: SOLANA_CLUSTER });
+  } catch (e) {
+    // Як і в користувацькій виплаті: не повертаємо наосліп — транзакція могла
+    // піти. Заявка лишається pending, resumePendingPayouts спитає мережу.
+    console.error('[treasury] payout:', e.message);
+    res.json({ ok: false, error: 'Виплата не підтвердилась, заявка лишилась у роботі' });
   }
 });
 
