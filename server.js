@@ -310,8 +310,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.27',
-  code: 28,
+  version: '0.9.28',
+  code: 29,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -3013,10 +3013,14 @@ app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий', code: 'err_param_nick' });
   const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming, invisible, solana_address').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
+  const ei = await earnedInfo(nick, user.coins || 0);
+  // Ціна відкриття — 0, якщо гаманець уже відкривали або є преміум: клієнт
+  // показує цю примітку ДО створення, і обіцяти плату, якої не буде, не можна.
+  const premiumNow = !!(user.premium_expires_at && new Date(user.premium_expires_at).getTime() > Date.now());
   res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true, solana_address: user.solana_address || null,
     // Скільки з балансу дозволено виводити в токен і чи вже сплачено відкриття
     // гаманця — клієнт має показувати це чесно, а не обіцяти вивід усього.
-    ...(await earnedInfo(nick, user.coins || 0)), wallet_open_fee: WALLET_OPEN_FEE });
+    ...ei, wallet_open_fee: (ei.wallet_opened || premiumNow) ? 0 : WALLET_OPEN_FEE });
 });
 
 // ── Гаманець Solana: тільки АДРЕСА, без ключів ───────────────────────────
