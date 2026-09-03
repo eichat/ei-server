@@ -5944,11 +5944,29 @@ app.post('/admin/treasury-credit', async (req, res) => {
     const gained = sum(post) - sum(pre);
     if (!(gained > 0)) return res.json({ ok: false, error: 'Ця транзакція не поповнила гаманець мосту' });
     const coins = Math.floor(gained / TOKEN_PAYOUT_RATE);
-    const { error: insErr } = await supabase.from('token_deposits').insert({
-      signature, nick: COMPANY_NICK, address: owner, tokens: gained, coins,
-      slot: tx.slot || null, status: 'credited',
-    });
-    if (insErr) return res.json({ ok: false, error: 'Цей підпис уже зараховано' });
+    // ⚠️ Рядок за цим підписом уже може існувати: періодичний сканер поповнень
+    // бачить будь-який вхідний переказ і записує його — з `status: unmatched`,
+    // якщо відправник не є користувачем (а гаманці фондів ним і не є). Тому не
+    // «вставити або відмовити», а: зарахувати лише те, що ще не зараховано.
+    const { data: prev } = await supabase.from('token_deposits')
+      .select('status, nick').eq('signature', signature).maybeSingle();
+    if (prev && prev.status === 'credited') {
+      return res.json({ ok: false, error: 'Цей підпис уже зараховано' });
+    }
+    if (prev) {
+      // `neq('status','credited')` робить оновлення гонко-безпечним: якщо інший
+      // інстанс устиг першим, ми не отримаємо жодного рядка й не нарахуємо вдруге.
+      const { data: upd } = await supabase.from('token_deposits')
+        .update({ nick: COMPANY_NICK, address: owner, tokens: gained, coins, status: 'credited' })
+        .eq('signature', signature).neq('status', 'credited').select('signature');
+      if (!upd || upd.length === 0) return res.json({ ok: false, error: 'Цей підпис уже зараховано' });
+    } else {
+      const { error: insErr } = await supabase.from('token_deposits').insert({
+        signature, nick: COMPANY_NICK, address: owner, tokens: gained, coins,
+        slot: tx.slot || null, status: 'credited',
+      });
+      if (insErr) return res.json({ ok: false, error: 'Цей підпис уже зараховано' });
+    }
     await supabase.rpc('add_coins', { p_nick: COMPANY_NICK, p_amount: coins });
     await noteFlow('float_in', coins);
     await logTx({ fromNick: null, toNick: COMPANY_NICK, amount: coins, kind: 'treasury_float', ref: signature });
