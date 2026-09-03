@@ -2983,6 +2983,21 @@ function avatarPathFromUrl(url) {
 async function purgeAccountData(nick, user) {
   const report = { deleted: {}, anonymized: {}, files: 0, errors: [] };
 
+  // 🔴 Залишок балансу — У СКАРБНИЦЮ, а не в нікуди. З 03.09 кожна монета
+  // забезпечена замкненим у мості токеном: якщо видалити рядок користувача
+  // разом із монетами, токени лишились би в мості без жодного власника, а
+  // обіг і скарбниця розійшлися б із дійсністю. Тому баланс повертається
+  // туди, звідки колись вийшов.
+  const leftover = Math.max(0, Number(user?.coins) || 0);
+  if (leftover > 0 && nick !== COMPANY_NICK) {
+    const { error } = await supabase.rpc('add_coins_earned', { p_nick: COMPANY_NICK, p_amount: leftover });
+    if (error) report.errors.push(`treasury_return: ${error.message}`);
+    else {
+      await logTx({ fromNick: nick, toNick: COMPANY_NICK, amount: leftover, kind: 'account_closed' });
+      report.returnedToTreasury = leftover;
+    }
+  }
+
   const del = async (table, col, value) => {
     const { error, count } = await supabase.from(table).delete({ count: 'exact' }).eq(col, value);
     if (error) { report.errors.push(`${table}.${col}: ${error.message}`); return; }
