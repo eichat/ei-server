@@ -335,8 +335,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.31',
-  code: 32,
+  version: '0.9.32',
+  code: 33,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',

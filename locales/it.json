@@ -808,5 +808,9 @@
   "premium_feat_translate": "Traduzione automatica: 1000 al giorno invece di 200",
   "premium_feat_wallet": "Apertura del portafoglio gratuita",
   "err_nick_bad_chars": "Il nickname contiene caratteri non consentiti",
-  "e2ee_undecryptable": "🔒 Impossibile decifrare — inviato a un altro dispositivo"
+  "e2ee_undecryptable": "🔒 Impossibile decifrare — inviato a un altro dispositivo",
+  "signup_age_accept": "Ho almeno 13 anni (16 nell’UE) e accetto i termini di utilizzo e l’informativa sulla privacy",
+  "signup_accept_required": "Per continuare, conferma la tua età e accetta i termini",
+  "legal_terms": "Termini di utilizzo",
+  "legal_privacy": "Informativa sulla privacy"
 }

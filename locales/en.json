@@ -808,5 +808,9 @@
   "premium_feat_translate": "Auto-translate: 1000 a day instead of 200",
   "premium_feat_wallet": "Opening a wallet is free",
   "err_nick_bad_chars": "The nickname contains characters that are not allowed",
-  "e2ee_undecryptable": "🔒 Could not decrypt — sent to a different device"
+  "e2ee_undecryptable": "🔒 Could not decrypt — sent to a different device",
+  "signup_age_accept": "I am at least 13 years old (16 in the EU) and I accept the terms of use and privacy policy",
+  "signup_accept_required": "To continue, confirm your age and accept the terms",
+  "legal_terms": "Terms of use",
+  "legal_privacy": "Privacy policy"
 }

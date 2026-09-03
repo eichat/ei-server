@@ -808,5 +808,9 @@
   "premium_feat_translate": "Awtomatikong pagsasalin: 1000 kada araw sa halip na 200",
   "premium_feat_wallet": "Libre ang pagbubukas ng wallet",
   "err_nick_bad_chars": "May hindi pinapayagang karakter ang palayaw",
-  "e2ee_undecryptable": "🔒 Hindi ma-decrypt — ipinadala sa ibang device"
+  "e2ee_undecryptable": "🔒 Hindi ma-decrypt — ipinadala sa ibang device",
+  "signup_age_accept": "Ako ay hindi bababa sa 13 taong gulang (16 sa EU) at tinatanggap ko ang mga tuntunin ng paggamit at patakaran sa privacy",
+  "signup_accept_required": "Upang magpatuloy, kumpirmahin ang iyong edad at tanggapin ang mga tuntunin",
+  "legal_terms": "Mga tuntunin ng paggamit",
+  "legal_privacy": "Patakaran sa privacy"
 }

@@ -808,5 +808,9 @@
   "premium_feat_translate": "Otomatik çeviri: 200 yerine günde 1000",
   "premium_feat_wallet": "Cüzdan açmak ücretsiz",
   "err_nick_bad_chars": "Takma ad izin verilmeyen karakterler içeriyor",
-  "e2ee_undecryptable": "🔒 Şifre çözülemedi — başka bir cihaza gönderilmiş"
+  "e2ee_undecryptable": "🔒 Şifre çözülemedi — başka bir cihaza gönderilmiş",
+  "signup_age_accept": "En az 13 yaşındayım (AB’de 16) ve kullanım şartlarını ve gizlilik politikasını kabul ediyorum",
+  "signup_accept_required": "Devam etmek için yaşınızı onaylayın ve şartları kabul edin",
+  "legal_terms": "Kullanım şartları",
+  "legal_privacy": "Gizlilik politikası"
 }

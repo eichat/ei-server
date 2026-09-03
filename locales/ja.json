@@ -808,5 +808,9 @@
   "premium_feat_translate": "自動翻訳：1日200件から1000件へ",
   "premium_feat_wallet": "ウォレットの開設が無料",
   "err_nick_bad_chars": "ニックネームに使用できない文字が含まれています",
-  "e2ee_undecryptable": "🔒 復号できません — 別の端末宛てに送信されています"
+  "e2ee_undecryptable": "🔒 復号できません — 別の端末宛てに送信されています",
+  "signup_age_accept": "私は13歳以上（EUでは16歳以上）であり、利用規約とプライバシーポリシーに同意します",
+  "signup_accept_required": "続けるには、年齢を確認して規約に同意してください",
+  "legal_terms": "利用規約",
+  "legal_privacy": "プライバシーポリシー"
 }

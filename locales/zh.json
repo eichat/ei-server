@@ -808,5 +808,9 @@
   "premium_feat_translate": "自动翻译：每天 1000 次而非 200 次",
   "premium_feat_wallet": "免费开通钱包",
   "err_nick_bad_chars": "昵称包含不允许的字符",
-  "e2ee_undecryptable": "🔒 无法解密——发送给了另一台设备"
+  "e2ee_undecryptable": "🔒 无法解密——发送给了另一台设备",
+  "signup_age_accept": "我已年满13岁（欧盟为16岁），并接受使用条款和隐私政策",
+  "signup_accept_required": "若要继续，请确认年龄并接受条款",
+  "legal_terms": "使用条款",
+  "legal_privacy": "隐私政策"
 }

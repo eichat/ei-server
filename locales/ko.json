@@ -808,5 +808,9 @@
   "premium_feat_translate": "자동 번역: 하루 200회 대신 1000회",
   "premium_feat_wallet": "지갑 개설 무료",
   "err_nick_bad_chars": "닉네임에 사용할 수 없는 문자가 있습니다",
-  "e2ee_undecryptable": "🔒 복호화할 수 없습니다 — 다른 기기로 보낸 메시지입니다"
+  "e2ee_undecryptable": "🔒 복호화할 수 없습니다 — 다른 기기로 보낸 메시지입니다",
+  "signup_age_accept": "저는 만 13세 이상(EU에서는 16세 이상)이며 이용약관과 개인정보처리방침에 동의합니다",
+  "signup_accept_required": "계속하려면 나이를 확인하고 약관에 동의하세요",
+  "legal_terms": "이용약관",
+  "legal_privacy": "개인정보처리방침"
 }

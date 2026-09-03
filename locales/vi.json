@@ -808,5 +808,9 @@
   "premium_feat_translate": "Dịch tự động: 1000 mỗi ngày thay vì 200",
   "premium_feat_wallet": "Mở ví miễn phí",
   "err_nick_bad_chars": "Biệt danh chứa ký tự không được phép",
-  "e2ee_undecryptable": "🔒 Không giải mã được — đã gửi tới thiết bị khác"
+  "e2ee_undecryptable": "🔒 Không giải mã được — đã gửi tới thiết bị khác",
+  "signup_age_accept": "Tôi đủ 13 tuổi (16 tuổi ở EU) và tôi chấp nhận điều khoản sử dụng và chính sách quyền riêng tư",
+  "signup_accept_required": "Để tiếp tục, hãy xác nhận độ tuổi và chấp nhận điều khoản",
+  "legal_terms": "Điều khoản sử dụng",
+  "legal_privacy": "Chính sách quyền riêng tư"
 }

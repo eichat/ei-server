@@ -808,5 +808,9 @@
   "premium_feat_translate": "Autotłumaczenie: 1000 dziennie zamiast 200",
   "premium_feat_wallet": "Otwarcie portfela za darmo",
   "err_nick_bad_chars": "Nick zawiera niedozwolone znaki",
-  "e2ee_undecryptable": "🔒 Nie udało się odszyfrować — wysłano na inne urządzenie"
+  "e2ee_undecryptable": "🔒 Nie udało się odszyfrować — wysłano na inne urządzenie",
+  "signup_age_accept": "Mam co najmniej 13 lat (16 w UE) i akceptuję warunki korzystania oraz politykę prywatności",
+  "signup_accept_required": "Aby kontynuować, potwierdź wiek i zaakceptuj warunki",
+  "legal_terms": "Warunki korzystania",
+  "legal_privacy": "Polityka prywatności"
 }

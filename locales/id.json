@@ -808,5 +808,9 @@
   "premium_feat_translate": "Terjemahan otomatis: 1000 per hari, bukan 200",
   "premium_feat_wallet": "Membuka dompet gratis",
   "err_nick_bad_chars": "Nama panggilan berisi karakter yang tidak diizinkan",
-  "e2ee_undecryptable": "🔒 Tidak bisa didekripsi — dikirim ke perangkat lain"
+  "e2ee_undecryptable": "🔒 Tidak bisa didekripsi — dikirim ke perangkat lain",
+  "signup_age_accept": "Saya berusia minimal 13 tahun (16 di UE) dan saya menyetujui ketentuan penggunaan serta kebijakan privasi",
+  "signup_accept_required": "Untuk melanjutkan, konfirmasi usia Anda dan setujui ketentuannya",
+  "legal_terms": "Ketentuan penggunaan",
+  "legal_privacy": "Kebijakan privasi"
 }

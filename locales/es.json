@@ -808,5 +808,9 @@
   "premium_feat_translate": "Traducción automática: 1000 al día en lugar de 200",
   "premium_feat_wallet": "Abrir la cartera es gratis",
   "err_nick_bad_chars": "El apodo contiene caracteres no permitidos",
-  "e2ee_undecryptable": "🔒 No se pudo descifrar: se envió a otro dispositivo"
+  "e2ee_undecryptable": "🔒 No se pudo descifrar: se envió a otro dispositivo",
+  "signup_age_accept": "Tengo al menos 13 años (16 en la UE) y acepto las condiciones de uso y la política de privacidad",
+  "signup_accept_required": "Para continuar, confirma tu edad y acepta las condiciones",
+  "legal_terms": "Condiciones de uso",
+  "legal_privacy": "Política de privacidad"
 }

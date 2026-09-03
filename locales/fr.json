@@ -808,5 +808,9 @@
   "premium_feat_translate": "Traduction auto : 1000 par jour au lieu de 200",
   "premium_feat_wallet": "Ouverture du portefeuille gratuite",
   "err_nick_bad_chars": "Le pseudo contient des caractères non autorisés",
-  "e2ee_undecryptable": "🔒 Déchiffrement impossible — envoyé à un autre appareil"
+  "e2ee_undecryptable": "🔒 Déchiffrement impossible — envoyé à un autre appareil",
+  "signup_age_accept": "J’ai au moins 13 ans (16 dans l’UE) et j’accepte les conditions d’utilisation et la politique de confidentialité",
+  "signup_accept_required": "Pour continuer, confirmez votre âge et acceptez les conditions",
+  "legal_terms": "Conditions d’utilisation",
+  "legal_privacy": "Politique de confidentialité"
 }
