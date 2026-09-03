@@ -310,8 +310,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.23',
-  code: 24,
+  version: '0.9.24',
+  code: 25,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -3901,6 +3901,57 @@ app.post('/storage/resolve', async (req, res) => {
 // бо логи підвантажуються лише при відкритті конкретного чату).
 // status: 'missed' (не додзвонились / офлайн) і 'no_answer' (скасовано до відповіді) —
 // обидва з погляду to_nick це пропущений. 'rejected'/'completed' не рахуємо.
+// Позначка часу правки — окремим запитом ПІСЛЯ оновлення тексту.
+//
+// ⚠️ Навмисно не одним `update({ content, edited_at })`: доки міграція
+// `message_edits_catchup.sql` не виконана, колонки немає, і спільний запит
+// відхилився б цілком — тобто правка не застосувалась би взагалі. Так текст
+// оновлюється завжди, а догін просто не працює до міграції.
+async function markEdited(table, match) {
+  try {
+    const { error } = await supabase.from(table).update({ edited_at: Date.now() }).match(match);
+    if (error) console.error('markEdited', table, error.message);
+  } catch (e) { console.error('markEdited', table, e.message); }
+}
+
+// Правки, які людина пропустила, поки була офлайн.
+//
+// Сервер сповіщає про правку лише наживо, тож без цього офлайн-адресат лишався
+// зі старим текстом назавжди. Вікно природно обмежене TTL самих повідомлень
+// (7 діб direct / 30 груп) — старіші правки стосуються того, чого вже немає.
+app.get('/edits', async (req, res) => {
+  const since = parseInt(req.query.since, 10) || 0;
+  const out = { ok: true, direct: [], groups: [] };
+  try {
+    const { data, error } = await supabase.from('messages')
+      .select('msg_id, from_nick, content, edited_at')
+      .eq('to_nick', req.nick)
+      .gt('edited_at', since)
+      .order('edited_at', { ascending: true })
+      .limit(500);
+    // Колонки ще немає (міграцію не виконано) — віддаємо порожньо, а не 500:
+    // клієнт має працювати й до міграції.
+    if (error) return res.json(out);
+    out.direct = (data || []).map(m => ({ msgId: m.msg_id, from: m.from_nick, text: m.content, editedAt: m.edited_at }));
+
+    const { data: gm } = await supabase.from('group_members').select('group_id').eq('nick', req.nick);
+    const gids = (gm || []).map(g => g.group_id);
+    if (gids.length) {
+      const { data: ge } = await supabase.from('group_messages')
+        .select('msg_id, group_id, from_nick, content, edited_at')
+        .in('group_id', gids)
+        .gt('edited_at', since)
+        .neq('from_nick', req.nick)      // свої правки клієнт уже застосував локально
+        .order('edited_at', { ascending: true })
+        .limit(500);
+      out.groups = (ge || []).map(m => ({ msgId: m.msg_id, groupId: m.group_id, from: m.from_nick, text: m.content, editedAt: m.edited_at }));
+    }
+  } catch (e) {
+    console.error('/edits', e.message);
+  }
+  res.json(out);
+});
+
 app.get('/missed-calls', async (req, res) => {
   const { nick, since } = req.query;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
@@ -6070,8 +6121,8 @@ wss.on('connection', (ws) => {
           }
         }
       }
-      if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); sendToUser(msg.to, { type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }); }
-      if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
+      if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); await markEdited('messages', { msg_id: msg.msgId, from_nick: userNick }); sendToUser(msg.to, { type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }); }
+      if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await markEdited('group_messages', { msg_id: msg.msgId, group_id: msg.groupId, from_nick: userNick }); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
       if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
       if (msg.type === 'delete_comment') {
         const { data: c } = await supabase.from('channel_comments').select('from_nick, channel_id, post_id, file_data').eq('id', msg.commentId).single();
