@@ -5886,14 +5886,17 @@ app.get('/admin/reserve', async (req, res) => {
     const { data: sup } = await supabase.from('coin_supply')
       .select('burned, deposited, released, float_in').eq('id', 1).single();
     const { data: company } = await supabase.from('users').select('coins').eq('nick', COMPANY_NICK).single();
-    const circulating = Number(circ || 0);
+    // null, а не 0: без міграції функції ще немає, і «0 монет в обігу» було б
+    // не фактом, а виглядало б як ідеальне забезпечення.
+    const circulating = circ == null ? null : Number(circ);
     const backing = await bridgeTokenBalance();
+    const known = circulating != null && backing != null;
     res.json({
       ok: true,
       circulating,                                   // скільки монет існує
       backing,                                       // скільки токенів у мості
-      surplus: backing == null ? null : backing - circulating,
-      solvent: backing == null ? null : backing >= circulating,
+      surplus: known ? backing - circulating : null,
+      solvent: known ? backing >= circulating : null,
       treasury: Number(company?.coins || 0),
       flows: {
         deposited: Number(sup?.deposited || 0),
