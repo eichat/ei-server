@@ -5927,7 +5927,10 @@ app.post('/admin/treasury-credit', async (req, res) => {
     const owner = getPayoutKeypair().publicKey.toBase58();
     const r = await httpPostJson(SOLANA_RPC, {}, {
       jsonrpc: '2.0', id: 1, method: 'getTransaction',
-      params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }],
+      // commitment обовʼязковий: за замовчуванням getTransaction відповідає
+      // лише про 'finalized', а щойно підтверджену транзакцію показує як
+      // «не знайдено» — і поповнення виглядало б як невдале при вдалому переказі.
+      params: [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
     });
     const body = JSON.parse(r.body || '{}');
     const tx = body.result;
