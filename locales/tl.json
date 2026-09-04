@@ -825,5 +825,12 @@
   "action_delete_account": "Tanggalin nang tuluyan ang account?",
   "action_delete_account_btn": "Tanggalin ang account",
   "msg_delete_account_body": "Hindi na ito maibabalik. Buburahin ang account na “{name}”, ang mga barya at subscription nito. Mananatili sa blockchain ang mga token sa wallet mo — ang lihim mong parirala lang ang makakabukas sa mga ito.",
-  "camera_unavailable": "Hindi mabuksan ang camera"
+  "camera_unavailable": "Hindi mabuksan ang camera",
+  "hint_password_repeat": "Ulitin ang password",
+  "msg_password_mismatch": "Hindi magkatugma ang mga password",
+  "payout_to_eion": "I-withdraw sa EION",
+  "deposit_to_coins": "Mag-top up ng Coins gamit ang EION",
+  "camera_mode_photo": "Larawan",
+  "camera_mode_video": "Video",
+  "camera_rec_failed": "Hindi ma-record ang video"
 }

@@ -825,5 +825,12 @@
   "action_delete_account": "حذف الحساب نهائيًا؟",
   "action_delete_account_btn": "حذف الحساب",
   "msg_delete_account_body": "إجراء لا يمكن التراجع عنه. سيُمحى الحساب «{name}» وعملاته واشتراكاته. تبقى الرموز في محفظتك على البلوكتشين — وعبارتك السرية وحدها تمنح الوصول إليها.",
-  "camera_unavailable": "تعذّر تشغيل الكاميرا"
+  "camera_unavailable": "تعذّر تشغيل الكاميرا",
+  "hint_password_repeat": "أعد إدخال كلمة المرور",
+  "msg_password_mismatch": "كلمتا المرور غير متطابقتين",
+  "payout_to_eion": "سحب إلى EION",
+  "deposit_to_coins": "شحن العملات بـ EION",
+  "camera_mode_photo": "صورة",
+  "camera_mode_video": "فيديو",
+  "camera_rec_failed": "تعذّر تسجيل الفيديو"
 }

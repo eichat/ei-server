@@ -825,5 +825,12 @@
   "action_delete_account": "Hesap kalıcı olarak silinsin mi?",
   "action_delete_account_btn": "Hesabı sil",
   "msg_delete_account_body": "Geri alınamaz. “{name}” hesabı, jetonları ve abonelikleri silinir. Cüzdanınızdaki EION blok zincirinde kalır — onlara yalnızca gizli ifadeniz erişim verir.",
-  "camera_unavailable": "Kamera açılamadı"
+  "camera_unavailable": "Kamera açılamadı",
+  "hint_password_repeat": "Şifreyi tekrarlayın",
+  "msg_password_mismatch": "Şifreler eşleşmiyor",
+  "payout_to_eion": "EION'a çek",
+  "deposit_to_coins": "EION ile Jeton yükle",
+  "camera_mode_photo": "Fotoğraf",
+  "camera_mode_video": "Video",
+  "camera_rec_failed": "Video kaydedilemedi"
 }

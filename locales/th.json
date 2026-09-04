@@ -825,5 +825,12 @@
   "action_delete_account": "ลบบัญชีถาวรหรือไม่?",
   "action_delete_account_btn": "ลบบัญชี",
   "msg_delete_account_body": "ไม่สามารถย้อนกลับได้ บัญชี “{name}” เหรียญและการสมัครสมาชิกจะถูกลบ โทเคนในกระเป๋ายังอยู่บนบล็อกเชน — มีเพียงวลีลับของคุณที่เข้าถึงได้",
-  "camera_unavailable": "ไม่สามารถเปิดกล้องได้"
+  "camera_unavailable": "ไม่สามารถเปิดกล้องได้",
+  "hint_password_repeat": "กรอกรหัสผ่านอีกครั้ง",
+  "msg_password_mismatch": "รหัสผ่านไม่ตรงกัน",
+  "payout_to_eion": "ถอนเป็น EION",
+  "deposit_to_coins": "เติมเหรียญด้วย EION",
+  "camera_mode_photo": "ภาพถ่าย",
+  "camera_mode_video": "วิดีโอ",
+  "camera_rec_failed": "บันทึกวิดีโอไม่สำเร็จ"
 }

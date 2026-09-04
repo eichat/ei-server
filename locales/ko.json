@@ -825,5 +825,12 @@
   "action_delete_account": "계정을 영구히 삭제할까요?",
   "action_delete_account_btn": "계정 삭제",
   "msg_delete_account_body": "되돌릴 수 없습니다. 계정 “{name}”과(와) 코인·구독이 삭제됩니다. 지갑의 토큰은 블록체인에 남으며, 접근할 수 있는 것은 시크릿 문구뿐입니다.",
-  "camera_unavailable": "카메라를 시작할 수 없습니다"
+  "camera_unavailable": "카메라를 시작할 수 없습니다",
+  "hint_password_repeat": "비밀번호 다시 입력",
+  "msg_password_mismatch": "비밀번호가 일치하지 않습니다",
+  "payout_to_eion": "EION으로 출금",
+  "deposit_to_coins": "EION으로 코인 충전",
+  "camera_mode_photo": "사진",
+  "camera_mode_video": "동영상",
+  "camera_rec_failed": "동영상을 녹화하지 못했습니다"
 }

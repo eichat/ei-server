@@ -825,5 +825,12 @@
   "action_delete_account": "Hapus akun secara permanen?",
   "action_delete_account_btn": "Hapus akun",
   "msg_delete_account_body": "Tindakan ini tidak bisa dibatalkan. Akun “{name}”, koin dan langganannya akan dihapus. Token di dompet tetap ada di blockchain — hanya frasa rahasia Anda yang memberi akses.",
-  "camera_unavailable": "Tidak dapat menyalakan kamera"
+  "camera_unavailable": "Tidak dapat menyalakan kamera",
+  "hint_password_repeat": "Ulangi kata sandi",
+  "msg_password_mismatch": "Kata sandi tidak cocok",
+  "payout_to_eion": "Tarik ke EION",
+  "deposit_to_coins": "Isi ulang Koin dengan EION",
+  "camera_mode_photo": "Foto",
+  "camera_mode_video": "Video",
+  "camera_rec_failed": "Tidak dapat merekam video"
 }

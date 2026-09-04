@@ -825,5 +825,12 @@
   "action_delete_account": "Konto endgültig löschen?",
   "action_delete_account_btn": "Konto löschen",
   "msg_delete_account_body": "Diese Aktion lässt sich nicht rückgängig machen. Das Konto „{name}“, seine Münzen und Abos werden gelöscht. Tokens in Ihrer Wallet bleiben in der Blockchain — Zugang dazu gibt nur Ihre geheime Phrase.",
-  "camera_unavailable": "Kamera konnte nicht gestartet werden"
+  "camera_unavailable": "Kamera konnte nicht gestartet werden",
+  "hint_password_repeat": "Passwort wiederholen",
+  "msg_password_mismatch": "Passwörter stimmen nicht überein",
+  "payout_to_eion": "In EION auszahlen",
+  "deposit_to_coins": "Coins mit EION aufladen",
+  "camera_mode_photo": "Foto",
+  "camera_mode_video": "Video",
+  "camera_rec_failed": "Video konnte nicht aufgenommen werden"
 }

@@ -825,5 +825,12 @@
   "action_delete_account": "Account definitief verwijderen?",
   "action_delete_account_btn": "Account verwijderen",
   "msg_delete_account_body": "Dit kan niet ongedaan worden gemaakt. Het account “{name}”, de munten en abonnementen worden gewist. Tokens in je wallet blijven op de blockchain — alleen je geheime zin geeft er toegang toe.",
-  "camera_unavailable": "Kan de camera niet starten"
+  "camera_unavailable": "Kan de camera niet starten",
+  "hint_password_repeat": "Herhaal wachtwoord",
+  "msg_password_mismatch": "Wachtwoorden komen niet overeen",
+  "payout_to_eion": "Opnemen naar EION",
+  "deposit_to_coins": "Munten opwaarderen met EION",
+  "camera_mode_photo": "Foto",
+  "camera_mode_video": "Video",
+  "camera_rec_failed": "Video kon niet worden opgenomen"
 }

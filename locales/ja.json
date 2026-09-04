@@ -825,5 +825,12 @@
   "action_delete_account": "アカウントを完全に削除しますか？",
   "action_delete_account_btn": "アカウントを削除",
   "msg_delete_account_body": "取り消せません。アカウント「{name}」とそのコイン・サブスクリプションは消去されます。ウォレットのトークンはブロックチェーンに残り、アクセスできるのはあなたのシークレットフレーズだけです。",
-  "camera_unavailable": "カメラを起動できませんでした"
+  "camera_unavailable": "カメラを起動できませんでした",
+  "hint_password_repeat": "パスワードを再入力",
+  "msg_password_mismatch": "パスワードが一致しません",
+  "payout_to_eion": "EIONへ出金",
+  "deposit_to_coins": "EIONでコインをチャージ",
+  "camera_mode_photo": "写真",
+  "camera_mode_video": "動画",
+  "camera_rec_failed": "動画を録画できませんでした"
 }

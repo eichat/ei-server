@@ -825,5 +825,12 @@
   "action_delete_account": "অ্যাকাউন্ট স্থায়ীভাবে মুছবেন?",
   "action_delete_account_btn": "অ্যাকাউন্ট মুছুন",
   "msg_delete_account_body": "এটি ফেরানো যাবে না। “{name}” অ্যাকাউন্ট, এর কয়েন ও সাবস্ক্রিপশন মুছে যাবে। ওয়ালেটের টোকেন ব্লকচেইনে থেকে যাবে — কেবল আপনার গোপন বাক্যাংশই সেগুলিতে প্রবেশ দেয়।",
-  "camera_unavailable": "ক্যামেরা চালু করা যায়নি"
+  "camera_unavailable": "ক্যামেরা চালু করা যায়নি",
+  "hint_password_repeat": "পাসওয়ার্ড আবার লিখুন",
+  "msg_password_mismatch": "পাসওয়ার্ড মিলছে না",
+  "payout_to_eion": "EION-এ উত্তোলন",
+  "deposit_to_coins": "EION দিয়ে কয়েন টপ-আপ",
+  "camera_mode_photo": "ছবি",
+  "camera_mode_video": "ভিডিও",
+  "camera_rec_failed": "ভিডিও রেকর্ড করা যায়নি"
 }

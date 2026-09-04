@@ -825,5 +825,12 @@
   "action_delete_account": "Eliminar a conta para sempre?",
   "action_delete_account_btn": "Eliminar conta",
   "msg_delete_account_body": "Ação irreversível. A conta “{name}”, as suas moedas e subscrições serão apagadas. Os tokens da carteira permanecem na blockchain — só a sua frase secreta dá acesso a eles.",
-  "camera_unavailable": "Não foi possível iniciar a câmera"
+  "camera_unavailable": "Não foi possível iniciar a câmera",
+  "hint_password_repeat": "Repita a senha",
+  "msg_password_mismatch": "As senhas não coincidem",
+  "payout_to_eion": "Sacar para EION",
+  "deposit_to_coins": "Recarregar Moedas com EION",
+  "camera_mode_photo": "Foto",
+  "camera_mode_video": "Vídeo",
+  "camera_rec_failed": "Não foi possível gravar o vídeo"
 }

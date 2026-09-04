@@ -825,5 +825,12 @@
   "action_delete_account": "Видалити акаунт назавжди?",
   "action_delete_account_btn": "Видалити акаунт",
   "msg_delete_account_body": "Незворотна дія. Акаунт «{name}», монети й підписки буде стерто. Токени на гаманці лишаться в блокчейні — доступ до них дає лише ваша секретна фраза.",
-  "camera_unavailable": "Не вдалося увімкнути камеру"
+  "camera_unavailable": "Не вдалося увімкнути камеру",
+  "hint_password_repeat": "Повторіть пароль",
+  "msg_password_mismatch": "Паролі не збігаються",
+  "payout_to_eion": "Вивести в EION",
+  "deposit_to_coins": "Поповнити монети з EION",
+  "camera_mode_photo": "Фото",
+  "camera_mode_video": "Відео",
+  "camera_rec_failed": "Не вдалося записати відео"
 }

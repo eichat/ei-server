@@ -825,5 +825,12 @@
   "action_delete_account": "Usunąć konto na zawsze?",
   "action_delete_account_btn": "Usuń konto",
   "msg_delete_account_body": "Działanie nieodwracalne. Konto „{name}”, monety i subskrypcje zostaną usunięte. Tokeny w portfelu pozostaną w blockchainie — dostęp do nich daje tylko twoja tajna fraza.",
-  "camera_unavailable": "Nie udało się uruchomić aparatu"
+  "camera_unavailable": "Nie udało się uruchomić aparatu",
+  "hint_password_repeat": "Powtórz hasło",
+  "msg_password_mismatch": "Hasła nie są zgodne",
+  "payout_to_eion": "Wypłać na EION",
+  "deposit_to_coins": "Doładuj Monety z EION",
+  "camera_mode_photo": "Zdjęcie",
+  "camera_mode_video": "Wideo",
+  "camera_rec_failed": "Nie udało się nagrać wideo"
 }

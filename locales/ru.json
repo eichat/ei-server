@@ -825,5 +825,12 @@
   "action_delete_account": "Удалить аккаунт навсегда?",
   "action_delete_account_btn": "Удалить аккаунт",
   "msg_delete_account_body": "Необратимое действие. Аккаунт «{name}», монеты и подписки будут стёрты. Токены на кошельке останутся в блокчейне — доступ к ним даёт только ваша секретная фраза.",
-  "camera_unavailable": "Не удалось включить камеру"
+  "camera_unavailable": "Не удалось включить камеру",
+  "hint_password_repeat": "Повторите пароль",
+  "msg_password_mismatch": "Пароли не совпадают",
+  "payout_to_eion": "Вывести в EION",
+  "deposit_to_coins": "Пополнить Монеты из EION",
+  "camera_mode_photo": "Фото",
+  "camera_mode_video": "Видео",
+  "camera_rec_failed": "Не удалось записать видео"
 }

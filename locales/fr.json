@@ -825,5 +825,12 @@
   "action_delete_account": "Supprimer le compte définitivement ?",
   "action_delete_account_btn": "Supprimer le compte",
   "msg_delete_account_body": "Action irréversible. Le compte « {name} », ses pièces et ses abonnements seront effacés. Les jetons de votre portefeuille restent sur la blockchain — seule votre phrase secrète y donne accès.",
-  "camera_unavailable": "Impossible de démarrer la caméra"
+  "camera_unavailable": "Impossible de démarrer la caméra",
+  "hint_password_repeat": "Répétez le mot de passe",
+  "msg_password_mismatch": "Les mots de passe ne correspondent pas",
+  "payout_to_eion": "Retirer vers EION",
+  "deposit_to_coins": "Recharger des Pièces avec des EION",
+  "camera_mode_photo": "Photo",
+  "camera_mode_video": "Vidéo",
+  "camera_rec_failed": "Impossible d’enregistrer la vidéo"
 }

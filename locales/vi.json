@@ -825,5 +825,12 @@
   "action_delete_account": "Xóa vĩnh viễn tài khoản?",
   "action_delete_account_btn": "Xóa tài khoản",
   "msg_delete_account_body": "Không thể hoàn tác. Tài khoản “{name}”, xu và các gói đăng ký sẽ bị xóa. Token trong ví vẫn nằm trên blockchain — chỉ cụm từ bí mật của bạn mới mở được.",
-  "camera_unavailable": "Không thể bật máy ảnh"
+  "camera_unavailable": "Không thể bật máy ảnh",
+  "hint_password_repeat": "Nhập lại mật khẩu",
+  "msg_password_mismatch": "Mật khẩu không khớp",
+  "payout_to_eion": "Rút sang EION",
+  "deposit_to_coins": "Nạp Xu bằng EION",
+  "camera_mode_photo": "Ảnh",
+  "camera_mode_video": "Video",
+  "camera_rec_failed": "Không thể quay video"
 }

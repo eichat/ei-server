@@ -825,5 +825,12 @@
   "action_delete_account": "永久删除账号？",
   "action_delete_account_btn": "删除账号",
   "msg_delete_account_body": "此操作无法撤销。账号“{name}”及其代币余额与订阅将被清除。钱包中的通证仍保留在区块链上——只有你的助记词才能取用。",
-  "camera_unavailable": "无法启动相机"
+  "camera_unavailable": "无法启动相机",
+  "hint_password_repeat": "再次输入密码",
+  "msg_password_mismatch": "两次输入的密码不一致",
+  "payout_to_eion": "提现为 EION",
+  "deposit_to_coins": "用 EION 充值金币",
+  "camera_mode_photo": "照片",
+  "camera_mode_video": "视频",
+  "camera_rec_failed": "无法录制视频"
 }
