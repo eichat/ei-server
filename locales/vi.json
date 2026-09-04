@@ -819,5 +819,10 @@
   "x_channel_sub": "Tài khoản chính thức — tin ngắn",
   "notif_messages_channel": "Tin nhắn",
   "media_sticker": "Nhãn dán",
-  "media_file": "Tệp"
+  "media_file": "Tệp",
+  "action_remove_device": "Xóa khỏi thiết bị này?",
+  "msg_remove_device_body": "Hồ sơ “{name}” và tin nhắn lưu trên thiết bị này sẽ biến mất. Tài khoản vẫn còn — bạn có thể đăng nhập lại tại đây hoặc trên thiết bị khác.",
+  "action_delete_account": "Xóa vĩnh viễn tài khoản?",
+  "action_delete_account_btn": "Xóa tài khoản",
+  "msg_delete_account_body": "Không thể hoàn tác. Tài khoản “{name}”, xu và các gói đăng ký sẽ bị xóa. Token trong ví vẫn nằm trên blockchain — chỉ cụm từ bí mật của bạn mới mở được."
 }

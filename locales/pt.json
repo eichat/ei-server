@@ -819,5 +819,10 @@
   "x_channel_sub": "Conta oficial — novidades curtas",
   "notif_messages_channel": "Mensagens",
   "media_sticker": "Autocolante",
-  "media_file": "Ficheiro"
+  "media_file": "Ficheiro",
+  "action_remove_device": "Remover deste dispositivo?",
+  "msg_remove_device_body": "O perfil “{name}” e as mensagens guardadas neste dispositivo vão desaparecer. A conta permanece — pode entrar novamente aqui ou noutro dispositivo.",
+  "action_delete_account": "Eliminar a conta para sempre?",
+  "action_delete_account_btn": "Eliminar conta",
+  "msg_delete_account_body": "Ação irreversível. A conta “{name}”, as suas moedas e subscrições serão apagadas. Os tokens da carteira permanecem na blockchain — só a sua frase secreta dá acesso a eles."
 }

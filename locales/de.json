@@ -819,5 +819,10 @@
   "x_channel_sub": "Offizielles Konto — kurze Updates",
   "notif_messages_channel": "Nachrichten",
   "media_sticker": "Sticker",
-  "media_file": "Datei"
+  "media_file": "Datei",
+  "action_remove_device": "Von diesem Gerät entfernen?",
+  "msg_remove_device_body": "Das Profil „{name}“ und die auf diesem Gerät gespeicherten Nachrichten werden entfernt. Das Konto bleibt bestehen — Sie können sich hier oder auf einem anderen Gerät erneut anmelden.",
+  "action_delete_account": "Konto endgültig löschen?",
+  "action_delete_account_btn": "Konto löschen",
+  "msg_delete_account_body": "Diese Aktion lässt sich nicht rückgängig machen. Das Konto „{name}“, seine Münzen und Abos werden gelöscht. Tokens in Ihrer Wallet bleiben in der Blockchain — Zugang dazu gibt nur Ihre geheime Phrase."
 }

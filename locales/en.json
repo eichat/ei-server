@@ -819,5 +819,10 @@
   "x_channel_sub": "Official account — short updates",
   "notif_messages_channel": "Messages",
   "media_sticker": "Sticker",
-  "media_file": "File"
+  "media_file": "File",
+  "action_remove_device": "Remove from this device?",
+  "msg_remove_device_body": "Profile “{name}” and the messages stored on this device will be gone. The account stays — you can sign in again here or on another device.",
+  "action_delete_account": "Delete account permanently?",
+  "action_delete_account_btn": "Delete account",
+  "msg_delete_account_body": "This cannot be undone. The account “{name}”, its coins and subscriptions will be erased. Tokens in your wallet stay on the blockchain — only your secret phrase gives access to them."
 }

@@ -819,5 +819,10 @@
   "x_channel_sub": "Account ufficiale — aggiornamenti brevi",
   "notif_messages_channel": "Messaggi",
   "media_sticker": "Sticker",
-  "media_file": "File"
+  "media_file": "File",
+  "action_remove_device": "Rimuovere da questo dispositivo?",
+  "msg_remove_device_body": "Il profilo «{name}» e i messaggi salvati su questo dispositivo verranno rimossi. L'account resta: potrai accedere di nuovo qui o su un altro dispositivo.",
+  "action_delete_account": "Eliminare l'account per sempre?",
+  "action_delete_account_btn": "Elimina account",
+  "msg_delete_account_body": "Azione irreversibile. L'account «{name}», le sue monete e gli abbonamenti verranno cancellati. I token nel portafoglio restano sulla blockchain: solo la tua frase segreta dà accesso."
 }

@@ -819,5 +819,10 @@
   "x_channel_sub": "Compte officiel — brèves actualités",
   "notif_messages_channel": "Messages",
   "media_sticker": "Sticker",
-  "media_file": "Fichier"
+  "media_file": "Fichier",
+  "action_remove_device": "Retirer de cet appareil ?",
+  "msg_remove_device_body": "Le profil « {name} » et les messages enregistrés sur cet appareil disparaîtront. Le compte est conservé — vous pourrez vous reconnecter ici ou sur un autre appareil.",
+  "action_delete_account": "Supprimer le compte définitivement ?",
+  "action_delete_account_btn": "Supprimer le compte",
+  "msg_delete_account_body": "Action irréversible. Le compte « {name} », ses pièces et ses abonnements seront effacés. Les jetons de votre portefeuille restent sur la blockchain — seule votre phrase secrète y donne accès."
 }

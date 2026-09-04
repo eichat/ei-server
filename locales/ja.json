@@ -819,5 +819,10 @@
   "x_channel_sub": "公式アカウント — 短い更新",
   "notif_messages_channel": "メッセージ",
   "media_sticker": "スタンプ",
-  "media_file": "ファイル"
+  "media_file": "ファイル",
+  "action_remove_device": "この端末から削除しますか？",
+  "msg_remove_device_body": "プロフィール「{name}」とこの端末に保存されたメッセージが消えます。アカウントは残るので、ここでも別の端末でも再ログインできます。",
+  "action_delete_account": "アカウントを完全に削除しますか？",
+  "action_delete_account_btn": "アカウントを削除",
+  "msg_delete_account_body": "取り消せません。アカウント「{name}」とそのコイン・サブスクリプションは消去されます。ウォレットのトークンはブロックチェーンに残り、アクセスできるのはあなたのシークレットフレーズだけです。"
 }

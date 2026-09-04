@@ -819,5 +819,10 @@
   "x_channel_sub": "Cuenta oficial: novedades breves",
   "notif_messages_channel": "Mensajes",
   "media_sticker": "Pegatina",
-  "media_file": "Archivo"
+  "media_file": "Archivo",
+  "action_remove_device": "¿Quitar de este dispositivo?",
+  "msg_remove_device_body": "El perfil «{name}» y los mensajes guardados en este dispositivo desaparecerán. La cuenta se mantiene: podrás iniciar sesión de nuevo aquí o en otro dispositivo.",
+  "action_delete_account": "¿Eliminar la cuenta para siempre?",
+  "action_delete_account_btn": "Eliminar cuenta",
+  "msg_delete_account_body": "Acción irreversible. La cuenta «{name}», sus monedas y suscripciones se borrarán. Los tokens de tu monedero permanecen en la blockchain: solo tu frase secreta da acceso a ellos."
 }
