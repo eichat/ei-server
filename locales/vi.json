@@ -816,5 +816,8 @@
   "tg_channel_title": "Kênh Telegram",
   "tg_channel_sub": "Kênh chính thức của dự án — tin tức và cập nhật",
   "x_channel_title": "EION trên X",
-  "x_channel_sub": "Tài khoản chính thức — tin ngắn"
+  "x_channel_sub": "Tài khoản chính thức — tin ngắn",
+  "notif_messages_channel": "Tin nhắn",
+  "media_sticker": "Nhãn dán",
+  "media_file": "Tệp"
 }

@@ -816,5 +816,8 @@
   "tg_channel_title": "Telegram channel",
   "tg_channel_sub": "Opisyal na channel ng proyekto — balita at update",
   "x_channel_title": "EION sa X",
-  "x_channel_sub": "Opisyal na account — maiikling update"
+  "x_channel_sub": "Opisyal na account — maiikling update",
+  "notif_messages_channel": "Mga mensahe",
+  "media_sticker": "Sticker",
+  "media_file": "File"
 }

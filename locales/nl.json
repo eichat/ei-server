@@ -816,5 +816,8 @@
   "tg_channel_title": "Telegram-kanaal",
   "tg_channel_sub": "Officieel projectkanaal — nieuws en updates",
   "x_channel_title": "EION op X",
-  "x_channel_sub": "Officieel account — korte updates"
+  "x_channel_sub": "Officieel account — korte updates",
+  "notif_messages_channel": "Berichten",
+  "media_sticker": "Sticker",
+  "media_file": "Bestand"
 }

@@ -816,5 +816,8 @@
   "tg_channel_title": "Канал в Telegram",
   "tg_channel_sub": "Официальный канал проекта — новости и обновления",
   "x_channel_title": "EION в X",
-  "x_channel_sub": "Официальный аккаунт — короткие новости"
+  "x_channel_sub": "Официальный аккаунт — короткие новости",
+  "notif_messages_channel": "Сообщения",
+  "media_sticker": "Наклейка",
+  "media_file": "Файл"
 }

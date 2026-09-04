@@ -816,5 +816,8 @@
   "tg_channel_title": "Telegram kanalı",
   "tg_channel_sub": "Projenin resmî kanalı — haberler ve güncellemeler",
   "x_channel_title": "X’te EION",
-  "x_channel_sub": "Resmî hesap — kısa güncellemeler"
+  "x_channel_sub": "Resmî hesap — kısa güncellemeler",
+  "notif_messages_channel": "Mesajlar",
+  "media_sticker": "Çıkartma",
+  "media_file": "Dosya"
 }

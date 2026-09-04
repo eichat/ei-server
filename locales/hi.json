@@ -816,5 +816,8 @@
   "tg_channel_title": "टेलीग्राम चैनल",
   "tg_channel_sub": "परियोजना का आधिकारिक चैनल — समाचार और अपडेट",
   "x_channel_title": "X पर EION",
-  "x_channel_sub": "आधिकारिक खाता — संक्षिप्त अपडेट"
+  "x_channel_sub": "आधिकारिक खाता — संक्षिप्त अपडेट",
+  "notif_messages_channel": "संदेश",
+  "media_sticker": "स्टिकर",
+  "media_file": "फ़ाइल"
 }

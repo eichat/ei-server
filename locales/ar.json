@@ -816,5 +816,8 @@
   "tg_channel_title": "قناة تيليجرام",
   "tg_channel_sub": "القناة الرسمية للمشروع — أخبار وتحديثات",
   "x_channel_title": "EION على X",
-  "x_channel_sub": "الحساب الرسمي — تحديثات قصيرة"
+  "x_channel_sub": "الحساب الرسمي — تحديثات قصيرة",
+  "notif_messages_channel": "الرسائل",
+  "media_sticker": "ملصق",
+  "media_file": "ملف"
 }

@@ -816,5 +816,8 @@
   "tg_channel_title": "ช่อง Telegram",
   "tg_channel_sub": "ช่องทางการของโปรเจกต์ — ข่าวสารและอัปเดต",
   "x_channel_title": "EION บน X",
-  "x_channel_sub": "บัญชีทางการ — อัปเดตสั้น ๆ"
+  "x_channel_sub": "บัญชีทางการ — อัปเดตสั้น ๆ",
+  "notif_messages_channel": "ข้อความ",
+  "media_sticker": "สติกเกอร์",
+  "media_file": "ไฟล์"
 }

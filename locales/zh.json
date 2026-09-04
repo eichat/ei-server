@@ -816,5 +816,8 @@
   "tg_channel_title": "Telegram 频道",
   "tg_channel_sub": "项目官方频道 — 新闻与更新",
   "x_channel_title": "X 上的 EION",
-  "x_channel_sub": "官方账号 — 简短更新"
+  "x_channel_sub": "官方账号 — 简短更新",
+  "notif_messages_channel": "消息",
+  "media_sticker": "贴纸",
+  "media_file": "文件"
 }

@@ -816,5 +816,8 @@
   "tg_channel_title": "Canal Telegram",
   "tg_channel_sub": "Canal officiel du projet — actualités et mises à jour",
   "x_channel_title": "EION sur X",
-  "x_channel_sub": "Compte officiel — brèves actualités"
+  "x_channel_sub": "Compte officiel — brèves actualités",
+  "notif_messages_channel": "Messages",
+  "media_sticker": "Sticker",
+  "media_file": "Fichier"
 }

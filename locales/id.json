@@ -816,5 +816,8 @@
   "tg_channel_title": "Kanal Telegram",
   "tg_channel_sub": "Kanal resmi proyek — berita dan pembaruan",
   "x_channel_title": "EION di X",
-  "x_channel_sub": "Akun resmi — kabar singkat"
+  "x_channel_sub": "Akun resmi — kabar singkat",
+  "notif_messages_channel": "Pesan",
+  "media_sticker": "Stiker",
+  "media_file": "Berkas"
 }

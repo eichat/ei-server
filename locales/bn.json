@@ -816,5 +816,8 @@
   "tg_channel_title": "টেলিগ্রাম চ্যানেল",
   "tg_channel_sub": "প্রকল্পের অফিশিয়াল চ্যানেল — খবর ও আপডেট",
   "x_channel_title": "X-এ EION",
-  "x_channel_sub": "অফিশিয়াল অ্যাকাউন্ট — সংক্ষিপ্ত আপডেট"
+  "x_channel_sub": "অফিশিয়াল অ্যাকাউন্ট — সংক্ষিপ্ত আপডেট",
+  "notif_messages_channel": "বার্তা",
+  "media_sticker": "স্টিকার",
+  "media_file": "ফাইল"
 }

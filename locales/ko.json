@@ -816,5 +816,8 @@
   "tg_channel_title": "텔레그램 채널",
   "tg_channel_sub": "프로젝트 공식 채널 — 소식과 업데이트",
   "x_channel_title": "X의 EION",
-  "x_channel_sub": "공식 계정 — 짧은 소식"
+  "x_channel_sub": "공식 계정 — 짧은 소식",
+  "notif_messages_channel": "메시지",
+  "media_sticker": "스티커",
+  "media_file": "파일"
 }

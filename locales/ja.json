@@ -816,5 +816,8 @@
   "tg_channel_title": "Telegram チャンネル",
   "tg_channel_sub": "プロジェクト公式チャンネル — お知らせと更新",
   "x_channel_title": "X の EION",
-  "x_channel_sub": "公式アカウント — 短い更新"
+  "x_channel_sub": "公式アカウント — 短い更新",
+  "notif_messages_channel": "メッセージ",
+  "media_sticker": "スタンプ",
+  "media_file": "ファイル"
 }
