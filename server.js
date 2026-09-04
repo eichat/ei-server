@@ -335,8 +335,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.37',
-  code: 38,
+  version: '0.9.38',
+  code: 39,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -3185,11 +3185,16 @@ app.post('/profile/solana-address', async (req, res) => {
   if (address && (SOLANA_INTERNAL.has(address) || address === payoutAddr)) {
     return res.json({ ok: false, error: 'Ця адреса службова', code: 'err_solana_internal_address' });
   }
-  // Пароль акаунта при ВСТАНОВЛЕННІ адреси: це адреса призначення виплат, тож
-  // її підміна з вкраденої сесії відправила б наступну виплату власника злодію.
-  // Відвʼязка (порожній рядок) лишається вільною — вона нічого не краде, а
-  // зворотна привʼязка пароль уже вимагає.
-  if (address) {
+  // Пароль акаунта потрібен лише коли адреса ЗМІНЮЄТЬСЯ на іншу — саме підміна
+  // вже привʼязаної адреси небезпечна: власник робить виплату своїм паролем, а
+  // токени йдуть злодію. ПЕРША привʼязка (поле порожнє) пароля не вимагає:
+  // вивести монети вкрадена сесія однаково не зможе — /token/payout просить
+  // пароль сама, — а змушувати вводити другий пароль поспіль одразу після
+  // пароля гаманця лише плутає.
+  const { data: cur } = await supabase.from('users')
+    .select('solana_address').eq('nick', req.nick).single();
+  const prevAddr = (cur && cur.solana_address ? String(cur.solana_address).trim() : '');
+  if (address && prevAddr && prevAddr !== address) {
     const pwErr = await requireAccountPassword(req);
     if (pwErr) return res.json(pwErr);
   }
