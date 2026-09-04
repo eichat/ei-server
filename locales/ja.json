@@ -832,5 +832,6 @@
   "deposit_to_coins": "EIONでコインをチャージ",
   "camera_mode_photo": "写真",
   "camera_mode_video": "動画",
-  "camera_rec_failed": "動画を録画できませんでした"
+  "camera_rec_failed": "動画を録画できませんでした",
+  "delete_account_wallet_warn": "この端末にウォレットがあります。アカウントと一緒に鍵も削除されます — 今すぐ復元フレーズを保存してください。さもないとトークンにアクセスできなくなります。"
 }

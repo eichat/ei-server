@@ -832,5 +832,6 @@
   "deposit_to_coins": "Recargar Monedas con EION",
   "camera_mode_photo": "Foto",
   "camera_mode_video": "Vídeo",
-  "camera_rec_failed": "No se pudo grabar el vídeo"
+  "camera_rec_failed": "No se pudo grabar el vídeo",
+  "delete_account_wallet_warn": "Este dispositivo tiene una cartera. Su clave se borrará junto con la cuenta: guarda ahora la frase de recuperación o perderás el acceso a los tokens."
 }

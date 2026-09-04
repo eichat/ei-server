@@ -832,5 +832,6 @@
   "deposit_to_coins": "Coins mit EION aufladen",
   "camera_mode_photo": "Foto",
   "camera_mode_video": "Video",
-  "camera_rec_failed": "Video konnte nicht aufgenommen werden"
+  "camera_rec_failed": "Video konnte nicht aufgenommen werden",
+  "delete_account_wallet_warn": "Auf diesem Gerät liegt eine Wallet. Ihr Schlüssel wird mit dem Konto gelöscht — sichern Sie jetzt die Wiederherstellungsphrase, sonst ist der Zugang zu den Token verloren."
 }

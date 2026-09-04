@@ -832,5 +832,6 @@
   "deposit_to_coins": "Doładuj Monety z EION",
   "camera_mode_photo": "Zdjęcie",
   "camera_mode_video": "Wideo",
-  "camera_rec_failed": "Nie udało się nagrać wideo"
+  "camera_rec_failed": "Nie udało się nagrać wideo",
+  "delete_account_wallet_warn": "Na tym urządzeniu jest portfel. Jego klucz zostanie usunięty razem z kontem — zapisz teraz frazę odzyskiwania, inaczej stracisz dostęp do tokenów."
 }

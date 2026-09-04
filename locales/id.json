@@ -832,5 +832,6 @@
   "deposit_to_coins": "Isi ulang Koin dengan EION",
   "camera_mode_photo": "Foto",
   "camera_mode_video": "Video",
-  "camera_rec_failed": "Tidak dapat merekam video"
+  "camera_rec_failed": "Tidak dapat merekam video",
+  "delete_account_wallet_warn": "Perangkat ini menyimpan dompet. Kuncinya akan terhapus bersama akun — simpan frasa pemulihan sekarang, atau akses ke token hilang."
 }

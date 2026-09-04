@@ -832,5 +832,6 @@
   "deposit_to_coins": "Top up Coins with EION",
   "camera_mode_photo": "Photo",
   "camera_mode_video": "Video",
-  "camera_rec_failed": "Could not record video"
+  "camera_rec_failed": "Could not record video",
+  "delete_account_wallet_warn": "This device holds a wallet. Its key will be deleted along with the account — save the recovery phrase now, or access to the tokens is lost."
 }

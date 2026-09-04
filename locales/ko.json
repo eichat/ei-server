@@ -832,5 +832,6 @@
   "deposit_to_coins": "EION으로 코인 충전",
   "camera_mode_photo": "사진",
   "camera_mode_video": "동영상",
-  "camera_rec_failed": "동영상을 녹화하지 못했습니다"
+  "camera_rec_failed": "동영상을 녹화하지 못했습니다",
+  "delete_account_wallet_warn": "이 기기에 지갑이 있습니다. 계정과 함께 키도 삭제됩니다 — 지금 복구 문구를 저장하세요. 그러지 않으면 토큰에 접근할 수 없습니다."
 }

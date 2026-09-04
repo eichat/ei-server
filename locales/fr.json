@@ -832,5 +832,6 @@
   "deposit_to_coins": "Recharger des Pièces avec des EION",
   "camera_mode_photo": "Photo",
   "camera_mode_video": "Vidéo",
-  "camera_rec_failed": "Impossible d’enregistrer la vidéo"
+  "camera_rec_failed": "Impossible d’enregistrer la vidéo",
+  "delete_account_wallet_warn": "Cet appareil contient un portefeuille. Sa clé sera supprimée avec le compte — enregistrez la phrase de récupération maintenant, sinon l’accès aux jetons sera perdu."
 }

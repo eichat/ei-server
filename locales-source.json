@@ -19211,6 +19211,29 @@
       "uk": "Не вдалося записати відео",
       "vi": "Không thể quay video",
       "zh": "无法录制视频"
+    },
+    "delete_account_wallet_warn": {
+      "ar": "على هذا الجهاز محفظة. سيُحذف مفتاحها مع الحساب — احفظ عبارة الاسترداد الآن، وإلا فسيُفقد الوصول إلى الرموز.",
+      "bn": "এই ডিভাইসে একটি ওয়ালেট আছে। অ্যাকাউন্টের সঙ্গে এর কী মুছে যাবে — এখনই রিকভারি ফ্রেজ সংরক্ষণ করুন, নইলে টোকেনে প্রবেশ হারাবেন।",
+      "de": "Auf diesem Gerät liegt eine Wallet. Ihr Schlüssel wird mit dem Konto gelöscht — sichern Sie jetzt die Wiederherstellungsphrase, sonst ist der Zugang zu den Token verloren.",
+      "en": "This device holds a wallet. Its key will be deleted along with the account — save the recovery phrase now, or access to the tokens is lost.",
+      "es": "Este dispositivo tiene una cartera. Su clave se borrará junto con la cuenta: guarda ahora la frase de recuperación o perderás el acceso a los tokens.",
+      "fr": "Cet appareil contient un portefeuille. Sa clé sera supprimée avec le compte — enregistrez la phrase de récupération maintenant, sinon l’accès aux jetons sera perdu.",
+      "hi": "इस डिवाइस में एक वॉलेट है। खाते के साथ उसकी कुंजी भी मिट जाएगी — रिकवरी वाक्यांश अभी सहेजें, वरना टोकन तक पहुँच खो जाएगी।",
+      "id": "Perangkat ini menyimpan dompet. Kuncinya akan terhapus bersama akun — simpan frasa pemulihan sekarang, atau akses ke token hilang.",
+      "it": "Questo dispositivo contiene un portafoglio. La sua chiave verrà eliminata con l’account: salva ora la frase di recupero, altrimenti perderai l’accesso ai token.",
+      "ja": "この端末にウォレットがあります。アカウントと一緒に鍵も削除されます — 今すぐ復元フレーズを保存してください。さもないとトークンにアクセスできなくなります。",
+      "ko": "이 기기에 지갑이 있습니다. 계정과 함께 키도 삭제됩니다 — 지금 복구 문구를 저장하세요. 그러지 않으면 토큰에 접근할 수 없습니다.",
+      "nl": "Op dit apparaat staat een wallet. De sleutel wordt samen met het account verwijderd — bewaar nu de herstelzin, anders is toegang tot de tokens weg.",
+      "pl": "Na tym urządzeniu jest portfel. Jego klucz zostanie usunięty razem z kontem — zapisz teraz frazę odzyskiwania, inaczej stracisz dostęp do tokenów.",
+      "pt": "Este dispositivo tem uma carteira. A chave será apagada junto com a conta — guarde agora a frase de recuperação, ou perderá o acesso aos tokens.",
+      "ru": "На этом устройстве есть кошелёк. Его ключ будет удалён вместе с аккаунтом — сохраните фразу восстановления сейчас, иначе доступ к токенам будет потерян.",
+      "th": "อุปกรณ์นี้มีกระเป๋าเงินอยู่ กุญแจจะถูกลบพร้อมบัญชี — บันทึกวลีกู้คืนตอนนี้ ไม่เช่นนั้นจะเข้าถึงโทเคนไม่ได้",
+      "tl": "May wallet sa device na ito. Mabubura ang key nito kasama ng account — i-save ang recovery phrase ngayon, kung hindi mawawala ang access sa mga token.",
+      "tr": "Bu cihazda bir cüzdan var. Anahtarı hesapla birlikte silinecek — kurtarma ifadesini şimdi kaydedin, yoksa token erişimi kaybolur.",
+      "uk": "На цьому пристрої є гаманець. Його ключ буде стерто разом з акаунтом — збережіть фразу відновлення зараз, інакше доступ до токенів зникне.",
+      "vi": "Thiết bị này có ví. Khóa của ví sẽ bị xoá cùng tài khoản — hãy lưu cụm từ khôi phục ngay, nếu không bạn sẽ mất quyền truy cập token.",
+      "zh": "此设备上有钱包。钱包密钥将随账号一并删除——请立即保存助记词，否则将无法再访问代币。"
     }
   }
 }

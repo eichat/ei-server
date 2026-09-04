@@ -832,5 +832,6 @@
   "deposit_to_coins": "EION ile Jeton yükle",
   "camera_mode_photo": "Fotoğraf",
   "camera_mode_video": "Video",
-  "camera_rec_failed": "Video kaydedilemedi"
+  "camera_rec_failed": "Video kaydedilemedi",
+  "delete_account_wallet_warn": "Bu cihazda bir cüzdan var. Anahtarı hesapla birlikte silinecek — kurtarma ifadesini şimdi kaydedin, yoksa token erişimi kaybolur."
 }

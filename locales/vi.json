@@ -832,5 +832,6 @@
   "deposit_to_coins": "Nạp Xu bằng EION",
   "camera_mode_photo": "Ảnh",
   "camera_mode_video": "Video",
-  "camera_rec_failed": "Không thể quay video"
+  "camera_rec_failed": "Không thể quay video",
+  "delete_account_wallet_warn": "Thiết bị này có ví. Khóa của ví sẽ bị xoá cùng tài khoản — hãy lưu cụm từ khôi phục ngay, nếu không bạn sẽ mất quyền truy cập token."
 }

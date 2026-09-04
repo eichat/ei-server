@@ -832,5 +832,6 @@
   "deposit_to_coins": "用 EION 充值金币",
   "camera_mode_photo": "照片",
   "camera_mode_video": "视频",
-  "camera_rec_failed": "无法录制视频"
+  "camera_rec_failed": "无法录制视频",
+  "delete_account_wallet_warn": "此设备上有钱包。钱包密钥将随账号一并删除——请立即保存助记词，否则将无法再访问代币。"
 }

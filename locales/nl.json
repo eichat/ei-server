@@ -832,5 +832,6 @@
   "deposit_to_coins": "Munten opwaarderen met EION",
   "camera_mode_photo": "Foto",
   "camera_mode_video": "Video",
-  "camera_rec_failed": "Video kon niet worden opgenomen"
+  "camera_rec_failed": "Video kon niet worden opgenomen",
+  "delete_account_wallet_warn": "Op dit apparaat staat een wallet. De sleutel wordt samen met het account verwijderd — bewaar nu de herstelzin, anders is toegang tot de tokens weg."
 }

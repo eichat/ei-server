@@ -832,5 +832,6 @@
   "deposit_to_coins": "شحن العملات بـ EION",
   "camera_mode_photo": "صورة",
   "camera_mode_video": "فيديو",
-  "camera_rec_failed": "تعذّر تسجيل الفيديو"
+  "camera_rec_failed": "تعذّر تسجيل الفيديو",
+  "delete_account_wallet_warn": "على هذا الجهاز محفظة. سيُحذف مفتاحها مع الحساب — احفظ عبارة الاسترداد الآن، وإلا فسيُفقد الوصول إلى الرموز."
 }
