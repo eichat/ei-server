@@ -19027,6 +19027,29 @@
       "uk": "Незворотна дія. Акаунт «{name}», монети й підписки буде стерто. Токени на гаманці лишаться в блокчейні — доступ до них дає лише ваша секретна фраза.",
       "vi": "Không thể hoàn tác. Tài khoản “{name}”, xu và các gói đăng ký sẽ bị xóa. Token trong ví vẫn nằm trên blockchain — chỉ cụm từ bí mật của bạn mới mở được.",
       "zh": "此操作无法撤销。账号“{name}”及其代币余额与订阅将被清除。钱包中的通证仍保留在区块链上——只有你的助记词才能取用。"
+    },
+    "camera_unavailable": {
+      "ar": "تعذّر تشغيل الكاميرا",
+      "bn": "ক্যামেরা চালু করা যায়নি",
+      "de": "Kamera konnte nicht gestartet werden",
+      "en": "Couldn't start the camera",
+      "es": "No se pudo iniciar la cámara",
+      "fr": "Impossible de démarrer la caméra",
+      "hi": "कैमरा चालू नहीं हो सका",
+      "id": "Tidak dapat menyalakan kamera",
+      "it": "Impossibile avviare la fotocamera",
+      "ja": "カメラを起動できませんでした",
+      "ko": "카메라를 시작할 수 없습니다",
+      "nl": "Kan de camera niet starten",
+      "pl": "Nie udało się uruchomić aparatu",
+      "pt": "Não foi possível iniciar a câmera",
+      "ru": "Не удалось включить камеру",
+      "th": "ไม่สามารถเปิดกล้องได้",
+      "tl": "Hindi mabuksan ang camera",
+      "tr": "Kamera açılamadı",
+      "uk": "Не вдалося увімкнути камеру",
+      "vi": "Không thể bật máy ảnh",
+      "zh": "无法启动相机"
     }
   }
 }

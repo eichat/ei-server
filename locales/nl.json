@@ -824,5 +824,6 @@
   "msg_remove_device_body": "Profiel “{name}” en de berichten die op dit apparaat zijn opgeslagen verdwijnen. Het account blijft bestaan — je kunt hier of op een ander apparaat opnieuw inloggen.",
   "action_delete_account": "Account definitief verwijderen?",
   "action_delete_account_btn": "Account verwijderen",
-  "msg_delete_account_body": "Dit kan niet ongedaan worden gemaakt. Het account “{name}”, de munten en abonnementen worden gewist. Tokens in je wallet blijven op de blockchain — alleen je geheime zin geeft er toegang toe."
+  "msg_delete_account_body": "Dit kan niet ongedaan worden gemaakt. Het account “{name}”, de munten en abonnementen worden gewist. Tokens in je wallet blijven op de blockchain — alleen je geheime zin geeft er toegang toe.",
+  "camera_unavailable": "Kan de camera niet starten"
 }

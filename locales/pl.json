@@ -824,5 +824,6 @@
   "msg_remove_device_body": "Profil „{name}” i wiadomości zapisane na tym urządzeniu znikną. Konto pozostanie — możesz zalogować się ponownie tutaj lub na innym urządzeniu.",
   "action_delete_account": "Usunąć konto na zawsze?",
   "action_delete_account_btn": "Usuń konto",
-  "msg_delete_account_body": "Działanie nieodwracalne. Konto „{name}”, monety i subskrypcje zostaną usunięte. Tokeny w portfelu pozostaną w blockchainie — dostęp do nich daje tylko twoja tajna fraza."
+  "msg_delete_account_body": "Działanie nieodwracalne. Konto „{name}”, monety i subskrypcje zostaną usunięte. Tokeny w portfelu pozostaną w blockchainie — dostęp do nich daje tylko twoja tajna fraza.",
+  "camera_unavailable": "Nie udało się uruchomić aparatu"
 }

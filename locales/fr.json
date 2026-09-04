@@ -824,5 +824,6 @@
   "msg_remove_device_body": "Le profil « {name} » et les messages enregistrés sur cet appareil disparaîtront. Le compte est conservé — vous pourrez vous reconnecter ici ou sur un autre appareil.",
   "action_delete_account": "Supprimer le compte définitivement ?",
   "action_delete_account_btn": "Supprimer le compte",
-  "msg_delete_account_body": "Action irréversible. Le compte « {name} », ses pièces et ses abonnements seront effacés. Les jetons de votre portefeuille restent sur la blockchain — seule votre phrase secrète y donne accès."
+  "msg_delete_account_body": "Action irréversible. Le compte « {name} », ses pièces et ses abonnements seront effacés. Les jetons de votre portefeuille restent sur la blockchain — seule votre phrase secrète y donne accès.",
+  "camera_unavailable": "Impossible de démarrer la caméra"
 }

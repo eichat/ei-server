@@ -824,5 +824,6 @@
   "msg_remove_device_body": "Mawawala ang profile na “{name}” at ang mga mensaheng nakaimbak sa device na ito. Mananatili ang account — puwede kang mag-sign in ulit dito o sa ibang device.",
   "action_delete_account": "Tanggalin nang tuluyan ang account?",
   "action_delete_account_btn": "Tanggalin ang account",
-  "msg_delete_account_body": "Hindi na ito maibabalik. Buburahin ang account na “{name}”, ang mga barya at subscription nito. Mananatili sa blockchain ang mga token sa wallet mo — ang lihim mong parirala lang ang makakabukas sa mga ito."
+  "msg_delete_account_body": "Hindi na ito maibabalik. Buburahin ang account na “{name}”, ang mga barya at subscription nito. Mananatili sa blockchain ang mga token sa wallet mo — ang lihim mong parirala lang ang makakabukas sa mga ito.",
+  "camera_unavailable": "Hindi mabuksan ang camera"
 }

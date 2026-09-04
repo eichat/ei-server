@@ -824,5 +824,6 @@
   "msg_remove_device_body": "个人资料“{name}”以及保存在此设备上的聊天记录将被移除。账号仍然保留——你可以在这里或其他设备重新登录。",
   "action_delete_account": "永久删除账号？",
   "action_delete_account_btn": "删除账号",
-  "msg_delete_account_body": "此操作无法撤销。账号“{name}”及其代币余额与订阅将被清除。钱包中的通证仍保留在区块链上——只有你的助记词才能取用。"
+  "msg_delete_account_body": "此操作无法撤销。账号“{name}”及其代币余额与订阅将被清除。钱包中的通证仍保留在区块链上——只有你的助记词才能取用。",
+  "camera_unavailable": "无法启动相机"
 }

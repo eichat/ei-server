@@ -824,5 +824,6 @@
   "msg_remove_device_body": "“{name}” profili ve bu cihazda saklanan yazışmalar silinir. Hesap kalır — burada ya da başka bir cihazda yeniden giriş yapabilirsiniz.",
   "action_delete_account": "Hesap kalıcı olarak silinsin mi?",
   "action_delete_account_btn": "Hesabı sil",
-  "msg_delete_account_body": "Geri alınamaz. “{name}” hesabı, jetonları ve abonelikleri silinir. Cüzdanınızdaki EION blok zincirinde kalır — onlara yalnızca gizli ifadeniz erişim verir."
+  "msg_delete_account_body": "Geri alınamaz. “{name}” hesabı, jetonları ve abonelikleri silinir. Cüzdanınızdaki EION blok zincirinde kalır — onlara yalnızca gizli ifadeniz erişim verir.",
+  "camera_unavailable": "Kamera açılamadı"
 }
