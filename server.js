@@ -1107,9 +1107,16 @@ function cacheEligible(messages) {
   return { question: q, norm, sysTemplate: sys };
 }
 
+/// Відбиток системного промпту (мовний шаблон) — те саме, що в `cacheKeyFor`,
+/// але доступне й тоді, коли питання не придатне для кешу. База знань шукається
+/// у межах свого відбитка, тож без нього не-перші питання шукали б наосліп.
+function sysFingerprint(sysText, nick) {
+  const template = nick ? String(sysText).split(nick).join('') : String(sysText);
+  return crypto.createHash('sha1').update(template).digest('hex').slice(0, 8);
+}
+
 function cacheKeyFor(elig, nick) {
-  const template = elig.sysTemplate.split(nick).join('');
-  const fp = crypto.createHash('sha1').update(template).digest('hex').slice(0, 8);
+  const fp = sysFingerprint(elig.sysTemplate, nick);
   return { fp, key: `${fp}:${crypto.createHash('sha1').update(elig.norm).digest('hex')}` };
 }
 
@@ -1712,11 +1719,25 @@ app.post('/ai/chat', async (req, res) => {
   }
 
   // Рівні 2–3: схоже питання і наша база знань.
+  //
+  // ⚠️ База шукається для ОСТАННЬОГО питання, а не лише для першого в розмові.
+  // Раніше весь блок стояв під `if (elig)`, тобто під умовою придатності до
+  // КЕШУ — а вона вимагає `users.length === 1`. Для кешу це правильно (відповідь
+  // на друге питання залежить від контексту, якого в іншого користувача немає),
+  // але для довідки — ні: після першої ж репліки асистент переставав бачити всі
+  // записи бази й на «is it open source?» відповідав «не знаю», хоча запис є.
+  // Дослівна віддача (`strong`) лишається тільки для першого питання: вона
+  // підміняє відповідь моделі й тримається на тому самому відбитку, що й кеш.
   let kbContext = null;
-  if (elig) {
-    const rows = await kbSearch(ck.fp, elig.question);
-    const strong = rows.find(r => r.source === 'model' && r.same_lang && kbServeOk(r));
-    if (strong) return serveKnown(strong.answer, `similar:${strong.via}`);
+  const lastUser = [...messages].reverse().find(m => m.role === 'user');
+  if (lastUser && lastUser.content.trim()) {
+    const fp = ck ? ck.fp
+      : sysFingerprint(messages.filter(m => m.role === 'system').map(m => m.content).join(' '), req.nick);
+    const rows = await kbSearch(fp, lastUser.content.trim().slice(0, 200));
+    if (elig) {
+      const strong = rows.find(r => r.source === 'model' && r.same_lang && kbServeOk(r));
+      if (strong) return serveKnown(strong.answer, `similar:${strong.via}`);
+    }
     const ctx = rows.filter(kbContextOk).slice(0, 3);
     if (ctx.length) kbContext = kbContextPrompt(ctx);
   }
