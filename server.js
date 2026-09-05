@@ -1543,9 +1543,16 @@ app.get('/admin/ai-tools-check', async (req, res) => {
 // змінились факти (ціна, норми) — інакше стара відповідь жила б до кінця TTL.
 app.get('/admin/ai-cache', async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
+  // 🔴 Чистимо ЛИШЕ відповіді моделі. Таблиця `ai_cache` спільна: у ній і кеш
+  // (source='model'), і наша база знань (source='curated'). Раніше тут стояло
+  // `.neq('key','')`, тобто «видалити все» — і один виклик «почистити кеш»
+  // зніс усю базу знань разом із кешем. Наповнювати її наново коштує годин,
+  // тож curated тут не видаляється НІКОЛИ: для цього є /admin/ai-kb/delete.
   if (req.query.clear === '1') {
-    const { error } = await supabase.from('ai_cache').delete().neq('key', '');
-    return res.json({ ok: !error, cleared: !error, error: error ? error.message : null });
+    const { error, count } = await supabase.from('ai_cache')
+      .delete({ count: 'exact' }).eq('source', 'model');
+    return res.json({ ok: !error, cleared: !error, removed: count ?? null,
+      note: 'curated (база знань) не чіпається', error: error ? error.message : null });
   }
   const { data, error } = await supabase.from('ai_cache')
     .select('question, hits, created_at, model, source').order('hits', { ascending: false }).limit(50);
