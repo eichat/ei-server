@@ -335,8 +335,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.48',
-  code: 49,
+  version: '0.9.49',
+  code: 50,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -2305,9 +2305,16 @@ async function quotaSnapshot(nick) {
   for (const kind of QUOTA_KINDS) {
     const limit = premium ? (FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind]) : FREE_QUOTA[kind];
     const used = await usageToday(nick, kind);
-    kinds[kind] = { used, limit, left: used === null ? null : Math.max(0, limit - used), price: SINK_PRICE[kind] || 0 };
+    // freeLimit/premiumLimit — щоб екран преміуму показував «зараз → стане» з
+    // ЖИВИХ чисел. Інакше клієнт зашивав би ті самі норми вдруге, і при зміні
+    // константи сторінка продажу почала б обіцяти не те, що видає сервер: цей
+    // клас розбіжностей уже коштував нам сайту з ціною 50 замість 200.
+    kinds[kind] = { used, limit, left: used === null ? null : Math.max(0, limit - used),
+      price: SINK_PRICE[kind] || 0,
+      freeLimit: FREE_QUOTA[kind],
+      premiumLimit: FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind] };
   }
-  return { premium, kinds };
+  return { premium, kinds, prices: PREMIUM_PRICES, walletFee: WALLET_OPEN_FEE };
 }
 
 /// Позначка «нік був онлайн». Пишемо не частіше разу на годину на нік: логін
