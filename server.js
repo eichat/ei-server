@@ -726,8 +726,29 @@ function parseOpenGraph(html, url) {
   if (image && !image.startsWith('http')) { try { const base = new URL(url); image = new URL(image, base.origin).toString(); } catch (_) { image = null; } }
   const siteName = getMeta('og:site_name') || null;
   let domain = url; try { domain = new URL(url).hostname.replace('www.', ''); } catch (_) {}
+  // Сторінки захисту (Cloudflare, WAF, капча) віддають 200 з власним <title>,
+  // і без цієї перевірки в чаті зʼявлялося прев'ю «Attention Required! |
+  // Cloudflare» замість заголовка сайту — саме так виглядало посилання на
+  // producthunt.com. Краще віддати порожнє прев'ю: клієнт тоді покаже саме
+  // посилання, а не чужу сторінку блокування.
+  if (title && BLOCK_PAGE_TITLES.some((re) => re.test(title))) {
+    return { title: null, description: null, image: null, siteName: null, domain, url };
+  }
   return { title, description, image, siteName, domain, url };
 }
+
+/// Заголовки сторінок-заглушок, які не мають потрапляти в прев'ю.
+const BLOCK_PAGE_TITLES = [
+  /attention required/i,
+  /just a moment/i,
+  /^access denied/i,
+  /^(403|404|429|503)\b/,
+  /forbidden/i,
+  /are you a (human|robot)/i,
+  /security check/i,
+  /enable javascript and cookies/i,
+  /^cloudflare$/i,
+];
 
 // ── AI-проксі (аудит #3) ────────────────────────────────────────────────────
 // GROQ_API_KEY був у .env → пакувався в APK, будь-хто з розпакованого APK палив
