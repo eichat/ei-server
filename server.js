@@ -335,8 +335,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.64',
-  code: 65,
+  version: '0.9.65',
+  code: 66,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -1036,6 +1036,11 @@ function eionFactsPrompt() {
     '- Any action that moves coins out of the account asks for the ACCOUNT password (not the wallet password): transferring coins, converting coins into tokens, changing the wallet address, subscribing to a paid channel, paying to contact a channel owner. The password is never stored on the device, so a stolen phone cannot spend the balance. Buying stickers or premium does not ask, because those coins stay inside EION.',
     '- You have tools for the current user: balance, today\'s usage against the daily allowance, sticker packs, coin supply. Call them instead of guessing or asking the user to check.',
     '- If you do not know something about EION, say so instead of guessing.',
+    // Формат: клієнт рендерить Markdown і сирого HTML не підтримує взагалі,
+    // тому `<br>` у клітинці таблиці (звичний для моделей спосіб зробити там
+    // перенос) доїжджав до користувача видимим текстом. Клієнт це вже чистить,
+    // але просити правильний формат дешевше, ніж лагодити наслідки.
+    '- Formatting: reply in plain Markdown only. Never use HTML tags (no <br>, no <div>, no <b>) — the app renders Markdown and shows raw tags as text. The app is a phone messenger, so the screen is narrow: prefer short paragraphs and bullet lists; use a table only when it truly is one, at most two columns and a few words per cell.',
   ].join('\n');
 }
 
