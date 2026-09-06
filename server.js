@@ -2197,6 +2197,41 @@ function liveTarget(nick) {
 }
 function isLive(nick) { return liveTarget(nick) !== null; }
 
+// Скільки чекаємо на підтвердження доставки, перш ніж будити пушем.
+const ACK_TIMEOUT_MS = 20000;
+
+// Чи цей адресат САМ підтверджує доставку (msg_ack; заявляє про це при WS-login: {ack:true}).
+//
+// 🔴 Навіщо: `delivered` керує догоном при вході (`.eq('delivered', false)`), а
+// ставилось воно за самим фактом сокета з readyState=OPEN. Але відкритий сокет
+// не означає доставленого фрейму: heartbeat ходить раз на 30 с, тож у сервера є
+// вікно до ~60 с, коли телефон уже відвалився (блокування екрана, зміна мережі),
+// а сокет ще «живий». Фрейм ішов у нікуди, повідомлення позначалось delivered —
+// і догін його вже НЕ БРАВ. Втрата назавжди, тихо, без помилки в Sentry
+// (випадок 06.09: id=134 Rumpel→void, delivered=true, на пристрої немає).
+//
+// Тому для клієнта, який вміє підтверджувати доставку, лишаємо delivered=false, доки він
+// не скаже «отримав». Старий клієнт (без ack) працює як раніше — інакше його
+// повідомлення приходили б повторно на кожен login.
+function ackAware(target, msgId) { return !!(target && target.canAck && msgId); }
+
+// Підтвердження не прийшло → будимо пушем, щоб повідомлення не чекало наступного
+// login. Таймер живе в памʼяті; його втрата при рестарті НЕ втрачає повідомлення —
+// воно лишається delivered=false і прийде догоном.
+function armAckFallback(toNick, fromNick, msgId) {
+  const timer = setTimeout(async () => {
+    try {
+      const { data } = await supabase.from('messages')
+        .select('id').eq('to_nick', toNick).eq('msg_id', msgId).eq('delivered', false).limit(1);
+      if (data && data.length > 0) {
+        console.log(`ack не отримано за ${ACK_TIMEOUT_MS}мс: ${fromNick}->${toNick} ${msgId}, будимо пушем`);
+        sendFcmPush(toNick, { type: 'message', from_nick: fromNick });
+      }
+    } catch (ex) { console.error('armAckFallback', ex && ex.message); }
+  }, ACK_TIMEOUT_MS);
+  if (timer.unref) timer.unref();
+}
+
 // ПОВНИЙ стан реакцій одного повідомлення: { emoji: [nick, ...] }.
 // Клієнт присвоює його як є, замість того щоб «перемикати» реакцію в себе.
 // Перемикання було крихким: одну подію нерідко застосовували двічі (панель +
@@ -6192,7 +6227,8 @@ wss.on('connection', (ws) => {
         const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', userNick).single();
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}`, ...(ban.reason ? { code: 'err_kick_banned_reason', banReason: ban.reason } : { code: 'err_kick_banned' }) })); ws.close(); return; }
         if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився', code: 'err_kick_new_device' })); old.ws.close(); }
-        onlineUsers.set(userNick, { ws, lastSeen: Date.now() });
+        // canAck: клієнт підтверджує доставку сам (див. ackAware).
+        onlineUsers.set(userNick, { ws, lastSeen: Date.now(), canAck: msg.ack === true });
         touchLastSeen(userNick);
         busPublish({ t: 'up', nick: userNick });
         // nickDevices має відображати, де нік ЗАРАЗ, а не де колись був.
@@ -6245,7 +6281,9 @@ wss.on('connection', (ws) => {
             const payload = m.type === 'sticker' ? { type: 'sticker', from: m.from_nick, ...decodeStickerContent(m.content), timestamp: m.timestamp, msgId: m.msg_id } : m.type === 'file' ? { type: 'file_message', from: m.from_nick, fileName: m.file_name, ...(m.content && m.content !== m.file_name ? { caption: m.content } : {}), ...(m.file_data && /^(https?:\/\/|eion:\/\/)/.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) } : { type: 'chat_message', from: m.from_nick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}), ...(m.reply_to_image ? { replyToImage: m.reply_to_image } : {}) };
             ws.send(JSON.stringify(await signDeep(payload)));
           }
-          await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
+          // Для ack-клієнта delivered ставить його власне підтвердження: інакше
+          // догін «спалював» повідомлення так само, як жива доставка.
+          if (msg.ack !== true) await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
         }
 
         const { data: myGroups } = await supabase.from('group_members').select('group_id').eq('nick', userNick);
@@ -6322,10 +6360,11 @@ wss.on('connection', (ws) => {
         // в його allowlist (зможе відповісти).
         await grantAllowlistIfBlocking(userNick, msg.to);
         const ts = (typeof msg.timestamp === 'number' && msg.timestamp > 0 && msg.timestamp <= Date.now() + 60000) ? msg.timestamp : Date.now(); const target = liveTarget(msg.to); const msgId = msg.msgId || null;
-        const status = target ? 'delivered' : 'sent';
+        const ack = ackAware(target, msgId);
+        const status = (target && !ack) ? 'delivered' : 'sent';
         const hasFile = msg.isFile && (msg.fileData || msg.fileUrl);
-        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: hasFile ? 'file' : 'text', content: msg.text, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(hasFile ? { file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
-        if (target) { target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+        await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: hasFile ? 'file' : 'text', content: msg.text, timestamp: ts, delivered: !!target && !ack, msg_id: msgId, status, ...(hasFile ? { file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
+        if (target) { target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
         else {
           // Безтілесний push (приватність): лише сигнал + нік, без тексту.
           sendFcmPush(msg.to, { type: 'message', from_nick: userNick });
@@ -6374,9 +6413,10 @@ wss.on('connection', (ws) => {
           }
           await grantAllowlistIfBlocking(userNick, msg.to);
           const target = liveTarget(msg.to);
-          const status = target ? 'delivered' : 'sent';
-          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'sticker', content, timestamp: ts, delivered: !!target, msg_id: msgId, status });
-          if (target) { target.ws.send(JSON.stringify({ type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+          const ack = ackAware(target, msgId);
+          const status = (target && !ack) ? 'delivered' : 'sent';
+          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'sticker', content, timestamp: ts, delivered: !!target && !ack, msg_id: msgId, status });
+          if (target) { target.ws.send(JSON.stringify({ type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId })); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
           else { sendFcmPush(msg.to, { type: 'message', from_nick: userNick }); }
         }
       }
@@ -6400,11 +6440,38 @@ wss.on('connection', (ws) => {
             return;
           }
           await grantAllowlistIfBlocking(userNick, msg.to);
-          const target = liveTarget(msg.to); const status = target ? 'delivered' : 'sent';
-          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: mediaCaption(msg), file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
+          const target = liveTarget(msg.to); const ack = ackAware(target, msgId);
+          const status = (target && !ack) ? 'delivered' : 'sent';
+          await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: mediaCaption(msg), file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target && !ack, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, [msg.to]); // 2C
-          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); }
+          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
           else { sendFcmPush(msg.to, { type: 'message', from_nick: userNick }); }
+        }
+      }
+
+      // Отримувач підтвердив, що повідомлення в нього. Лише ЗВІДСИ ставиться
+      // delivered=true для ack-клієнтів — див. ackAware.
+      if (msg.type === 'msg_ack') {
+        if (!userNick) return;
+        const ids = Array.isArray(msg.msgIds)
+          ? msg.msgIds.filter(x => typeof x === 'string' && x.length > 0 && x.length <= 128).slice(0, 200)
+          : [];
+        if (ids.length === 0) return;
+        const { data: rows, error } = await supabase.from('messages')
+          .select('msg_id, from_nick').eq('to_nick', userNick).in('msg_id', ids).eq('delivered', false);
+        if (error) { console.error('msg_ack select', error.message); return; }
+        if (!rows || rows.length === 0) return;
+        await supabase.from('messages')
+          .update({ delivered: true, status: 'delivered' })
+          .eq('to_nick', userNick).in('msg_id', rows.map(r => r.msg_id));
+        // Відправникам — друга галочка, тепер за фактом, а не за здогадом.
+        const bySender = {};
+        for (const r of rows) (bySender[r.from_nick] ??= []).push(r.msg_id);
+        for (const [sender, mids] of Object.entries(bySender)) {
+          const s = onlineUsers.get(sender);
+          if (s && s.ws && s.ws.readyState === WebSocket.OPEN) {
+            s.ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: mids }));
+          }
         }
       }
 
