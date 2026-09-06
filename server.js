@@ -335,8 +335,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.59',
-  code: 60,
+  version: '0.9.60',
+  code: 61,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -674,8 +674,14 @@ app.get('/link-preview', async (req, res) => {
       linkPreviewCache.set(url, { data: preview, expires: Date.now() + 3600000 });
       return res.json({ ok: true, ...preview });
     }
-    const html = await fetchUrl(url);
-    const preview = parseOpenGraph(html, url);
+    // Перша спроба — своїм іменем; якщо повернулась сторінка захисту,
+    // пробуємо агентами соцмереж (їх пропускають заради прев'ю посилань).
+    let preview = null;
+    for (const agent of PREVIEW_AGENTS) {
+      preview = parseOpenGraph(await fetchUrl(url, 0, agent), url);
+      if (!preview.blocked) break;   // сайт без OG-тегів повторювати не треба
+    }
+    delete preview.blocked;
     linkPreviewCache.set(url, { data: preview, expires: Date.now() + 3600000 });
     res.json({ ok: true, ...preview });
   } catch (e) { res.json({ ok: false, error: e.message }); }
@@ -694,16 +700,29 @@ function fetchJson(url) {
   });
 }
 
-function fetchUrl(url, depth = 0) {
+/// Юзер-агенти для прев'ю, у порядку спроб.
+///
+/// ⚠️ Справа НЕ в тому, «чи схожі ми на браузер»: з домашньої мережі Product
+/// Hunt віддає сторінку навіть боту, а з Render — ні. Cloudflare ріже за IP
+/// датацентру, і браузерний UA тут не рятує (перевірено: з ним прилітає
+/// «Just a moment...»). Що справді допомагає — представитись ботом соцмережі:
+/// сайти навмисно пропускають їх, бо самі зацікавлені в прев'ю посилань.
+const PREVIEW_AGENTS = [
+  'Mozilla/5.0 (compatible; EIONBot/1.0)',
+  'Twitterbot/1.1',
+  'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+];
+
+function fetchUrl(url, depth = 0, agent = PREVIEW_AGENTS[0]) {
   return new Promise((resolve, reject) => {
     if (depth > 4) return reject(new Error('Забагато редіректів'));
     const client = url.startsWith('https') ? https : httpModule;
-    const req = client.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; EIONBot/1.0)', 'Accept': 'text/html' }, timeout: 8000 }, (resp) => {
+    const req = client.get(url, { headers: { 'User-Agent': agent, 'Accept': 'text/html' }, timeout: 8000 }, (resp) => {
       if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
         // SSRF: редірект теж валідуємо (міг вести на приватну адресу).
         const loc = new URL(resp.headers.location, url).toString();
         resp.destroy();
-        return assertPublicUrl(loc).then(() => fetchUrl(loc, depth + 1)).then(resolve).catch(reject);
+        return assertPublicUrl(loc).then(() => fetchUrl(loc, depth + 1, agent)).then(resolve).catch(reject);
       }
       let data = ''; resp.setEncoding('utf8');
       resp.on('data', chunk => { data += chunk; if (data.length > 100000) { resp.destroy(); resolve(data); } });
@@ -732,7 +751,9 @@ function parseOpenGraph(html, url) {
   // producthunt.com. Краще віддати порожнє прев'ю: клієнт тоді покаже саме
   // посилання, а не чужу сторінку блокування.
   if (title && BLOCK_PAGE_TITLES.some((re) => re.test(title))) {
-    return { title: null, description: null, image: null, siteName: null, domain, url };
+    // `blocked` відрізняє «нас не пустили» від «сторінка просто без OG-тегів»:
+    // повторювати запит іншим агентом має сенс лише в першому випадку.
+    return { title: null, description: null, image: null, siteName: null, domain, url, blocked: true };
   }
   return { title, description, image, siteName, domain, url };
 }
