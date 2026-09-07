@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Carteira deste dispositivo",
   "wants_chat": "{from} quer iniciar uma conversa com você",
   "x_channel_sub": "Conta oficial — novidades curtas",
-  "x_channel_title": "EION no X"
+  "x_channel_title": "EION no X",
+  "sticker_delete_title": "Excluir o sticker?",
+  "sticker_delete_body": "O sticker sairá dos seus. As mensagens em que você já o enviou permanecem.",
+  "stickers_more_in_shop": "Mais {n} pacotes na loja",
+  "ugc_unpublish": "Tirar da loja",
+  "ugc_republish": "Voltar para a loja",
+  "ugc_unpublish_confirm": "O pacote sairá da loja. Quem já comprou continua com ele.",
+  "ugc_change_price": "Alterar preço",
+  "ugc_price_changed": "Preço alterado",
+  "ugc_not_in_shop": "Fora da loja",
+  "err_pack_not_approved": "O pacote ainda não foi aprovado",
+  "err_pack_price_daily": "Muitas alterações de preço hoje"
 }

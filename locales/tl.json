@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Wallet ng device na ito",
   "wants_chat": "Gusto kang kausapin ni {from}",
   "x_channel_sub": "Opisyal na account — maiikling update",
-  "x_channel_title": "EION sa X"
+  "x_channel_title": "EION sa X",
+  "sticker_delete_title": "Tanggalin ang sticker?",
+  "sticker_delete_body": "Mawawala ang sticker sa iyo. Mananatili ang mga mensaheng naipadala mo na.",
+  "stickers_more_in_shop": "{n} pang pack sa tindahan",
+  "ugc_unpublish": "Alisin sa tindahan",
+  "ugc_republish": "Ibalik sa tindahan",
+  "ugc_unpublish_confirm": "Mawawala ang pack sa tindahan. Mananatili ito sa mga bumili na.",
+  "ugc_change_price": "Baguhin ang presyo",
+  "ugc_price_changed": "Nabago ang presyo",
+  "ugc_not_in_shop": "Wala sa tindahan",
+  "err_pack_not_approved": "Hindi pa aprubado ang pack",
+  "err_pack_price_daily": "Masyadong maraming pagbabago ng presyo ngayon"
 }

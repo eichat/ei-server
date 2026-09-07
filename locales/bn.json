@@ -906,5 +906,16 @@
   "wallet_use_this_device": "এই ডিভাইসের ওয়ালেট",
   "wants_chat": "{from} আপনার সাথে চ্যাট শুরু করতে চান",
   "x_channel_sub": "অফিশিয়াল অ্যাকাউন্ট — সংক্ষিপ্ত আপডেট",
-  "x_channel_title": "X-এ EION"
+  "x_channel_title": "X-এ EION",
+  "sticker_delete_title": "স্টিকার মুছবেন?",
+  "sticker_delete_body": "স্টিকারটি আপনার তালিকা থেকে সরে যাবে। আপনি যেসব বার্তায় পাঠিয়েছেন সেগুলো থাকবে।",
+  "stickers_more_in_shop": "দোকানে আরও {n}টি প্যাক",
+  "ugc_unpublish": "দোকান থেকে সরান",
+  "ugc_republish": "দোকানে ফেরত দিন",
+  "ugc_unpublish_confirm": "প্যাকটি দোকান থেকে সরে যাবে। যারা কিনেছেন তাদের কাছে থাকবে।",
+  "ugc_change_price": "দাম বদলান",
+  "ugc_price_changed": "দাম বদলানো হয়েছে",
+  "ugc_not_in_shop": "দোকানে নেই",
+  "err_pack_not_approved": "প্যাকটি এখনও অনুমোদিত হয়নি",
+  "err_pack_price_daily": "আজ অনেকবার দাম বদলানো হয়েছে"
 }

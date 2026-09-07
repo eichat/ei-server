@@ -1035,7 +1035,7 @@ function eionFactsPrompt() {
     `- Transfers between users carry a ${TRANSFER_FEE_PCT}% fee. Paid channels give 70% to the author.`,
     '- Any action that moves coins out of the account asks for the ACCOUNT password (not the wallet password): transferring coins, converting coins into tokens, changing the wallet address, subscribing to a paid channel, paying to contact a channel owner, and buying a sticker pack made by another USER (70% of it goes to that person). Premium and official sticker packs do NOT ask, because those coins stay inside EION. The password is never stored on the device, so a stolen phone cannot spend the balance.',
     '- How to MAKE a sticker: sticker panel → "Create" → pick a photo from the gallery or take one with the camera, then drag and zoom it — the square area becomes the sticker. Any image format works (PNG, JPEG, WebP); the app resizes it itself to at most 512 px per side, so nothing has to be prepared or compressed by hand. A PNG with a transparent background KEEPS its transparency (it is saved as PNG); photos without transparency are saved as JPEG. Stickers made this way live in "My stickers" and can be sent in chats or collected into a pack for the shop.',
-    `- Users can publish their own sticker packs and earn from them. The author builds a pack out of stickers THEY created (in the sticker panel: Create, then the shop, then "My packs"), gives it a name and picks a price from a fixed list (${UGC_PACK_PRICES.join(', ')} coins), and submits it for review. After EION approves it, the pack appears in the shop and the author gets ${UGC_AUTHOR_SHARE_PCT}% of every purchase as WITHDRAWABLE coins; the rest goes to the platform. A pack holds ${UGC_PACK_MIN_ITEMS}-${UGC_PACK_MAX_ITEMS} stickers. Only stickers the user made themselves can go in — one saved from someone else's message belongs to its author. While a pack is still in review the author can withdraw it; once approved it can no longer be withdrawn, because people may have bought it. Moderators can take an approved pack out of the shop, and buyers keep what they already own.`,
+    `- Users can publish their own sticker packs and earn from them. The author builds a pack out of stickers THEY created (in the sticker panel: Create, then the shop, then "My packs"), gives it a name and picks a price from a fixed list (${UGC_PACK_PRICES.join(', ')} coins), and submits it for review. After EION approves it, the pack appears in the shop and the author gets ${UGC_AUTHOR_SHARE_PCT}% of every purchase as WITHDRAWABLE coins; the rest goes to the platform. A pack holds ${UGC_PACK_MIN_ITEMS}-${UGC_PACK_MAX_ITEMS} stickers. Only stickers the user made themselves can go in — one saved from someone else's message belongs to its author. While a pack is still in review the author can withdraw it entirely. Once approved the CONTENT is fixed (that is what review is for), but the author can still take the pack off the shop or put it back, and change its price to another value from the same list (up to ${UGC_PRICE_CHANGES_DAILY} changes a day). Moderators can also take an approved pack out of the shop. In every case buyers keep what they already own and are not refunded.`,
     '- You have tools for the current user: balance, today\'s usage against the daily allowance, sticker packs, coin supply. Call them instead of guessing or asking the user to check.',
     '- If you do not know something about EION, say so instead of guessing.',
     // Формат: клієнт рендерить Markdown і сирого HTML не підтримує взагалі,
@@ -4854,6 +4854,12 @@ app.post('/shop/buy-pack', async (req, res) => {
 
 // Сітка цін. Довільне число не приймаємо: магазин лишається читабельним, а
 // «пак за 137» неможливий без окремої перевірки на кожному кроці.
+// Ключ наліпки-джерела: шлях у Storage без підпису й параметрів. Саме за ним
+// відрізняємо «та сама наліпка» від «інша»: URL однієї наліпки може прийти і
+// рефом, і підписаним посиланням, і публічним.
+function ugcSourceKey(url) {
+  return storagePathFromUrl(url) || String(url).split('?')[0];
+}
 const UGC_PACK_PRICES = [0, 100, 200, 500, 1000];
 const UGC_AUTHOR_SHARE_PCT = 70;      // решта — платформі (як канали)
 const UGC_PACK_MIN_ITEMS = 3;
@@ -4866,6 +4872,7 @@ const UGC_PACK_TITLE_MAX = 40;
 const UGC_PENDING_MAX = 3;            // одночасно на модерації
 const UGC_PACKS_MAX = 20;             // усього на автора
 const UGC_SUBMIT_DAILY = 5;           // подач на добу
+const UGC_PRICE_CHANGES_DAILY = 5;    // змін ціни на добу
 
 function ugcNewPackId() {
   return 'u' + crypto.randomBytes(6).toString('hex');
@@ -4928,6 +4935,16 @@ app.post('/stickers/pack/submit', async (req, res) => {
     }
     return null;
   }).filter(it => it && it.url);
+  // Дублі всередині набору. Через UI їх не буває (вибір — Set), але API
+  // приймає що завгодно: та сама url 12 разів давала б «набір із 12 наліпок»,
+  // за який покупець платить як за повноцінний.
+  {
+    const seen = new Set();
+    for (let i = urls.length - 1; i >= 0; i--) {
+      const key = ugcSourceKey(urls[i].url);
+      if (seen.has(key)) urls.splice(i, 1); else seen.add(key);
+    }
+  }
   if (urls.length < UGC_PACK_MIN_ITEMS || urls.length > UGC_PACK_MAX_ITEMS) {
     return res.json({ ok: false, error: `Потрібно від ${UGC_PACK_MIN_ITEMS} до ${UGC_PACK_MAX_ITEMS} наліпок`, code: 'err_pack_items_count' });
   }
@@ -5049,6 +5066,14 @@ app.get('/stickers/my-packs', async (req, res) => {
       cropScale: it.crop_scale ?? 1, cropDx: it.crop_dx ?? 0, cropDy: it.crop_dy ?? 0,
     });
   }
+  // Фактичні нарахування автору по кожному набору.
+  const earnedByPack = {};
+  if (list.length) {
+    const { data: txs } = await supabase.from('coin_transactions')
+      .select('amount, ref').eq('to_nick', nick).eq('kind', 'pack_author')
+      .in('ref', list.map(p => String(p.id)));
+    for (const t of txs || []) earnedByPack[t.ref] = (earnedByPack[t.ref] || 0) + Number(t.amount || 0);
+  }
   res.json({
     ok: true,
     prices: UGC_PACK_PRICES,
@@ -5060,13 +5085,15 @@ app.get('/stickers/my-packs', async (req, res) => {
     pendingMax: UGC_PENDING_MAX,
     packsMax: UGC_PACKS_MAX,
     submitDaily: UGC_SUBMIT_DAILY,
+    priceChangesDaily: UGC_PRICE_CHANGES_DAILY,
     stickerMaxBytes: UGC_STICKER_MAX_BYTES,
     packs: list.map(p => ({
       ...p,
       sales: sales[p.id] || 0,
-      // Стільки автор отримав із цього набору. Ціна пака після схвалення не
-      // змінюється, тож множення точне.
-      earned: (sales[p.id] || 0) * Math.floor(p.price * UGC_AUTHOR_SHARE_PCT / 100),
+      // Стільки автор отримав із цього набору — з ЖУРНАЛУ, а не множенням
+      // продажів на поточну ціну: відколи ціну можна змінювати, таке множення
+      // переписувало б заднім числом і вже отримані виплати.
+      earned: earnedByPack[p.id] || 0,
       items: byPack[p.id] || [],
     })),
   });
@@ -5086,6 +5113,52 @@ app.post('/stickers/pack/withdraw', async (req, res) => {
   await supabase.from('sticker_pack_items').delete().eq('pack_id', packId);
   await supabase.from('sticker_packs').delete().eq('id', packId);
   res.json({ ok: true });
+});
+
+// ── Керування власним набором (автор) ─────────────────────────────────────
+//
+// Схвалений набір автор не міг ні зняти з магазину, ні змінити ціну — лише
+// просити адміна. Для платного контенту це задорого, тож обидві дії тепер його.
+//
+// Межа проста: ЗМІСТ після схвалення не міняється (інакше модерація нічого не
+// означала б — можна було б провести набір котиків і підмінити вміст), а
+// вітрина й ціна — міняються.
+
+// Зняти зі вітрини / повернути. Куплене в покупців лишається завжди.
+app.post('/stickers/pack/publish', async (req, res) => {
+  const nick = req.nick;
+  const { packId, active } = req.body || {};
+  if (!nick || !packId) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { data: pack } = await supabase.from('sticker_packs')
+    .select('id, author_nick, status').eq('id', packId).maybeSingle();
+  if (!pack || pack.author_nick !== nick) return res.json({ ok: false, error: 'Набір не знайдено', code: 'err_pack_not_found' });
+  if (pack.status !== 'approved') return res.json({ ok: false, error: 'Набір ще не схвалено', code: 'err_pack_not_approved' });
+  const isActive = active !== false;
+  await supabase.from('sticker_packs').update({ is_active: isActive }).eq('id', packId);
+  res.json({ ok: true, isActive });
+});
+
+// Змінити ціну. Повторної модерації не потребує — зміст той самий; частоту
+// обмежуємо, щоб ціна не стрибала (лічильник той самий, що для подач).
+app.post('/stickers/pack/price', async (req, res) => {
+  const nick = req.nick;
+  const { packId } = req.body || {};
+  const price = Number(req.body?.price);
+  if (!nick || !packId) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  if (!UGC_PACK_PRICES.includes(price)) return res.json({ ok: false, error: 'Невірна ціна', code: 'err_pack_price' });
+  const { data: pack } = await supabase.from('sticker_packs')
+    .select('id, author_nick, price, status').eq('id', packId).maybeSingle();
+  if (!pack || pack.author_nick !== nick) return res.json({ ok: false, error: 'Набір не знайдено', code: 'err_pack_not_found' });
+  if (pack.price === price) return res.json({ ok: true, price });
+  const changedToday = await usageToday(nick, 'ugc_price');
+  if (changedToday === null) {
+    console.error('[ugc] лічильник зміни ціни недоступний, пропускаю ліміт:', nick);
+  } else if (changedToday >= UGC_PRICE_CHANGES_DAILY) {
+    return res.json({ ok: false, error: 'Забагато змін ціни сьогодні', code: 'err_pack_price_daily' });
+  }
+  await supabase.from('sticker_packs').update({ price }).eq('id', packId);
+  await bumpUsage(nick, 'ugc_price', 1);
+  res.json({ ok: true, price });
 });
 
 // ── Черга модерації (адмін) ───────────────────────────────────────────────
@@ -5131,14 +5204,20 @@ app.post('/admin/sticker-review', async (req, res) => {
   const now = Date.now();
   const patch = { reviewed_at: now, reviewed_by: COMPANY_NICK };
   if (action === 'approve') { patch.status = 'approved'; patch.is_active = true; patch.reject_reason = null; }
+  // 🔴 `unpublish` раніше провалювався в гілку `reject`: набір ставав
+  // «відхиленим», і автор бачив відмову замість «знято з магазину». Статус
+  // лишається approved — знімає з вітрини саме `is_active`, і покупці своє
+  // не втрачають.
+  else if (action === 'unpublish') { patch.is_active = false; }
   else { patch.status = 'rejected'; patch.is_active = false; patch.reject_reason = (reason || '').slice(0, 300) || null; }
   await supabase.from('sticker_packs').update(patch).eq('id', packId);
 
   sendToUser(pack.author_nick, {
     type: 'sticker_pack_reviewed', packId, title: pack.title,
-    status: patch.status, reason: patch.reject_reason || null,
+    status: patch.status || pack.status, action,
+    reason: patch.reject_reason || null,
   });
-  res.json({ ok: true, status: patch.status });
+  res.json({ ok: true, status: patch.status || pack.status, isActive: patch.is_active !== false });
 });
 
 app.post('/group/update', async (req, res) => {

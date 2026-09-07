@@ -906,5 +906,16 @@
   "wallet_use_this_device": "이 기기의 지갑",
   "wants_chat": "{from} 님이 대화를 시작하고 싶어 합니다",
   "x_channel_sub": "공식 계정 — 짧은 소식",
-  "x_channel_title": "X의 EION"
+  "x_channel_title": "X의 EION",
+  "sticker_delete_title": "스티커를 삭제할까요?",
+  "sticker_delete_body": "내 스티커에서 사라집니다. 이미 보낸 메시지는 그대로 남습니다.",
+  "stickers_more_in_shop": "상점에 {n}개 더",
+  "ugc_unpublish": "상점에서 내리기",
+  "ugc_republish": "상점에 다시 올리기",
+  "ugc_unpublish_confirm": "상점에서 사라집니다. 이미 구매한 사람은 계속 사용합니다.",
+  "ugc_change_price": "가격 변경",
+  "ugc_price_changed": "가격을 변경했습니다",
+  "ugc_not_in_shop": "상점에 없음",
+  "err_pack_not_approved": "팩이 아직 승인되지 않았습니다",
+  "err_pack_price_daily": "오늘 가격 변경이 너무 많습니다"
 }

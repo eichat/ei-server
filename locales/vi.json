@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Ví của thiết bị này",
   "wants_chat": "{from} muốn bắt đầu trò chuyện với bạn",
   "x_channel_sub": "Tài khoản chính thức — tin ngắn",
-  "x_channel_title": "EION trên X"
+  "x_channel_title": "EION trên X",
+  "sticker_delete_title": "Xoá nhãn dán?",
+  "sticker_delete_body": "Nhãn dán sẽ biến mất khỏi của bạn. Tin nhắn bạn đã gửi vẫn còn.",
+  "stickers_more_in_shop": "Còn {n} bộ trong cửa hàng",
+  "ugc_unpublish": "Gỡ khỏi cửa hàng",
+  "ugc_republish": "Đưa lại cửa hàng",
+  "ugc_unpublish_confirm": "Bộ sẽ rời cửa hàng. Người đã mua vẫn giữ được.",
+  "ugc_change_price": "Đổi giá",
+  "ugc_price_changed": "Đã đổi giá",
+  "ugc_not_in_shop": "Không ở cửa hàng",
+  "err_pack_not_approved": "Bộ chưa được duyệt",
+  "err_pack_price_daily": "Đổi giá quá nhiều lần hôm nay"
 }

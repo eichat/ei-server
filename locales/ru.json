@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Кошелёк этого устройства",
   "wants_chat": "{from} хочет начать чат с вами",
   "x_channel_sub": "Официальный аккаунт — короткие новости",
-  "x_channel_title": "EION в X"
+  "x_channel_title": "EION в X",
+  "sticker_delete_title": "Удалить наклейку?",
+  "sticker_delete_body": "Наклейка исчезнет из ваших. Сообщения, в которых вы её уже отправили, останутся.",
+  "stickers_more_in_shop": "Ещё {n} наборов в магазине",
+  "ugc_unpublish": "Снять с магазина",
+  "ugc_republish": "Вернуть в магазин",
+  "ugc_unpublish_confirm": "Набор исчезнет из магазина. У тех, кто уже купил, он останется.",
+  "ugc_change_price": "Изменить цену",
+  "ugc_price_changed": "Цена изменена",
+  "ugc_not_in_shop": "Не в магазине",
+  "err_pack_not_approved": "Набор ещё не одобрен",
+  "err_pack_price_daily": "Слишком много изменений цены сегодня"
 }

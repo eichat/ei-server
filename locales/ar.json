@@ -906,5 +906,16 @@
   "wallet_use_this_device": "محفظة هذا الجهاز",
   "wants_chat": "يريد {from} بدء محادثة معك",
   "x_channel_sub": "الحساب الرسمي — تحديثات قصيرة",
-  "x_channel_title": "EION على X"
+  "x_channel_title": "EION على X",
+  "sticker_delete_title": "حذف الملصق؟",
+  "sticker_delete_body": "سيختفي الملصق من ملصقاتك. الرسائل التي أرسلته فيها ستبقى.",
+  "stickers_more_in_shop": "‏{n} حزم أخرى في المتجر",
+  "ugc_unpublish": "إزالة من المتجر",
+  "ugc_republish": "إعادة إلى المتجر",
+  "ugc_unpublish_confirm": "ستختفي الحزمة من المتجر. من اشتراها يحتفظ بها.",
+  "ugc_change_price": "تغيير السعر",
+  "ugc_price_changed": "تم تغيير السعر",
+  "ugc_not_in_shop": "ليست في المتجر",
+  "err_pack_not_approved": "لم تتم الموافقة على الحزمة بعد",
+  "err_pack_price_daily": "تغييرات كثيرة للسعر اليوم"
 }

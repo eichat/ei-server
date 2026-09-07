@@ -906,5 +906,16 @@
   "wallet_use_this_device": "กระเป๋าของอุปกรณ์นี้",
   "wants_chat": "{from} ต้องการเริ่มแชทกับคุณ",
   "x_channel_sub": "บัญชีทางการ — อัปเดตสั้น ๆ",
-  "x_channel_title": "EION บน X"
+  "x_channel_title": "EION บน X",
+  "sticker_delete_title": "ลบสติกเกอร์ไหม",
+  "sticker_delete_body": "สติกเกอร์จะหายไปจากของคุณ ข้อความที่คุณส่งไปแล้วยังอยู่",
+  "stickers_more_in_shop": "มีอีก {n} ชุดในร้าน",
+  "ugc_unpublish": "นำออกจากร้าน",
+  "ugc_republish": "นำกลับเข้าร้าน",
+  "ugc_unpublish_confirm": "ชุดจะหายจากร้าน คนที่ซื้อแล้วยังมีอยู่",
+  "ugc_change_price": "เปลี่ยนราคา",
+  "ugc_price_changed": "เปลี่ยนราคาแล้ว",
+  "ugc_not_in_shop": "ไม่อยู่ในร้าน",
+  "err_pack_not_approved": "ชุดยังไม่ได้รับอนุมัติ",
+  "err_pack_price_daily": "เปลี่ยนราคาบ่อยเกินไปวันนี้"
 }

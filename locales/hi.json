@@ -906,5 +906,16 @@
   "wallet_use_this_device": "इस डिवाइस का वॉलेट",
   "wants_chat": "{from} आपसे चैट शुरू करना चाहते हैं",
   "x_channel_sub": "आधिकारिक खाता — संक्षिप्त अपडेट",
-  "x_channel_title": "X पर EION"
+  "x_channel_title": "X पर EION",
+  "sticker_delete_title": "स्टिकर हटाएं?",
+  "sticker_delete_body": "स्टिकर आपकी सूची से हट जाएगा। जिन संदेशों में आपने इसे भेजा है, वे बने रहेंगे।",
+  "stickers_more_in_shop": "स्टोर में {n} और पैक",
+  "ugc_unpublish": "स्टोर से हटाएं",
+  "ugc_republish": "स्टोर में वापस लाएं",
+  "ugc_unpublish_confirm": "पैक स्टोर से हट जाएगा। जिन्होंने खरीदा है, उनके पास रहेगा।",
+  "ugc_change_price": "कीमत बदलें",
+  "ugc_price_changed": "कीमत बदल दी गई",
+  "ugc_not_in_shop": "स्टोर में नहीं",
+  "err_pack_not_approved": "पैक अभी स्वीकृत नहीं है",
+  "err_pack_price_daily": "आज कीमत बहुत बार बदली गई"
 }

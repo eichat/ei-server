@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Гаманець цього пристрою",
   "wants_chat": "{from} хоче розпочати чат з вами",
   "x_channel_sub": "Офіційний акаунт — короткі новини",
-  "x_channel_title": "EION у X"
+  "x_channel_title": "EION у X",
+  "sticker_delete_title": "Видалити наліпку?",
+  "sticker_delete_body": "Наліпка зникне з ваших. Повідомлення, у яких ви її вже надіслали, лишаться.",
+  "stickers_more_in_shop": "Ще {n} наборів у магазині",
+  "ugc_unpublish": "Зняти з магазину",
+  "ugc_republish": "Повернути в магазин",
+  "ugc_unpublish_confirm": "Набір зникне з магазину. У тих, хто вже купив, він лишиться.",
+  "ugc_change_price": "Змінити ціну",
+  "ugc_price_changed": "Ціну змінено",
+  "ugc_not_in_shop": "Не в магазині",
+  "err_pack_not_approved": "Набір ще не схвалено",
+  "err_pack_price_daily": "Забагато змін ціни сьогодні"
 }

@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Portefeuille de cet appareil",
   "wants_chat": "{from} veut démarrer une discussion avec toi",
   "x_channel_sub": "Compte officiel — brèves actualités",
-  "x_channel_title": "EION sur X"
+  "x_channel_title": "EION sur X",
+  "sticker_delete_title": "Supprimer le sticker ?",
+  "sticker_delete_body": "Le sticker disparaîtra des vôtres. Les messages où vous l’avez déjà envoyé restent.",
+  "stickers_more_in_shop": "{n} packs de plus dans la boutique",
+  "ugc_unpublish": "Retirer de la boutique",
+  "ugc_republish": "Remettre en boutique",
+  "ugc_unpublish_confirm": "Le pack quittera la boutique. Ceux qui l’ont acheté le gardent.",
+  "ugc_change_price": "Changer le prix",
+  "ugc_price_changed": "Prix modifié",
+  "ugc_not_in_shop": "Hors boutique",
+  "err_pack_not_approved": "Le pack n’est pas encore approuvé",
+  "err_pack_price_daily": "Trop de changements de prix aujourd’hui"
 }

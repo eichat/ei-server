@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Wallet van dit apparaat",
   "wants_chat": "{from} wil een chat met je beginnen",
   "x_channel_sub": "Officieel account — korte updates",
-  "x_channel_title": "EION op X"
+  "x_channel_title": "EION op X",
+  "sticker_delete_title": "Sticker verwijderen?",
+  "sticker_delete_body": "De sticker verdwijnt uit die van jou. Berichten waarin je hem al stuurde blijven.",
+  "stickers_more_in_shop": "Nog {n} pakketten in de winkel",
+  "ugc_unpublish": "Uit de winkel halen",
+  "ugc_republish": "Terug in de winkel",
+  "ugc_unpublish_confirm": "Het pakket verdwijnt uit de winkel. Wie het kocht, houdt het.",
+  "ugc_change_price": "Prijs wijzigen",
+  "ugc_price_changed": "Prijs gewijzigd",
+  "ugc_not_in_shop": "Niet in de winkel",
+  "err_pack_not_approved": "Het pakket is nog niet goedgekeurd",
+  "err_pack_price_daily": "Te veel prijswijzigingen vandaag"
 }

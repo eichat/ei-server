@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Billetera de este dispositivo",
   "wants_chat": "{from} quiere iniciar un chat contigo",
   "x_channel_sub": "Cuenta oficial: novedades breves",
-  "x_channel_title": "EION en X"
+  "x_channel_title": "EION en X",
+  "sticker_delete_title": "¿Eliminar el sticker?",
+  "sticker_delete_body": "El sticker desaparecerá de los tuyos. Los mensajes donde ya lo enviaste se conservan.",
+  "stickers_more_in_shop": "{n} paquetes más en la tienda",
+  "ugc_unpublish": "Quitar de la tienda",
+  "ugc_republish": "Volver a la tienda",
+  "ugc_unpublish_confirm": "El paquete saldrá de la tienda. Quien ya lo compró lo conserva.",
+  "ugc_change_price": "Cambiar precio",
+  "ugc_price_changed": "Precio cambiado",
+  "ugc_not_in_shop": "Fuera de la tienda",
+  "err_pack_not_approved": "El paquete aún no está aprobado",
+  "err_pack_price_daily": "Demasiados cambios de precio hoy"
 }

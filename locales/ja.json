@@ -906,5 +906,16 @@
   "wallet_use_this_device": "この端末のウォレット",
   "wants_chat": "{from} があなたとのチャットを希望しています",
   "x_channel_sub": "公式アカウント — 短い更新",
-  "x_channel_title": "X の EION"
+  "x_channel_title": "X の EION",
+  "sticker_delete_title": "ステッカーを削除しますか？",
+  "sticker_delete_body": "あなたのステッカーから消えます。すでに送信したメッセージは残ります。",
+  "stickers_more_in_shop": "ショップにあと {n} パック",
+  "ugc_unpublish": "ショップから外す",
+  "ugc_republish": "ショップに戻す",
+  "ugc_unpublish_confirm": "パックはショップから消えます。購入済みの人はそのまま使えます。",
+  "ugc_change_price": "価格を変更",
+  "ugc_price_changed": "価格を変更しました",
+  "ugc_not_in_shop": "ショップ非公開",
+  "err_pack_not_approved": "パックはまだ承認されていません",
+  "err_pack_price_daily": "本日の価格変更が多すぎます"
 }

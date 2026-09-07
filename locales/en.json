@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Use this device’s wallet",
   "wants_chat": "{from} wants to start a chat with you",
   "x_channel_sub": "Official account — short updates",
-  "x_channel_title": "EION on X"
+  "x_channel_title": "EION on X",
+  "sticker_delete_title": "Delete sticker?",
+  "sticker_delete_body": "The sticker will disappear from yours. Messages where you already sent it will stay.",
+  "stickers_more_in_shop": "{n} more packs in the shop",
+  "ugc_unpublish": "Remove from shop",
+  "ugc_republish": "Put back in shop",
+  "ugc_unpublish_confirm": "The pack will leave the shop. People who already bought it keep it.",
+  "ugc_change_price": "Change price",
+  "ugc_price_changed": "Price changed",
+  "ugc_not_in_shop": "Not in shop",
+  "err_pack_not_approved": "The pack is not approved yet",
+  "err_pack_price_daily": "Too many price changes today"
 }

@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Bu cihazın cüzdanı",
   "wants_chat": "{from} seninle sohbet başlatmak istiyor",
   "x_channel_sub": "Resmî hesap — kısa güncellemeler",
-  "x_channel_title": "X’te EION"
+  "x_channel_title": "X’te EION",
+  "sticker_delete_title": "Çıkartma silinsin mi?",
+  "sticker_delete_body": "Çıkartma sizinkilerden kaybolur. Daha önce gönderdiğiniz mesajlar kalır.",
+  "stickers_more_in_shop": "Mağazada {n} paket daha",
+  "ugc_unpublish": "Mağazadan kaldır",
+  "ugc_republish": "Mağazaya geri koy",
+  "ugc_unpublish_confirm": "Paket mağazadan kalkar. Satın alanlarda kalır.",
+  "ugc_change_price": "Fiyatı değiştir",
+  "ugc_price_changed": "Fiyat değişti",
+  "ugc_not_in_shop": "Mağazada değil",
+  "err_pack_not_approved": "Paket henüz onaylanmadı",
+  "err_pack_price_daily": "Bugün çok fazla fiyat değişikliği"
 }

@@ -906,5 +906,16 @@
   "wallet_use_this_device": "Dompet perangkat ini",
   "wants_chat": "{from} ingin memulai obrolan denganmu",
   "x_channel_sub": "Akun resmi — kabar singkat",
-  "x_channel_title": "EION di X"
+  "x_channel_title": "EION di X",
+  "sticker_delete_title": "Hapus stiker?",
+  "sticker_delete_body": "Stiker akan hilang dari milikmu. Pesan yang sudah kamu kirim tetap ada.",
+  "stickers_more_in_shop": "{n} paket lagi di toko",
+  "ugc_unpublish": "Tarik dari toko",
+  "ugc_republish": "Kembalikan ke toko",
+  "ugc_unpublish_confirm": "Paket akan hilang dari toko. Yang sudah membeli tetap memilikinya.",
+  "ugc_change_price": "Ubah harga",
+  "ugc_price_changed": "Harga diubah",
+  "ugc_not_in_shop": "Tidak di toko",
+  "err_pack_not_approved": "Paket belum disetujui",
+  "err_pack_price_daily": "Terlalu banyak perubahan harga hari ini"
 }
