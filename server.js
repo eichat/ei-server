@@ -3167,6 +3167,20 @@ async function purgeAccountData(nick, user) {
     if (ph) await del('phone_codes', 'phone', ph);
   }
 
+  // Власні наліпки користувача (`files/stickers/<нік>/`). Їх не бере ні
+  // видалення повідомлень (вони не вкладення), ні періодична чистка —
+  // ORPHAN_PROTECTED навмисно захищає префікс `stickers/` від неї. Тобто без
+  // цього кроку вони лишались би у сховищі назавжди після видалення акаунта.
+  // Копії, що вже пішли в опубліковані набори, лежать в іншому бакеті
+  // (`stickers`) і тут не зачіпаються — їх купили.
+  try {
+    const { data: own } = await supabase.storage.from('files').list(`stickers/${nick}`, { limit: 1000 });
+    const paths = (own || []).map(o => `stickers/${nick}/${o.name}`);
+    if (paths.length) await supabase.storage.from('files').remove(paths);
+  } catch (e) {
+    console.error('[purge] власні наліпки:', e.message);
+  }
+
   // Набори наліпок автора знімаємо з магазину, але НЕ видаляємо: їх могли
   // купити, і в покупців вони мають лишитись. Далі продавати їх не можна —
   // 70% ціни нікому було б нарахувати, тобто гроші покупця просто зникали б.
