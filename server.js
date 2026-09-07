@@ -5055,6 +5055,12 @@ app.get('/stickers/my-packs', async (req, res) => {
     authorSharePct: UGC_AUTHOR_SHARE_PCT,
     minItems: UGC_PACK_MIN_ITEMS,
     maxItems: UGC_PACK_MAX_ITEMS,
+    // Ліміти теж віддаємо: екран довідки показує їх користувачу, і зашиті в
+    // клієнті числа неминуче розійшлися б із цими при першій же зміні.
+    pendingMax: UGC_PENDING_MAX,
+    packsMax: UGC_PACKS_MAX,
+    submitDaily: UGC_SUBMIT_DAILY,
+    stickerMaxBytes: UGC_STICKER_MAX_BYTES,
     packs: list.map(p => ({
       ...p,
       sales: sales[p.id] || 0,
