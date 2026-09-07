@@ -4979,10 +4979,18 @@ app.post('/stickers/pack/submit', async (req, res) => {
         await ugcRemovePackFiles(packId);
         return res.json({ ok: false, error: 'Наліпка завелика', code: 'err_pack_sticker_too_big' });
       }
-      const ext = path.toLowerCase().endsWith('.webp') ? 'webp' : 'png';
+      // Тип беремо з розширення джерела: редактор зберігає PNG для прозорих
+      // наліпок і JPEG для решти, тож зашите «завжди png» робило б із JPEG
+      // файл із брехливим типом (працює, бо всі декодують за вмістом, але це
+      // рівно та неточність, яку щойно прибрали на клієнті).
+      const lower = path.toLowerCase();
+      const ext = lower.endsWith('.webp') ? 'webp'
+        : (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) ? 'jpg'
+        : lower.endsWith('.gif') ? 'gif' : 'png';
+      const MIME = { webp: 'image/webp', jpg: 'image/jpeg', gif: 'image/gif', png: 'image/png' };
       const dest = `${packId}/s${i + 1}.${ext}`;
       const { error: upErr } = await supabase.storage.from('stickers')
-        .upload(dest, bytes, { contentType: ext === 'webp' ? 'image/webp' : 'image/png', upsert: true });
+        .upload(dest, bytes, { contentType: MIME[ext], upsert: true });
       if (upErr) throw new Error(upErr.message);
       uploaded.push({
         pack_id: packId, sticker_id: `s${i + 1}`, storage_path: dest, kind: 'image', sort_order: i,
