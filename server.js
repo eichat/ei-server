@@ -1033,7 +1033,8 @@ function eionFactsPrompt() {
     `- Premium allowance: ${FREE_QUOTA.ai_premium} AI requests, ${FREE_QUOTA.storage_premium} MB, ${FREE_QUOTA.turn_premium} relayed calls, ${FREE_QUOTA.translate_premium} translations; files up to 20 MB instead of 5, and a stronger AI model.`,
     `- Beyond the allowance the user pays coins: ${SINK_PRICE.ai} per AI request, ${SINK_PRICE.storage} per MB, ${SINK_PRICE.turn} per relayed call.`,
     `- Transfers between users carry a ${TRANSFER_FEE_PCT}% fee. Paid channels give 70% to the author.`,
-    '- Any action that moves coins out of the account asks for the ACCOUNT password (not the wallet password): transferring coins, converting coins into tokens, changing the wallet address, subscribing to a paid channel, paying to contact a channel owner. The password is never stored on the device, so a stolen phone cannot spend the balance. Buying stickers or premium does not ask, because those coins stay inside EION.',
+    '- Any action that moves coins out of the account asks for the ACCOUNT password (not the wallet password): transferring coins, converting coins into tokens, changing the wallet address, subscribing to a paid channel, paying to contact a channel owner, and buying a sticker pack made by another USER (70% of it goes to that person). Premium and official sticker packs do NOT ask, because those coins stay inside EION. The password is never stored on the device, so a stolen phone cannot spend the balance.',
+    `- Users can publish their own sticker packs and earn from them. The author builds a pack out of stickers THEY created (in the sticker panel: Create, then the shop, then "My packs"), gives it a name and picks a price from a fixed list (${UGC_PACK_PRICES.join(', ')} coins), and submits it for review. After EION approves it, the pack appears in the shop and the author gets ${UGC_AUTHOR_SHARE_PCT}% of every purchase as WITHDRAWABLE coins; the rest goes to the platform. A pack holds ${UGC_PACK_MIN_ITEMS}-${UGC_PACK_MAX_ITEMS} stickers. Only stickers the user made themselves can go in — one saved from someone else's message belongs to its author. While a pack is still in review the author can withdraw it; once approved it can no longer be withdrawn, because people may have bought it. Moderators can take an approved pack out of the shop, and buyers keep what they already own.`,
     '- You have tools for the current user: balance, today\'s usage against the daily allowance, sticker packs, coin supply. Call them instead of guessing or asking the user to check.',
     '- If you do not know something about EION, say so instead of guessing.',
     // Формат: клієнт рендерить Markdown і сирого HTML не підтримує взагалі,
@@ -3166,6 +3167,17 @@ async function purgeAccountData(nick, user) {
     if (ph) await del('phone_codes', 'phone', ph);
   }
 
+  // Набори наліпок автора знімаємо з магазину, але НЕ видаляємо: їх могли
+  // купити, і в покупців вони мають лишитись. Далі продавати їх не можна —
+  // 70% ціни нікому було б нарахувати, тобто гроші покупця просто зникали б.
+  {
+    const { error } = await supabase.from('sticker_packs')
+      .update({ is_active: false, status: 'rejected', reject_reason: 'account deleted' })
+      .eq('author_nick', nick);
+    // Помилка = міграції ugc_sticker_packs ще немає, тобто UGC-наборів теж.
+    if (error) console.error('[purge] sticker_packs:', error.message);
+  }
+
   // 4. Знеособлення — там, де рядок потрібен без людини.
   await anon('coin_transactions', 'from_nick');
   await anon('coin_transactions', 'to_nick');
@@ -4585,7 +4597,18 @@ app.post('/shop/buy-premium', async (req, res) => {
 // одразу були "у власності" без окремої купівлі. Ідемпотентно (on conflict).
 async function grantFreePacks(nick) {
   try {
-    const { data: freePacks } = await supabase.from('sticker_packs').select('id').eq('price', 0).eq('is_active', true);
+    // ⚠️ Лише ОФІЦІЙНІ (author_nick is null). Безкоштовний UGC-пак роздавати
+    // автоматично не можна: панель наліпок у кожного забилася б чужими
+    // наборами, яких він не обирав. Такий пак береться свідомо, з магазину.
+    let { data: freePacks, error: freeErr } = await supabase.from('sticker_packs').select('id')
+      .eq('price', 0).eq('is_active', true).is('author_nick', null);
+    if (freeErr) {
+      // Міграції ugc_sticker_packs ще немає. Тоді UGC-паків не існує в
+      // принципі, тож старий запит дає той самий результат — деградуємо тихо,
+      // інакше безкоштовні набори перестали б видаватись до міграції.
+      const legacy = await supabase.from('sticker_packs').select('id').eq('price', 0).eq('is_active', true);
+      freePacks = legacy.data;
+    }
     if (!freePacks || freePacks.length === 0) return;
     const rows = freePacks.map(p => ({ nick, pack_id: p.id }));
     await supabase.from('user_sticker_packs').upsert(rows, { onConflict: 'nick,pack_id', ignoreDuplicates: true });
@@ -4650,11 +4673,25 @@ app.get('/shop/sticker-packs', async (req, res) => {
   await grantFreePacks(nick); // безкоштовні одразу у власності
   // Безкоштовні — завжди зверху: вони й так уже у власності, тож саме з них
   // починають користуватись. Усередині кожної групи — за sort_order.
-  const { data: packs, error } = await supabase.from('sticker_packs')
-    .select('id, title, price, preview_sticker, sort_order')
+  // status: у магазин потрапляє лише схвалене. `is_active` лишається другим
+  // замком — зняти пак можна, не міняючи його статусу.
+  let { data: packs, error } = await supabase.from('sticker_packs')
+    .select('id, title, price, preview_sticker, sort_order, author_nick')
     .eq('is_active', true)
+    .eq('status', 'approved')
     .order('price', { ascending: true })
     .order('sort_order', { ascending: true });
+  if (error) {
+    // До міграції колонок status/author_nick ще немає — тоді й UGC-паків
+    // немає, тож старий каталог правильний. Без цього пуш сервера раніше за
+    // міграцію ламав би магазин наліпок усім.
+    const legacy = await supabase.from('sticker_packs')
+      .select('id, title, price, preview_sticker, sort_order')
+      .eq('is_active', true)
+      .order('price', { ascending: true })
+      .order('sort_order', { ascending: true });
+    packs = legacy.data; error = legacy.error;
+  }
   if (error) {
     console.error('[shop/sticker-packs] select error:', error);
     return res.json({ ok: false, error: 'Помилка каталогу', code: 'err_catalog_failed' });
@@ -4664,9 +4701,17 @@ app.get('/shop/sticker-packs', async (req, res) => {
   // Склад паків — щоб клієнт міг показати наліпки, яких немає в його збірці.
   // Раніше картинки жили лише в assets застосунку: новий пак вимагав релізу, а
   // до того куплений пак виглядав як «зображення недоступне».
-  const { data: items } = await supabase.from('sticker_pack_items')
-    .select('pack_id, sticker_id, storage_path, kind, sort_order')
+  let { data: items, error: itemsErr } = await supabase.from('sticker_pack_items')
+    .select('pack_id, sticker_id, storage_path, kind, sort_order, crop_scale, crop_dx, crop_dy')
     .order('sort_order', { ascending: true });
+  if (itemsErr) {
+    // До міграції колонок кропу ще немає — тоді й UGC-наборів немає, а
+    // офіційні паки кропу не мають.
+    const legacy = await supabase.from('sticker_pack_items')
+      .select('pack_id, sticker_id, storage_path, kind, sort_order')
+      .order('sort_order', { ascending: true });
+    items = legacy.data;
+  }
   const byPack = new Map();
   for (const it of items || []) {
     if (!byPack.has(it.pack_id)) byPack.set(it.pack_id, []);
@@ -4674,12 +4719,19 @@ app.get('/shop/sticker-packs', async (req, res) => {
       id: it.sticker_id,
       url: stickerPublicUrl(it.storage_path),
       kind: it.kind || 'lottie',
+      // Кроп передаємо лише коли він щось міняє — щоб не роздувати каталог
+      // трійкою нулів на кожній офіційній наліпці.
+      ...(it.crop_scale != null && (it.crop_scale !== 1 || it.crop_dx || it.crop_dy)
+        ? { cropScale: it.crop_scale, cropDx: it.crop_dx || 0, cropDy: it.crop_dy || 0 } : {}),
     });
   }
   const result = (packs || []).map(p => ({
     id: p.id, title: p.title, price: p.price,
     previewSticker: p.preview_sticker,
-    owned: ownedSet.has(p.id) || p.price === 0,
+    ...(p.author_nick ? { authorNick: p.author_nick } : {}),
+    // Безкоштовний вважається своїм одразу лише для ОФІЦІЙНИХ паків (їх
+    // видає grantFreePacks). Безкоштовний UGC треба додати свідомо.
+    owned: ownedSet.has(p.id) || (p.price === 0 && !p.author_nick),
     items: byPack.get(p.id) || [],   // порожньо → пак вбудований у застосунок
   }));
   res.json({ ok: true, packs: result });
@@ -4704,8 +4756,19 @@ app.post('/shop/buy-pack', async (req, res) => {
   const nick = req.nick; // Фаза 1: покупець — автентифікований юзер.
   if (!nick || !packId) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   // Ціна — виключно з БД (клієнт не може її підмінити).
-  const { data: pack } = await supabase.from('sticker_packs').select('id, price, is_active').eq('id', packId).single();
-  if (!pack || !pack.is_active) return res.json({ ok: false, error: 'Пак недоступний', code: 'err_pack_unavailable' });
+  let { data: pack } = await supabase.from('sticker_packs')
+    .select('id, price, is_active, status, author_nick').eq('id', packId).single();
+  if (!pack) {
+    // До міграції — старий набір колонок; такий пак завжди офіційний.
+    const legacy = await supabase.from('sticker_packs').select('id, price, is_active').eq('id', packId).single();
+    if (legacy.data) pack = { ...legacy.data, status: 'approved', author_nick: null };
+  }
+  if (!pack || !pack.is_active || pack.status !== 'approved') {
+    return res.json({ ok: false, error: 'Пак недоступний', code: 'err_pack_unavailable' });
+  }
+  if (pack.author_nick && pack.author_nick === nick) {
+    return res.json({ ok: false, error: 'Це ваш власний набір', code: 'err_pack_own' });
+  }
   // Вже володіє? — не списувати повторно.
   const { data: existing } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick).eq('pack_id', packId).maybeSingle();
   if (existing) return res.json({ ok: true, alreadyOwned: true });
@@ -4715,26 +4778,338 @@ app.post('/shop/buy-pack', async (req, res) => {
     await supabase.from('user_sticker_packs').upsert([{ nick, pack_id: packId }], { onConflict: 'nick,pack_id', ignoreDuplicates: true });
     return res.json({ ok: true, granted: true });
   }
-  // Платний — атомарне списання.
-  const { data: newBalance, error: spendErr } = await supabase.rpc('spend_coins', { p_nick: nick, p_amount: price });
-  if (spendErr) return res.json({ ok: false, error: 'Помилка списання', code: 'err_charge_failed' });
-  if (newBalance === -1) return res.json({ ok: false, error: `Недостатньо EION (потрібно ${price})`, code: 'err_not_enough_coins' });
+  // Пароль — лише для UGC: там 70% ідуть ІНШІЙ людині у «зароблене», тобто
+  // виводяться в токен. Без нього вкрадена сесія купувала б пак зловмисника й
+  // виносила баланс — та сама схема, яку вже закрито на платних каналах.
+  // Офіційний пак пароля не просить: монети лишаються всередині EION.
+  if (pack.author_nick) {
+    const pwErr = await requireAccountPassword(req);
+    if (pwErr) return res.json(pwErr);
+  }
+  // Платний — атомарне списання. Split, бо для UGC треба знати, яка частина
+  // витраченого була «заробленою»: інакше внутрішні монети покупця ставали б
+  // у автора виведеними, і бонус новачка знову був би краном токена.
+  const spend = await spendCoinsSplit(nick, price);
+  if (!spend.ok) return res.json({ ok: false, error: spend.error, code: spend.code });
+  const newBalance = spend.balance;
   // Записуємо власність. Якщо провалилось — повертаємо коіни (щоб не списати даремно).
   const { error: ownErr } = await supabase.from('user_sticker_packs').insert({ nick, pack_id: packId });
   if (ownErr) {
     // Можливо, паралельний запит уже записав власність (гонка) — перевіряємо.
     const { data: recheck } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick).eq('pack_id', packId).maybeSingle();
     if (!recheck) {
-      await supabase.rpc('add_coins', { p_nick: nick, p_amount: price }); // повертаємо кошти
+      // Повертаємо ВНУТРІШНІМИ навмисно (як і решта відкатів): інакше
+      // «витратив внутрішні → домігся збою → отримав виведені» відмивало б бонус.
+      await supabase.rpc('add_coins', { p_nick: nick, p_amount: price });
       await logTx({ fromNick: null, toNick: nick, amount: price, kind: 'pack_refund', ref: packId });
       return res.json({ ok: false, error: 'Помилка купівлі', code: 'err_purchase_failed' });
     }
   }
-  // Дохід від паку → компанії (EION) з live-нотифікацією + журнал. Після
-  // успішного запису власності, щоб при поверненні не нарахувати за скасовану купівлю.
-  await creditCompany(price, 'pack', { fromNick: nick, ref: packId });
+  // Розподіл після успішного запису власності — щоб при поверненні не
+  // нарахувати за скасовану купівлю.
+  if (pack.author_nick) {
+    const authorShare = Math.floor(price * UGC_AUTHOR_SHARE_PCT / 100);
+    const companyShare = price - authorShare;
+    const authorBalance = await creditSplit(pack.author_nick, authorShare, spend.earnedSpent);
+    await logTx({ fromNick: nick, toNick: pack.author_nick, amount: authorShare, kind: 'pack_author', ref: packId });
+    if (companyShare > 0) await creditCompany(companyShare, 'pack_fee', { fromNick: nick, ref: packId });
+    if (authorBalance != null) {
+      sendToUser(pack.author_nick, { type: 'coins_received', fromNick: nick, amount: authorShare, total: authorBalance });
+    }
+  } else {
+    await creditCompany(price, 'pack', { fromNick: nick, ref: packId });
+  }
   sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
   res.json({ ok: true, newBalance, packId });
+});
+
+// ═══════════════════════════════════════════════
+//  КОРИСТУВАЦЬКІ НАБОРИ НАЛІПОК (UGC) З ВИНАГОРОДОЮ АВТОРУ
+//
+//  Автор збирає пак зі СВОЇХ уже створених наліпок → модерація (EION) →
+//  магазин. Кожна купівля: 70% автору, 30% платформі (з них частина
+//  спалюється, як і за офіційні паки).
+//
+//  Чому в тіло запиту йдуть ПОСИЛАННЯ, а не байти: наліпки вже лежать у
+//  Storage (їх туди кладе редактор при створенні), а `express.json` обмежений
+//  4 МБ — 24 наліпки байтами туди не влізли б у принципі. Плюс сам шлях
+//  (`stickers/<нік>/…`) і є доказом володіння: опублікувати чужу наліпку,
+//  збережену з чужого повідомлення, не вийде.
+// ═══════════════════════════════════════════════
+
+// Сітка цін. Довільне число не приймаємо: магазин лишається читабельним, а
+// «пак за 137» неможливий без окремої перевірки на кожному кроці.
+const UGC_PACK_PRICES = [0, 100, 200, 500, 1000];
+const UGC_AUTHOR_SHARE_PCT = 70;      // решта — платформі (як канали)
+const UGC_PACK_MIN_ITEMS = 3;
+const UGC_PACK_MAX_ITEMS = 24;
+// 1 МБ: редактор віддає 800 px JPEG (≈150–300 КБ), тож із великим запасом.
+// Ліміт саме такий, а не 512 КБ, щоб пройшли й наліпки, створені старими
+// збірками — вони робились із 1600 px і важать до ~900 КБ.
+const UGC_STICKER_MAX_BYTES = 1024 * 1024;
+const UGC_PACK_TITLE_MAX = 40;
+const UGC_PENDING_MAX = 3;            // одночасно на модерації
+const UGC_PACKS_MAX = 20;             // усього на автора
+const UGC_SUBMIT_DAILY = 5;           // подач на добу
+
+function ugcNewPackId() {
+  return 'u' + crypto.randomBytes(6).toString('hex');
+}
+
+// Назва пака. Керівні символи вирізаємо: вона потрапляє в магазин, у списки
+// й у повідомлення модератора.
+function ugcCleanTitle(raw) {
+  const t = String(raw || '').replace(/[\x00-\x1f\x7f]/g, '').trim();
+  if (t.length < 2 || t.length > UGC_PACK_TITLE_MAX) return null;
+  return t;
+}
+
+// Прибирає пак разом із файлами в бакеті `stickers`. Викликається, коли автор
+// забирає заявку й коли прибирають відхилений пак: інакше бакет накопичував би
+// сміття, якого аудит осиротілих файлів не бачить (він сканує `files`, а
+// магазин лежить у `stickers`).
+async function ugcRemovePackFiles(packId) {
+  try {
+    const { data: items } = await supabase.from('sticker_pack_items')
+      .select('storage_path').eq('pack_id', packId);
+    const paths = (items || []).map(i => i.storage_path).filter(Boolean);
+    if (paths.length) await supabase.storage.from('stickers').remove(paths);
+  } catch (e) {
+    console.error('[ugcRemovePackFiles]', packId, e.message);
+  }
+}
+
+// ── Подати пак на модерацію ───────────────────────────────────────────────
+// { title, price, stickers: [url…] } — url з бакета `files`, шлях мусить
+// починатись на `stickers/<нік автора>/`.
+app.post('/stickers/pack/submit', async (req, res) => {
+  const nick = req.nick;
+  const { title: rawTitle, price: rawPrice, stickers } = req.body;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+
+  const title = ugcCleanTitle(rawTitle);
+  if (!title) return res.json({ ok: false, error: 'Невірна назва набору', code: 'err_pack_title' });
+
+  const price = Number(rawPrice);
+  if (!UGC_PACK_PRICES.includes(price)) {
+    return res.json({ ok: false, error: 'Невірна ціна', code: 'err_pack_price' });
+  }
+
+  // Кожен елемент — або голий URL, або {url, cropScale, cropDx, cropDy}. Кроп
+  // обов'язково їде з наліпкою: він і є тим, що автор бачить у себе, а без
+  // нього покупець отримав би необрізане вихідне фото.
+  const num = (v, def) => (Number.isFinite(Number(v)) ? Number(v) : def);
+  const urls = (Array.isArray(stickers) ? stickers : []).map(it => {
+    if (typeof it === 'string') return { url: it, scale: 1, dx: 0, dy: 0 };
+    if (it && typeof it.url === 'string') {
+      return {
+        url: it.url,
+        // Межі ті самі, що в редакторі наліпок (масштаб 1..4, зсув у долях
+        // розміру): клієнт може прислати будь-що.
+        scale: Math.min(4, Math.max(1, num(it.cropScale, 1))),
+        dx: Math.min(1, Math.max(-1, num(it.cropDx, 0))),
+        dy: Math.min(1, Math.max(-1, num(it.cropDy, 0))),
+      };
+    }
+    return null;
+  }).filter(it => it && it.url);
+  if (urls.length < UGC_PACK_MIN_ITEMS || urls.length > UGC_PACK_MAX_ITEMS) {
+    return res.json({ ok: false, error: `Потрібно від ${UGC_PACK_MIN_ITEMS} до ${UGC_PACK_MAX_ITEMS} наліпок`, code: 'err_pack_items_count' });
+  }
+
+  // Ліміти автора. Рахуємо ДО заливки — інакше відмова лишила б файли.
+  const { data: mine } = await supabase.from('sticker_packs')
+    .select('id, status').eq('author_nick', nick);
+  const all = mine || [];
+  if (all.length >= UGC_PACKS_MAX) {
+    return res.json({ ok: false, error: 'Досягнуто ліміту наборів', code: 'err_pack_limit' });
+  }
+  if (all.filter(p => p.status === 'pending').length >= UGC_PENDING_MAX) {
+    return res.json({ ok: false, error: 'Забагато наборів на модерації', code: 'err_pack_pending_limit' });
+  }
+  // Денний ліміт подач. Без нього «подав 3 → сам забрав → подав ще 3» лило б
+  // у Storage нескінченний потік файлів, обходячи ліміт черги. Це не сінк:
+  // монет за подачу не беремо, тож лічильник рахуємо прямо.
+  const submittedToday = await usageToday(nick, 'ugc_submit');
+  if (submittedToday === null) {
+    // Лічильник недоступний — пропускаємо, але гучно (як у сінках): мовчазний
+    // нуль означав би, що ліміт не працює НІКОЛИ.
+    console.error('[ugc] лічильник подач недоступний, пропускаю ліміт:', nick);
+  } else if (submittedToday >= UGC_SUBMIT_DAILY) {
+    return res.json({ ok: false, error: 'Забагато подач сьогодні', code: 'err_pack_submit_daily' });
+  }
+
+  const packId = ugcNewPackId();
+  const uploaded = [];
+  try {
+    for (let i = 0; i < urls.length; i++) {
+      const path = storagePathFromUrl(urls[i].url);
+      // Шлях і є доказом володіння: чужа наліпка (збережена з повідомлення)
+      // лежить під чужим ніком і сюди не пройде.
+      // ⚠️ `..` перевіряємо ОКРЕМО: storagePathFromUrl робить
+      // decodeURIComponent, тож `%2E%2E` стає `..`, і рядок
+      // `stickers/<мій нік>/../<чужий нік>/f.png` пройшов би startsWith,
+      // а сховище могло б нормалізувати його вже до чужого файла.
+      if (!path || !path.startsWith(`stickers/${nick}/`) || path.split('/').includes('..')) {
+        await ugcRemovePackFiles(packId);
+        return res.json({ ok: false, error: 'Наліпка не належить вам', code: 'err_pack_not_yours' });
+      }
+      const { data: blob, error: dlErr } = await supabase.storage.from('files').download(path);
+      if (dlErr || !blob) {
+        await ugcRemovePackFiles(packId);
+        return res.json({ ok: false, error: 'Наліпку не знайдено', code: 'err_pack_sticker_missing' });
+      }
+      const bytes = Buffer.from(await blob.arrayBuffer());
+      if (bytes.length > UGC_STICKER_MAX_BYTES) {
+        await ugcRemovePackFiles(packId);
+        return res.json({ ok: false, error: 'Наліпка завелика', code: 'err_pack_sticker_too_big' });
+      }
+      const ext = path.toLowerCase().endsWith('.webp') ? 'webp' : 'png';
+      const dest = `${packId}/s${i + 1}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('stickers')
+        .upload(dest, bytes, { contentType: ext === 'webp' ? 'image/webp' : 'image/png', upsert: true });
+      if (upErr) throw new Error(upErr.message);
+      uploaded.push({
+        pack_id: packId, sticker_id: `s${i + 1}`, storage_path: dest, kind: 'image', sort_order: i,
+        crop_scale: urls[i].scale, crop_dx: urls[i].dx, crop_dy: urls[i].dy,
+      });
+    }
+
+    const now = Date.now();
+    // is_active: false до схвалення — навіть якби фільтр за статусом десь
+    // забули, непідтверджений пак у магазин не потрапить.
+    const { error: packErr } = await supabase.from('sticker_packs').insert({
+      id: packId, title, price, preview_sticker: 's1', is_active: false,
+      sort_order: 100, author_nick: nick, status: 'pending', submitted_at: now,
+    });
+    if (packErr) throw new Error(packErr.message);
+    const { error: itemsErr } = await supabase.from('sticker_pack_items').insert(uploaded);
+    if (itemsErr) throw new Error(itemsErr.message);
+
+    await bumpUsage(nick, 'ugc_submit', 1);
+    sendToUser(COMPANY_NICK, { type: 'moderation_new', kind: 'sticker_pack', packId });
+    res.json({ ok: true, packId, status: 'pending' });
+  } catch (e) {
+    console.error('[stickers/pack/submit]', e.message);
+    await ugcRemovePackFiles(packId);
+    await supabase.from('sticker_pack_items').delete().eq('pack_id', packId);
+    await supabase.from('sticker_packs').delete().eq('id', packId);
+    res.json({ ok: false, error: 'Не вдалося створити набір', code: 'err_pack_create_failed' });
+  }
+});
+
+// ── Мої набори (з їх статусами) ───────────────────────────────────────────
+app.get('/stickers/my-packs', async (req, res) => {
+  const nick = req.nick;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { data: packs } = await supabase.from('sticker_packs')
+    .select('id, title, price, status, reject_reason, submitted_at, reviewed_at, is_active, preview_sticker')
+    .eq('author_nick', nick).order('submitted_at', { ascending: false });
+  const list = packs || [];
+  // Продажі рахуємо з володінь, а не з окремої колонки-лічильника: інкремент
+  // при купівлі міг би розійтися з дійсністю при гонці, а тут число точне.
+  const sales = {};
+  for (const p of list) {
+    const { count } = await supabase.from('user_sticker_packs')
+      .select('nick', { count: 'exact', head: true }).eq('pack_id', p.id);
+    sales[p.id] = count || 0;
+  }
+  const { data: items } = list.length
+    ? await supabase.from('sticker_pack_items')
+        .select('pack_id, sticker_id, storage_path, sort_order, crop_scale, crop_dx, crop_dy')
+        .in('pack_id', list.map(p => p.id)).order('sort_order')
+    : { data: [] };
+  const byPack = {};
+  for (const it of items || []) {
+    (byPack[it.pack_id] ||= []).push({
+      id: it.sticker_id, url: stickerPublicUrl(it.storage_path),
+      cropScale: it.crop_scale ?? 1, cropDx: it.crop_dx ?? 0, cropDy: it.crop_dy ?? 0,
+    });
+  }
+  res.json({
+    ok: true,
+    prices: UGC_PACK_PRICES,
+    authorSharePct: UGC_AUTHOR_SHARE_PCT,
+    minItems: UGC_PACK_MIN_ITEMS,
+    maxItems: UGC_PACK_MAX_ITEMS,
+    packs: list.map(p => ({
+      ...p,
+      sales: sales[p.id] || 0,
+      // Стільки автор отримав із цього набору. Ціна пака після схвалення не
+      // змінюється, тож множення точне.
+      earned: (sales[p.id] || 0) * Math.floor(p.price * UGC_AUTHOR_SHARE_PCT / 100),
+      items: byPack[p.id] || [],
+    })),
+  });
+});
+
+// ── Забрати заявку / прибрати відхилений набір ────────────────────────────
+// Схвалений пак автор зняти НЕ може: його вже могли купити.
+app.post('/stickers/pack/withdraw', async (req, res) => {
+  const nick = req.nick;
+  const { packId } = req.body;
+  if (!nick || !packId) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { data: pack } = await supabase.from('sticker_packs')
+    .select('id, author_nick, status').eq('id', packId).maybeSingle();
+  if (!pack || pack.author_nick !== nick) return res.json({ ok: false, error: 'Набір не знайдено', code: 'err_pack_not_found' });
+  if (pack.status === 'approved') return res.json({ ok: false, error: 'Схвалений набір зняти не можна', code: 'err_pack_approved' });
+  await ugcRemovePackFiles(packId);
+  await supabase.from('sticker_pack_items').delete().eq('pack_id', packId);
+  await supabase.from('sticker_packs').delete().eq('id', packId);
+  res.json({ ok: true });
+});
+
+// ── Черга модерації (адмін) ───────────────────────────────────────────────
+app.get('/admin/sticker-queue', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'forbidden' });
+  const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : 'pending';
+  const { data: packs } = await supabase.from('sticker_packs')
+    .select('id, title, price, status, author_nick, submitted_at, reviewed_at, reject_reason, is_active')
+    .not('author_nick', 'is', null).eq('status', status)
+    .order('submitted_at', { ascending: status === 'pending' });
+  const list = packs || [];
+  const { data: items } = list.length
+    ? await supabase.from('sticker_pack_items')
+        .select('pack_id, sticker_id, storage_path, sort_order, crop_scale, crop_dx, crop_dy')
+        .in('pack_id', list.map(p => p.id)).order('sort_order')
+    : { data: [] };
+  const byPack = {};
+  for (const it of items || []) {
+    (byPack[it.pack_id] ||= []).push({
+      id: it.sticker_id, url: stickerPublicUrl(it.storage_path),
+      cropScale: it.crop_scale ?? 1, cropDx: it.crop_dx ?? 0, cropDy: it.crop_dy ?? 0,
+    });
+  }
+  res.json({ ok: true, packs: list.map(p => ({ ...p, items: byPack[p.id] || [] })) });
+});
+
+// ── Рішення модератора (адмін) ────────────────────────────────────────────
+// approve   — пак у магазин
+// reject    — відхилити з причиною (автор бачить її й може подати новий)
+// unpublish — зняти вже схвалений: у покупців лишається, гроші не повертаємо
+//             (так само роблять магазини застосунків і Telegram)
+app.post('/admin/sticker-review', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'forbidden' });
+  const { packId, action, reason } = req.body || {};
+  if (!packId || !['approve', 'reject', 'unpublish'].includes(action)) {
+    return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  }
+  const { data: pack } = await supabase.from('sticker_packs')
+    .select('id, author_nick, title, status').eq('id', packId).maybeSingle();
+  if (!pack) return res.json({ ok: false, error: 'Набір не знайдено', code: 'err_pack_not_found' });
+  if (!pack.author_nick) return res.json({ ok: false, error: 'Це офіційний набір', code: 'err_pack_official' });
+
+  const now = Date.now();
+  const patch = { reviewed_at: now, reviewed_by: COMPANY_NICK };
+  if (action === 'approve') { patch.status = 'approved'; patch.is_active = true; patch.reject_reason = null; }
+  else { patch.status = 'rejected'; patch.is_active = false; patch.reject_reason = (reason || '').slice(0, 300) || null; }
+  await supabase.from('sticker_packs').update(patch).eq('id', packId);
+
+  sendToUser(pack.author_nick, {
+    type: 'sticker_pack_reviewed', packId, title: pack.title,
+    status: patch.status, reason: patch.reject_reason || null,
+  });
+  res.json({ ok: true, status: patch.status });
 });
 
 app.post('/group/update', async (req, res) => {
@@ -6177,8 +6552,19 @@ app.get('/admin/ping', (req, res) => {
 
 app.get('/admin/reports', async (req, res) => {
   if (!isAdmin(req)) return res.json({ ok: false, error: 'Доступ заборонено', code: 'err_forbidden' });
-  const { data } = await supabase.from('reports').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-  res.json({ ok: true, reports: data || [] });
+  const status = ['pending', 'resolved'].includes(req.query.status) ? req.query.status : 'pending';
+  const { data } = await supabase.from('reports').select('*')
+    .eq('status', status).order('created_at', { ascending: false }).limit(200);
+  const list = data || [];
+  // Чи вже забанена ціль — інакше модератор не бачить, що зі скаргою вже
+  // розібрались, і банив би повторно.
+  const targets = [...new Set(list.map(r => r.target_nick).filter(Boolean))];
+  const banned = new Set();
+  if (targets.length) {
+    const { data: bans } = await supabase.from('platform_bans').select('nick').in('nick', targets);
+    for (const b of bans || []) banned.add(b.nick);
+  }
+  res.json({ ok: true, reports: list.map(r => ({ ...r, targetBanned: banned.has(r.target_nick) })) });
 });
 
 app.post('/admin/ban', async (req, res) => {

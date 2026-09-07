@@ -414,8 +414,39 @@ create table if not exists public.sticker_packs (
   price integer NOT NULL DEFAULT 0,
   sort_order integer NOT NULL DEFAULT 0,
   title text NOT NULL,
+  -- UGC: not null → пак створив користувач, 70% ціни йдуть йому.
+  -- Офіційні паки лишаються з null і статусом 'approved'.
+  author_nick text,
+  status text NOT NULL DEFAULT 'approved',  -- 'approved' | 'pending' | 'rejected'
+  reject_reason text,
+  submitted_at bigint,
+  reviewed_at bigint,
+  reviewed_by text,
   primary key (id)
 );
+
+create index if not exists sticker_packs_status_idx on public.sticker_packs (status, submitted_at);
+create index if not exists sticker_packs_author_idx on public.sticker_packs (author_nick);
+
+-- Склад пака (з міграції sticker_packs_network.sql). Файли — у бакеті
+-- `stickers`, який навмисно ПУБЛІЧНИЙ: статичний контент магазину, однаковий
+-- для всіх і без персональних даних.
+create table if not exists public.sticker_pack_items (
+  pack_id      text    NOT NULL,
+  sticker_id   text    NOT NULL,
+  storage_path text    NOT NULL,
+  kind         text    NOT NULL DEFAULT 'lottie',  -- 'lottie' (json) | 'image' (webp/png)
+  sort_order   integer NOT NULL DEFAULT 0,
+  -- Кроп UGC-наліпки: масштаб + зсув у ДОЛЯХ розміру (не растрове вирізання,
+  -- тож однаковий вигляд при будь-якому розмірі показу).
+  crop_scale   real    NOT NULL DEFAULT 1,
+  crop_dx      real    NOT NULL DEFAULT 0,
+  crop_dy      real    NOT NULL DEFAULT 0,
+  created_at   timestamp with time zone NOT NULL DEFAULT now(),
+  primary key (pack_id, sticker_id)
+);
+
+create index if not exists sticker_pack_items_pack_idx on public.sticker_pack_items (pack_id, sort_order);
 
 create table if not exists public.token_deposits (
   signature text primary key,
@@ -490,6 +521,8 @@ alter table public.channel_comment_reactions drop constraint if exists channel_c
 alter table public.channel_comment_reactions add constraint channel_comment_reactions_comment_id_fkey foreign key (comment_id) references public.channel_comments(id);
 alter table public.user_sticker_packs drop constraint if exists user_sticker_packs_pack_id_fkey;
 alter table public.user_sticker_packs add constraint user_sticker_packs_pack_id_fkey foreign key (pack_id) references public.sticker_packs(id);
+alter table public.sticker_pack_items drop constraint if exists sticker_pack_items_pack_fkey;
+alter table public.sticker_pack_items add constraint sticker_pack_items_pack_fkey foreign key (pack_id) references public.sticker_packs(id) on delete cascade;
 
 -- ─────────────────────────────────────────────────────────────────
 -- 3. ІНДЕКСИ (без тих, що створюються автоматично для PK/UNIQUE)
@@ -689,6 +722,7 @@ alter table public.phone_codes enable row level security;
 alter table public.platform_bans enable row level security;
 alter table public.reports enable row level security;
 alter table public.sticker_packs enable row level security;
+alter table public.sticker_pack_items enable row level security;
 alter table public.token_deposits enable row level security;
 alter table public.token_payouts enable row level security;
 alter table public.user_sticker_packs enable row level security;
@@ -956,6 +990,8 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 grant delete, insert, references, select, trigger, truncate, update on table public.reports to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.sticker_packs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.sticker_packs to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.sticker_pack_items to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.sticker_pack_items to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_sticker_packs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_sticker_packs to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.users to postgres;
@@ -1010,6 +1046,12 @@ insert into storage.buckets (id, name, public) values ('avatars', 'avatars', fal
   on conflict (id) do update set public = false;
 insert into storage.buckets (id, name, public) values ('files', 'files', false)
   on conflict (id) do update set public = false;
+
+-- Наліпки — ЄДИНИЙ публічний бакет: статичний контент магазину, однаковий для
+-- всіх і без персональних даних. Публічність дає кешування в клієнті й прибирає
+-- підписування кожного файла на кожен кадр гортання панелі.
+insert into storage.buckets (id, name, public) values ('stickers', 'stickers', true)
+  on conflict (id) do update set public = true;
 
 -- Явна політика для сервера. service_role і так обходить RLS — тримаємо
 -- її заради читабельності: видно, що доступ має ЛИШЕ сервер.
