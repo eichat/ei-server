@@ -335,8 +335,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.70',
-  code: 71,
+  version: '0.9.71',
+  code: 72,
   minCode: 0,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
@@ -4648,9 +4648,13 @@ app.get('/shop/sticker-packs', async (req, res) => {
   const nick = req.query.nick;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   await grantFreePacks(nick); // безкоштовні одразу у власності
+  // Безкоштовні — завжди зверху: вони й так уже у власності, тож саме з них
+  // починають користуватись. Усередині кожної групи — за sort_order.
   const { data: packs, error } = await supabase.from('sticker_packs')
     .select('id, title, price, preview_sticker, sort_order')
-    .eq('is_active', true).order('sort_order', { ascending: true });
+    .eq('is_active', true)
+    .order('price', { ascending: true })
+    .order('sort_order', { ascending: true });
   if (error) {
     console.error('[shop/sticker-packs] select error:', error);
     return res.json({ ok: false, error: 'Помилка каталогу', code: 'err_catalog_failed' });
