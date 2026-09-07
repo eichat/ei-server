@@ -515,10 +515,24 @@ const pendingCallOffers = new Map();
 async function saveFcmToken(nick, token, deviceId) {
   fcmTokens.set(nick, token);
   if (deviceId) { nickDevices.set(nick, deviceId); busPublish({ t: 'dev', nick, deviceId }); }
+  // 🔴 Той самий токен знімаємо з УСІХ інших ніків.
+  //
+  // Токен FCM належить ПРИСТРОЮ, а лежить у нас на ніку. Хто перемкнув профіль
+  // (на телефоні був void, тепер EION), лишав свій старий запис недоторканим —
+  // і повідомлення для void прилітало пушем на цей самий телефон, де сидить уже
+  // інша людина. Тобто чуже сповіщення на чужому екрані.
+  // Знімати безпечно: один фізичний пристрій обслуговує один акаунт, а
+  // повернувшись у void, клієнт одразу зареєструє токен назад (login_ok).
+  for (const [n, t] of fcmTokens) {
+    if (t === token && n.toLowerCase() !== nick.toLowerCase()) fcmTokens.delete(n);
+  }
   try {
     const patch = { fcm_token: token };
     if (deviceId) patch.fcm_device_id = deviceId;
     await supabase.from('users').update(patch).eq('nick_lower', nick.toLowerCase());
+    await supabase.from('users')
+      .update({ fcm_token: null, fcm_device_id: null })
+      .eq('fcm_token', token).neq('nick_lower', nick.toLowerCase());
   } catch (e) { console.error(`saveFcmToken(${nick}):`, e.message); }
 }
 
