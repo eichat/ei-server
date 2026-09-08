@@ -917,5 +917,6 @@
   "ugc_price_changed": "দাম বদলানো হয়েছে",
   "ugc_not_in_shop": "দোকানে নেই",
   "err_pack_not_approved": "প্যাকটি এখনও অনুমোদিত হয়নি",
-  "err_pack_price_daily": "আজ অনেকবার দাম বদলানো হয়েছে"
+  "err_pack_price_daily": "আজ অনেকবার দাম বদলানো হয়েছে",
+  "ugc_mine": "আপনার প্যাক"
 }

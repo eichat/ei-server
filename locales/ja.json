@@ -917,5 +917,6 @@
   "ugc_price_changed": "価格を変更しました",
   "ugc_not_in_shop": "ショップ非公開",
   "err_pack_not_approved": "パックはまだ承認されていません",
-  "err_pack_price_daily": "本日の価格変更が多すぎます"
+  "err_pack_price_daily": "本日の価格変更が多すぎます",
+  "ugc_mine": "あなたのパック"
 }

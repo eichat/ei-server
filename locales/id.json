@@ -917,5 +917,6 @@
   "ugc_price_changed": "Harga diubah",
   "ugc_not_in_shop": "Tidak di toko",
   "err_pack_not_approved": "Paket belum disetujui",
-  "err_pack_price_daily": "Terlalu banyak perubahan harga hari ini"
+  "err_pack_price_daily": "Terlalu banyak perubahan harga hari ini",
+  "ugc_mine": "Paket kamu"
 }

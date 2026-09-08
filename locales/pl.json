@@ -917,5 +917,6 @@
   "ugc_price_changed": "Cena zmieniona",
   "ugc_not_in_shop": "Poza sklepem",
   "err_pack_not_approved": "Zestaw nie został jeszcze zatwierdzony",
-  "err_pack_price_daily": "Zbyt wiele zmian ceny dzisiaj"
+  "err_pack_price_daily": "Zbyt wiele zmian ceny dzisiaj",
+  "ugc_mine": "Twój zestaw"
 }

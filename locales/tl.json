@@ -917,5 +917,6 @@
   "ugc_price_changed": "Nabago ang presyo",
   "ugc_not_in_shop": "Wala sa tindahan",
   "err_pack_not_approved": "Hindi pa aprubado ang pack",
-  "err_pack_price_daily": "Masyadong maraming pagbabago ng presyo ngayon"
+  "err_pack_price_daily": "Masyadong maraming pagbabago ng presyo ngayon",
+  "ugc_mine": "Pack mo"
 }

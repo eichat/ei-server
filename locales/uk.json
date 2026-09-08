@@ -917,5 +917,6 @@
   "ugc_price_changed": "Ціну змінено",
   "ugc_not_in_shop": "Не в магазині",
   "err_pack_not_approved": "Набір ще не схвалено",
-  "err_pack_price_daily": "Забагато змін ціни сьогодні"
+  "err_pack_price_daily": "Забагато змін ціни сьогодні",
+  "ugc_mine": "Ваш набір"
 }

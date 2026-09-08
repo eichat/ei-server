@@ -917,5 +917,6 @@
   "ugc_price_changed": "Цена изменена",
   "ugc_not_in_shop": "Не в магазине",
   "err_pack_not_approved": "Набор ещё не одобрен",
-  "err_pack_price_daily": "Слишком много изменений цены сегодня"
+  "err_pack_price_daily": "Слишком много изменений цены сегодня",
+  "ugc_mine": "Ваш набор"
 }

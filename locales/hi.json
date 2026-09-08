@@ -917,5 +917,6 @@
   "ugc_price_changed": "कीमत बदल दी गई",
   "ugc_not_in_shop": "स्टोर में नहीं",
   "err_pack_not_approved": "पैक अभी स्वीकृत नहीं है",
-  "err_pack_price_daily": "आज कीमत बहुत बार बदली गई"
+  "err_pack_price_daily": "आज कीमत बहुत बार बदली गई",
+  "ugc_mine": "आपका पैक"
 }

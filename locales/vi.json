@@ -917,5 +917,6 @@
   "ugc_price_changed": "Đã đổi giá",
   "ugc_not_in_shop": "Không ở cửa hàng",
   "err_pack_not_approved": "Bộ chưa được duyệt",
-  "err_pack_price_daily": "Đổi giá quá nhiều lần hôm nay"
+  "err_pack_price_daily": "Đổi giá quá nhiều lần hôm nay",
+  "ugc_mine": "Bộ của bạn"
 }

@@ -21166,6 +21166,29 @@
    "uk": "Забагато змін ціни сьогодні",
    "vi": "Đổi giá quá nhiều lần hôm nay",
    "zh": "今天修改价格次数过多"
+  },
+  "ugc_mine": {
+   "ar": "حزمتك",
+   "bn": "আপনার প্যাক",
+   "de": "Dein Paket",
+   "en": "Your pack",
+   "es": "Tu paquete",
+   "fr": "Votre pack",
+   "hi": "आपका पैक",
+   "id": "Paket kamu",
+   "it": "Il tuo pacchetto",
+   "ja": "あなたのパック",
+   "ko": "내 팩",
+   "nl": "Jouw pakket",
+   "pl": "Twój zestaw",
+   "pt": "Seu pacote",
+   "ru": "Ваш набор",
+   "th": "ชุดของคุณ",
+   "tl": "Pack mo",
+   "tr": "Sizin paketiniz",
+   "uk": "Ваш набір",
+   "vi": "Bộ của bạn",
+   "zh": "你的贴纸包"
   }
  }
 }

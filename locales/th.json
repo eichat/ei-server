@@ -917,5 +917,6 @@
   "ugc_price_changed": "เปลี่ยนราคาแล้ว",
   "ugc_not_in_shop": "ไม่อยู่ในร้าน",
   "err_pack_not_approved": "ชุดยังไม่ได้รับอนุมัติ",
-  "err_pack_price_daily": "เปลี่ยนราคาบ่อยเกินไปวันนี้"
+  "err_pack_price_daily": "เปลี่ยนราคาบ่อยเกินไปวันนี้",
+  "ugc_mine": "ชุดของคุณ"
 }

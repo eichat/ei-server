@@ -917,5 +917,6 @@
   "ugc_price_changed": "Fiyat değişti",
   "ugc_not_in_shop": "Mağazada değil",
   "err_pack_not_approved": "Paket henüz onaylanmadı",
-  "err_pack_price_daily": "Bugün çok fazla fiyat değişikliği"
+  "err_pack_price_daily": "Bugün çok fazla fiyat değişikliği",
+  "ugc_mine": "Sizin paketiniz"
 }

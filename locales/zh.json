@@ -917,5 +917,6 @@
   "ugc_price_changed": "价格已修改",
   "ugc_not_in_shop": "未上架",
   "err_pack_not_approved": "贴纸包尚未通过审核",
-  "err_pack_price_daily": "今天修改价格次数过多"
+  "err_pack_price_daily": "今天修改价格次数过多",
+  "ugc_mine": "你的贴纸包"
 }

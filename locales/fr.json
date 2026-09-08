@@ -917,5 +917,6 @@
   "ugc_price_changed": "Prix modifié",
   "ugc_not_in_shop": "Hors boutique",
   "err_pack_not_approved": "Le pack n’est pas encore approuvé",
-  "err_pack_price_daily": "Trop de changements de prix aujourd’hui"
+  "err_pack_price_daily": "Trop de changements de prix aujourd’hui",
+  "ugc_mine": "Votre pack"
 }

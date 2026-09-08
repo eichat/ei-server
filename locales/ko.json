@@ -917,5 +917,6 @@
   "ugc_price_changed": "가격을 변경했습니다",
   "ugc_not_in_shop": "상점에 없음",
   "err_pack_not_approved": "팩이 아직 승인되지 않았습니다",
-  "err_pack_price_daily": "오늘 가격 변경이 너무 많습니다"
+  "err_pack_price_daily": "오늘 가격 변경이 너무 많습니다",
+  "ugc_mine": "내 팩"
 }

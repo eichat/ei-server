@@ -4760,7 +4760,14 @@ app.get('/shop/sticker-packs', async (req, res) => {
     ...(p.author_nick ? { authorNick: p.author_nick } : {}),
     // Безкоштовний вважається своїм одразу лише для ОФІЦІЙНИХ паків (їх
     // видає grantFreePacks). Безкоштовний UGC треба додати свідомо.
-    owned: ownedSet.has(p.id) || (p.price === 0 && !p.author_nick),
+    //
+    // Власний набір автор має завжди: купити його однаково не можна
+    // (err_pack_own), а без цього магазин показував би йому кнопку «Купити»,
+    // яка гарантовано відмовляє. Запис у user_sticker_packs НЕ робимо —
+    // інакше автор порахувався б власним покупцем і «Продажів» показувало б
+    // на одиницю більше.
+    owned: ownedSet.has(p.id) || (p.price === 0 && !p.author_nick) || p.author_nick === nick,
+    ...(p.author_nick === nick ? { mine: true } : {}),
     items: byPack.get(p.id) || [],   // порожньо → пак вбудований у застосунок
   }));
   res.json({ ok: true, packs: result });
@@ -4772,7 +4779,12 @@ app.get('/shop/my-packs', async (req, res) => {
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   await grantFreePacks(nick);
   const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
-  res.json({ ok: true, packIds: (owned || []).map(o => o.pack_id) });
+  // Власні набори — теж свої (див. /shop/sticker-packs). Обидва списки мають
+  // збігатися, інакше пак був би доступний у магазині й замкнений у панелі.
+  const { data: mine } = await supabase.from('sticker_packs')
+    .select('id').eq('author_nick', nick).eq('status', 'approved');
+  const ids = new Set([...(owned || []).map(o => o.pack_id), ...(mine || []).map(p => p.id)]);
+  res.json({ ok: true, packIds: [...ids] });
 });
 
 // Купівля пака за коіни (Крок 2B). Порядок критичний для безпеки:

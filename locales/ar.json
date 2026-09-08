@@ -917,5 +917,6 @@
   "ugc_price_changed": "تم تغيير السعر",
   "ugc_not_in_shop": "ليست في المتجر",
   "err_pack_not_approved": "لم تتم الموافقة على الحزمة بعد",
-  "err_pack_price_daily": "تغييرات كثيرة للسعر اليوم"
+  "err_pack_price_daily": "تغييرات كثيرة للسعر اليوم",
+  "ugc_mine": "حزمتك"
 }
