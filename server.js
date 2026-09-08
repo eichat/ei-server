@@ -138,7 +138,7 @@ app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120 }));
 // ВИПРАВЛЕНО (аудит #4): раніше тут були неіснуючі /request-reset,/reset-password —
 // реальні шляхи це /forgot,/reset. Плюс телефонні коди (SMS — дорого, брутфорс коду).
 const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
-app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/request-code', '/phone/verify-code'], authLimiter);
+app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/request-code', '/phone/verify-code', '/check-phone'], authLimiter);
 
 // 🔴 Нік потрапляє у фільтри PostgREST, де кома й дужки — РОЗДІЛЬНИКИ. Нік
 // `x,id.gt.0` перетворював `or=(from_nick.eq.x,to_nick.eq.x)` на умову, що
@@ -295,6 +295,11 @@ const PUBLIC_PATHS = new Set([
   '/health', '/stats', '/ping', '/keepalive',
   '/login', '/register', '/forgot', '/reset', '/verify-email',
   '/phone/request-code', '/phone/verify-code',
+  // 🔴 Викликається у формі реєстрації, коли токена ще НЕМАЄ: без цього рядка
+  // перевірка «цей номер уже зареєстровано» мовчки віддавала 401 і не
+  // працювала взагалі (знайдено 08.09.2026 за подією Sentry services.http401).
+  // Перебір прикриває authLimiter нижче — 20 запитів на IP за 15 хв.
+  '/check-phone',
   '/download-ping', '/app/version',
 ]);
 app.use((req, res, next) => {
