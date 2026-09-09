@@ -925,5 +925,6 @@
   "export_title": "Verilerimin bir kopyası",
   "export_sub": "JSON dosyası: profil, sohbetler, jetonlar",
   "export_progress": "Arşiv hazırlanıyor…",
-  "export_saved": "Verilerinizin kopyası kaydedildi"
+  "export_saved": "Verilerinizin kopyası kaydedildi",
+  "test_mode_notice": "Test sürümü — hatalar olabilir"
 }

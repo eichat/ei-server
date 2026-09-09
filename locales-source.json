@@ -21350,6 +21350,29 @@
    "uk": "Копію ваших даних збережено",
    "vi": "Đã lưu bản sao dữ liệu của bạn",
    "zh": "已保存您的数据副本"
+  },
+  "test_mode_notice": {
+   "ar": "نسخة تجريبية — قد تحدث أخطاء",
+   "bn": "পরীক্ষামূলক সংস্করণ — ত্রুটি হতে পারে",
+   "de": "Testversion – Fehler sind möglich",
+   "en": "Test build — bugs are expected",
+   "es": "Versión de prueba: puede haber errores",
+   "fr": "Version de test — des bugs sont possibles",
+   "hi": "परीक्षण संस्करण — गड़बड़ियाँ संभव हैं",
+   "id": "Versi uji — mungkin ada kesalahan",
+   "it": "Versione di prova — sono possibili errori",
+   "ja": "テスト版 — 不具合が起こりえます",
+   "ko": "테스트 버전 — 오류가 있을 수 있습니다",
+   "nl": "Testversie — fouten zijn mogelijk",
+   "pl": "Wersja testowa — możliwe błędy",
+   "pt": "Versão de teste — podem ocorrer erros",
+   "ru": "Тестовая версия — возможны ошибки",
+   "th": "เวอร์ชันทดสอบ — อาจมีข้อผิดพลาด",
+   "tl": "Test build — posibleng may bug",
+   "tr": "Test sürümü — hatalar olabilir",
+   "uk": "Тестова версія — можливі помилки",
+   "vi": "Bản thử nghiệm — có thể có lỗi",
+   "zh": "测试版本 — 可能存在问题"
   }
  }
 }

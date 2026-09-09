@@ -925,5 +925,6 @@
   "export_title": "Bản sao dữ liệu của tôi",
   "export_sub": "Tệp JSON: hồ sơ, trò chuyện, xu",
   "export_progress": "Đang tạo tệp lưu trữ…",
-  "export_saved": "Đã lưu bản sao dữ liệu của bạn"
+  "export_saved": "Đã lưu bản sao dữ liệu của bạn",
+  "test_mode_notice": "Bản thử nghiệm — có thể có lỗi"
 }

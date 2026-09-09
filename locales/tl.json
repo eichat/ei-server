@@ -925,5 +925,6 @@
   "export_title": "Kopya ng aking data",
   "export_sub": "JSON file: profile, chat, barya",
   "export_progress": "Binubuo ang archive…",
-  "export_saved": "Na-save ang kopya ng iyong data"
+  "export_saved": "Na-save ang kopya ng iyong data",
+  "test_mode_notice": "Test build — posibleng may bug"
 }

@@ -40,7 +40,11 @@ const TRANSFER_FEE_PCT = 1;
 const PREMIUM_PRICES = { monthly: 1000, yearly: 8400 };
 // Стартовий баланс нового акаунта. Задається ТУТ (у /register), колонка в БД
 // має свій DEFAULT лише як запобіжник.
-const NEW_USER_COINS = 200;
+// ⚠️ ТЕСТОВИЙ ПЕРІОД: 2000 замість 200 (рішення 09.09.2026) — щоб бета-
+// тестувальникам вистачало на преміум і платні набори без штучної економії.
+// 🔴 ПОВЕРНУТИ 200 ПЕРЕД РЕЛІЗОМ: бонус іде зі скарбниці, тож при 2000 її
+// вистачає лише на ~500 реєстрацій, а ще це вдесятеро дорожчий Sybil.
+const NEW_USER_COINS = 2000;
 // Гаманець створюється НЕ автоматично, а кнопкою — і його відкриття коштує
 // монет: наша реальна витрата тут одна, рента токен-рахунку (~0,002 SOL ≈
 // $0,37 на mainnet), і платить її наш гаманець. Преміум звільняється.
@@ -2446,7 +2450,7 @@ async function quotaSnapshot(nick) {
       freeLimit: FREE_QUOTA[kind],
       premiumLimit: FREE_QUOTA[`${kind}_premium`] || FREE_QUOTA[kind] };
   }
-  return { premium, kinds, prices: PREMIUM_PRICES, walletFee: WALLET_OPEN_FEE };
+  return { premium, kinds, prices: PREMIUM_PRICES, walletFee: WALLET_OPEN_FEE, signupBonus: NEW_USER_COINS };
 }
 
 /// Позначка «нік був онлайн». Пишемо не частіше разу на годину на нік: логін
@@ -3444,7 +3448,7 @@ app.get('/user-info', async (req, res) => {
   res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true, solana_address: user.solana_address || null,
     // Скільки з балансу дозволено виводити в токен і чи вже сплачено відкриття
     // гаманця — клієнт має показувати це чесно, а не обіцяти вивід усього.
-    ...ei, wallet_open_fee: (ei.wallet_opened || premiumNow) ? 0 : WALLET_OPEN_FEE });
+    ...ei, wallet_open_fee: (ei.wallet_opened || premiumNow) ? 0 : WALLET_OPEN_FEE, signup_bonus: NEW_USER_COINS });
 });
 
 // ── Гаманець Solana: тільки АДРЕСА, без ключів ───────────────────────────

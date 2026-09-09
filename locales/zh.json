@@ -925,5 +925,6 @@
   "export_title": "我的数据副本",
   "export_sub": "JSON 文件：个人资料、聊天、金币",
   "export_progress": "正在生成存档…",
-  "export_saved": "已保存您的数据副本"
+  "export_saved": "已保存您的数据副本",
+  "test_mode_notice": "测试版本 — 可能存在问题"
 }

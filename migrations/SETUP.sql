@@ -482,7 +482,9 @@ create table if not exists public.user_sticker_packs (
 create table if not exists public.users (
   avatar_url text,
   block_incoming boolean NOT NULL DEFAULT false,
-  coins integer DEFAULT 200,
+  -- 0, а не бонус: реєстрація задає coins явно й нараховує бонус зі скарбниці
+  -- (grantFromTreasury). DEFAULT із сумою тут колись дав би подвійне нарахування.
+  coins integer DEFAULT 0,
   -- Частина coins, яку дозволено виводити в токен. Міст працює 1:1, тож усе,
   -- що роздали ми самі, лишається внутрішнім — інакше кожна роздача була б
   -- прямою емісією токена (реєстрація давала 200 при мінімумі виводу 100).

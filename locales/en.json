@@ -925,5 +925,6 @@
   "export_title": "A copy of my data",
   "export_sub": "A JSON file: profile, chats, coins",
   "export_progress": "Building your archive…",
-  "export_saved": "Your data copy has been saved"
+  "export_saved": "Your data copy has been saved",
+  "test_mode_notice": "Test build — bugs are expected"
 }

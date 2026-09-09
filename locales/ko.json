@@ -925,5 +925,6 @@
   "export_title": "내 데이터 사본",
   "export_sub": "JSON 파일: 프로필, 대화, 코인",
   "export_progress": "보관 파일을 만드는 중…",
-  "export_saved": "데이터 사본을 저장했습니다"
+  "export_saved": "데이터 사본을 저장했습니다",
+  "test_mode_notice": "테스트 버전 — 오류가 있을 수 있습니다"
 }

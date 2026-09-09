@@ -925,5 +925,6 @@
   "export_title": "Una copia de mis datos",
   "export_sub": "Un archivo JSON: perfil, chats, monedas",
   "export_progress": "Preparando el archivo…",
-  "export_saved": "Se guardó la copia de tus datos"
+  "export_saved": "Se guardó la copia de tus datos",
+  "test_mode_notice": "Versión de prueba: puede haber errores"
 }
