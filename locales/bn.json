@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "দোকানে নেই",
   "err_pack_not_approved": "প্যাকটি এখনও অনুমোদিত হয়নি",
   "err_pack_price_daily": "আজ অনেকবার দাম বদলানো হয়েছে",
-  "ugc_mine": "আপনার প্যাক"
+  "ugc_mine": "আপনার প্যাক",
+  "err_export_daily_limit": "আজকের এক্সপোর্ট সীমা শেষ",
+  "export_title": "আমার ডেটার কপি",
+  "export_sub": "JSON ফাইল: প্রোফাইল, চ্যাট, কয়েন",
+  "export_progress": "আর্কাইভ তৈরি হচ্ছে…",
+  "export_saved": "আপনার ডেটার কপি সংরক্ষিত হয়েছে"
 }

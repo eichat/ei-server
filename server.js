@@ -1053,6 +1053,7 @@ function eionFactsPrompt() {
     `- Beyond the allowance the user pays coins: ${SINK_PRICE.ai} per AI request, ${SINK_PRICE.storage} per MB, ${SINK_PRICE.turn} per relayed call.`,
     `- Transfers between users carry a ${TRANSFER_FEE_PCT}% fee. Paid channels give 70% to the author.`,
     '- Any action that moves coins out of the account asks for the ACCOUNT password (not the wallet password): transferring coins, converting coins into tokens, changing the wallet address, subscribing to a paid channel, paying to contact a channel owner, and buying a sticker pack made by another USER (70% of it goes to that person). Premium and official sticker packs do NOT ask, because those coins stay inside EION. The password is never stored on the device, so a stolen phone cannot spend the balance.',
+    '- Users can export a copy of all their data (Profile settings → A copy of my data): a JSON file with profile, coin log, conversations, memberships, sticker packs and quota counters. It asks for the account password. Direct message text is decrypted by the app from its local copy, because the key never leaves the device; anything the app cannot decrypt stays marked encrypted. Files are not embedded — the archive holds links.',
     '- How to MAKE a sticker: sticker panel → "Create" → pick a photo from the gallery or take one with the camera, then drag and zoom it — the square area becomes the sticker. Any image format works (PNG, JPEG, WebP); the app resizes it itself to at most 512 px per side, so nothing has to be prepared or compressed by hand. A PNG with a transparent background KEEPS its transparency (it is saved as PNG); photos without transparency are saved as JPEG. Stickers made this way live in "My stickers" and can be sent in chats or collected into a pack for the shop.',
     `- Users can publish their own sticker packs and earn from them. The author builds a pack out of stickers THEY created (in the sticker panel: Create, then the shop, then "My packs"), gives it a name and picks a price from a fixed list (${UGC_PACK_PRICES.join(', ')} coins), and submits it for review. After EION approves it, the pack appears in the shop and the author gets ${UGC_AUTHOR_SHARE_PCT}% of every purchase as WITHDRAWABLE coins; the rest goes to the platform. A pack holds ${UGC_PACK_MIN_ITEMS}-${UGC_PACK_MAX_ITEMS} stickers. Only stickers the user made themselves can go in — one saved from someone else's message belongs to its author. While a pack is still in review the author can withdraw it entirely. Once approved the CONTENT is fixed (that is what review is for), but the author can still take the pack off the shop or put it back, and change its price to another value from the same list (up to ${UGC_PRICE_CHANGES_DAILY} changes a day). Moderators can also take an approved pack out of the shop. In every case buyers keep what they already own and are not refunded.`,
     '- You have tools for the current user: balance, today\'s usage against the daily allowance, sticker packs, coin supply. Call them instead of guessing or asking the user to check.',
@@ -3238,6 +3239,145 @@ async function purgeAccountData(nick, user) {
   }
   return report;
 }
+
+/// ── Право на копію своїх даних (GDPR ст. 15 «доступ» і ст. 20 «портативність») ──
+///
+/// Парний до /delete-account нижче: право на видалення (ст. 17) закрито 02.09,
+/// а право отримати копію не було реалізоване взагалі.
+///
+/// 🔴 Сервер віддає ЛИШЕ свою половину архіву. Текст особистих чатів після
+/// переходу на E2EE (02.09) лежить у нас конвертами `[e2e1]…`: ключ живе на
+/// пристрої, тож віддати відкритий текст ми не можемо навіть на прохання
+/// самого власника. Тому кожен рядок несе `encrypted`, а відкритий текст
+/// підставляє КЛІЄНТ зі своєї локальної бази, зшиваючи обидві половини.
+/// Незашифровані (старі, до 02.09) приходять читабельними одразу.
+///
+/// Пароль акаунта обовʼязковий: вивантажити все листування вкраденою сесією
+/// гірше за переказ монет, який пароля вже вимагає.
+const EXPORT_ROW_LIMIT = 5000;
+const ACCOUNT_EXPORT_DAILY = 3;
+
+/// Збирання архіву винесене з обробника окремо, щоб його можна було прогнати
+/// офлайн із підставним supabase: запускати сервер локально заради перевірки
+/// не можна — він підключився б до прод-бази й продублював фонові задачі
+/// (чистку файлів, сканер депозитів, дозасилання виплат).
+async function buildAccountExport(nick) {
+  const errors = [];
+  const truncated = [];
+  const rows = async (table, col, select = '*') => {
+    const { data, error } = await supabase.from(table).select(select).eq(col, nick).limit(EXPORT_ROW_LIMIT + 1);
+    if (error) { errors.push(`${table}.${col}: ${error.message}`); return []; }
+    const list = data || [];
+    if (list.length > EXPORT_ROW_LIMIT) { truncated.push(`${table}.${col}`); return list.slice(0, EXPORT_ROW_LIMIT); }
+    return list;
+  };
+  // Дедуп по id: повідомлення сам собі трапляється в обох вибірках (from і to),
+  // а «нотатки собі» — це саме такий випадок.
+  const both = async (table, colA, colB) => {
+    const seen = new Set(); const out = [];
+    for (const col of [colA, colB]) for (const r of await rows(table, col)) {
+      const key = r.id != null ? `i${r.id}` : JSON.stringify(r);
+      if (seen.has(key)) continue;
+      seen.add(key); out.push(r);
+    }
+    return out;
+  };
+
+  // 🔴 Профіль — ЯВНИЙ перелік колонок, а не `*` мінус зайве: `password_hash`,
+  // `fcm_token` і `tokens_valid_from` не мають потрапити в архів ніколи, а
+  // чорний список мовчки пропустив би будь-яку нову колонку зі схеми.
+  const { data: profile } = await supabase.from('users')
+    .select('nick, color, nick_color, avatar_url, status, created_at, last_seen, ' +
+            'email, phone, phone_verified, premium_plan, premium_expires_at, ' +
+            'coins, coins_earned, wallet_opened, solana_address, e2ee_pubkey, ' +
+            'block_incoming, invisible')
+    .eq('nick', nick).single();
+
+  const isSealed = (c) => typeof c === 'string' && c.startsWith('[e2e1]');
+  const mapDirect = (r) => ({
+    id: r.id, msg_id: r.msg_id, from: r.from_nick, to: r.to_nick,
+    timestamp: r.timestamp, type: r.type,
+    content: r.content, encrypted: isSealed(r.content),
+    file_name: r.file_name, file_url: r.file_data || null,
+    duration_sec: r.duration_sec, edited_at: r.edited_at, status: r.status,
+    reply_to: r.reply_to_msg_id
+      ? { msg_id: r.reply_to_msg_id, from: r.reply_to_from, text: r.reply_to_text, encrypted: isSealed(r.reply_to_text) }
+      : null,
+  });
+
+  const direct = (await both('messages', 'from_nick', 'to_nick')).map(mapDirect)
+    .sort((a, b) => (Number(a.timestamp) || 0) - (Number(b.timestamp) || 0));
+
+  const payload = {
+    format: 'eion-export-1',
+    generated_at: new Date().toISOString(),
+    nick,
+    profile: profile || null,
+
+    // Гроші. `coin_transactions` — обидва напрямки; token_* прив'язані до ніка.
+    coins: {
+      transactions: await both('coin_transactions', 'from_nick', 'to_nick'),
+      payouts: await rows('token_payouts', 'nick'),
+      deposits: await rows('token_deposits', 'nick'),
+    },
+
+    // Листування. Особисті — обидва напрямки (це переписка власника архіва).
+    // Групові, пости й коментарі — ЛИШЕ власні: чужі повідомлення в групі це
+    // дані інших людей, і віддавати їх під виглядом «своїх» не можна.
+    messages: {
+      direct,
+      group_own: await rows('group_messages', 'from_nick'),
+      channel_posts_own: await rows('channel_messages', 'from_nick'),
+      channel_comments_own: await rows('channel_comments', 'from_nick'),
+    },
+
+    memberships: {
+      channels: await rows('channel_members', 'nick'),
+      groups: await rows('group_members', 'nick'),
+      paid_subscriptions: await rows('channel_paid_subs', 'nick'),
+    },
+
+    stickers: {
+      owned_packs: await rows('user_sticker_packs', 'nick'),
+      authored_packs: await rows('sticker_packs', 'author_nick'),
+    },
+
+    privacy: {
+      blocked_contacts: await rows('blocked_contacts', 'blocker_nick'),
+      allowlist: await rows('block_allowlist', 'owner_nick'),
+    },
+
+    calls: await both('call_logs', 'from_nick', 'to_nick'),
+    usage_counters: await rows('usage_counters', 'nick'),
+
+    limits: { row_limit: EXPORT_ROW_LIMIT, truncated },
+    errors,
+    notes: {
+      encrypted: 'Рядки з encrypted:true зашифровані наскрізно. Ключ зберігається лише на вашому пристрої, тому сервер не має до них доступу — відкритий текст додає застосунок із локальної бази.',
+      not_included: 'Вміст груп і каналів, написаний іншими людьми, не входить в архів: це їхні дані. Файли не вкладені — у полі file_url лежать посилання, доки об’єкт живий у сховищі.',
+    },
+  };
+
+  return payload;
+}
+
+app.post('/account/export', async (req, res) => {
+  const nick = req.nick;
+  const pwErr = await requireAccountPassword(req);
+  if (pwErr) return res.json(pwErr);
+
+  // Ліміт: експорт читає десяток таблиць цілком, тож це найдорожчий запит у
+  // застосунку. Три на добу вистачає людині й не дає зробити з нього спосіб
+  // навантажити базу.
+  const used = await usageToday(nick, 'account_export');
+  if (used !== null && used >= ACCOUNT_EXPORT_DAILY) {
+    return res.json({ ok: false, error: 'Ліміт вивантажень на сьогодні вичерпано', code: 'err_export_daily_limit' });
+  }
+
+  const payload = await buildAccountExport(nick);
+  await bumpUsage(nick, 'account_export');
+  res.json({ ok: true, export: payload });
+});
 
 app.post('/delete-account', async (req, res) => {
   const { password } = req.body; const nick = req.nick;

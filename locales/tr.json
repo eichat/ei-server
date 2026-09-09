@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Mağazada değil",
   "err_pack_not_approved": "Paket henüz onaylanmadı",
   "err_pack_price_daily": "Bugün çok fazla fiyat değişikliği",
-  "ugc_mine": "Sizin paketiniz"
+  "ugc_mine": "Sizin paketiniz",
+  "err_export_daily_limit": "Bugünkü dışa aktarma sınırına ulaştınız",
+  "export_title": "Verilerimin bir kopyası",
+  "export_sub": "JSON dosyası: profil, sohbetler, jetonlar",
+  "export_progress": "Arşiv hazırlanıyor…",
+  "export_saved": "Verilerinizin kopyası kaydedildi"
 }

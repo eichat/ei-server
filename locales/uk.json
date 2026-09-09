@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Не в магазині",
   "err_pack_not_approved": "Набір ще не схвалено",
   "err_pack_price_daily": "Забагато змін ціни сьогодні",
-  "ugc_mine": "Ваш набір"
+  "ugc_mine": "Ваш набір",
+  "err_export_daily_limit": "Ліміт вивантажень на сьогодні вичерпано",
+  "export_title": "Копія моїх даних",
+  "export_sub": "Файл JSON: профіль, листування, монети",
+  "export_progress": "Збираємо архів…",
+  "export_saved": "Копію ваших даних збережено"
 }

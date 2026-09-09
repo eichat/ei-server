@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Nicht im Shop",
   "err_pack_not_approved": "Das Paket ist noch nicht freigegeben",
   "err_pack_price_daily": "Zu viele Preisänderungen heute",
-  "ugc_mine": "Dein Paket"
+  "ugc_mine": "Dein Paket",
+  "err_export_daily_limit": "Das heutige Export-Limit ist erreicht",
+  "export_title": "Kopie meiner Daten",
+  "export_sub": "JSON-Datei: Profil, Chats, Münzen",
+  "export_progress": "Archiv wird erstellt …",
+  "export_saved": "Kopie deiner Daten gespeichert"
 }

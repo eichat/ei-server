@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Fora da loja",
   "err_pack_not_approved": "O pacote ainda não foi aprovado",
   "err_pack_price_daily": "Muitas alterações de preço hoje",
-  "ugc_mine": "Seu pacote"
+  "ugc_mine": "Seu pacote",
+  "err_export_daily_limit": "Você atingiu o limite de exportações de hoje",
+  "export_title": "Uma cópia dos meus dados",
+  "export_sub": "Um ficheiro JSON: perfil, conversas, moedas",
+  "export_progress": "A preparar o arquivo…",
+  "export_saved": "Cópia dos seus dados guardada"
 }

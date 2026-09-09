@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Không ở cửa hàng",
   "err_pack_not_approved": "Bộ chưa được duyệt",
   "err_pack_price_daily": "Đổi giá quá nhiều lần hôm nay",
-  "ugc_mine": "Bộ của bạn"
+  "ugc_mine": "Bộ của bạn",
+  "err_export_daily_limit": "Bạn đã đạt giới hạn xuất dữ liệu hôm nay",
+  "export_title": "Bản sao dữ liệu của tôi",
+  "export_sub": "Tệp JSON: hồ sơ, trò chuyện, xu",
+  "export_progress": "Đang tạo tệp lưu trữ…",
+  "export_saved": "Đã lưu bản sao dữ liệu của bạn"
 }

@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Tidak di toko",
   "err_pack_not_approved": "Paket belum disetujui",
   "err_pack_price_daily": "Terlalu banyak perubahan harga hari ini",
-  "ugc_mine": "Paket kamu"
+  "ugc_mine": "Paket kamu",
+  "err_export_daily_limit": "Batas ekspor hari ini sudah tercapai",
+  "export_title": "Salinan data saya",
+  "export_sub": "Berkas JSON: profil, obrolan, koin",
+  "export_progress": "Menyiapkan arsip…",
+  "export_saved": "Salinan data Anda tersimpan"
 }

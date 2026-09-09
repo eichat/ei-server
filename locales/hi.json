@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "स्टोर में नहीं",
   "err_pack_not_approved": "पैक अभी स्वीकृत नहीं है",
   "err_pack_price_daily": "आज कीमत बहुत बार बदली गई",
-  "ugc_mine": "आपका पैक"
+  "ugc_mine": "आपका पैक",
+  "err_export_daily_limit": "आज की एक्सपोर्ट सीमा पूरी हो गई",
+  "export_title": "मेरे डेटा की कॉपी",
+  "export_sub": "JSON फ़ाइल: प्रोफ़ाइल, चैट, सिक्के",
+  "export_progress": "संग्रह तैयार हो रहा है…",
+  "export_saved": "आपके डेटा की कॉपी सेव हो गई"
 }

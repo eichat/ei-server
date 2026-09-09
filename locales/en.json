@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Not in shop",
   "err_pack_not_approved": "The pack is not approved yet",
   "err_pack_price_daily": "Too many price changes today",
-  "ugc_mine": "Your pack"
+  "ugc_mine": "Your pack",
+  "err_export_daily_limit": "Today’s export limit has been reached",
+  "export_title": "A copy of my data",
+  "export_sub": "A JSON file: profile, chats, coins",
+  "export_progress": "Building your archive…",
+  "export_saved": "Your data copy has been saved"
 }

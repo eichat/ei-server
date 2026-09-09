@@ -20,6 +20,9 @@ jobs:
       - name: Перевірити логіку користувацьких наборів наліпок
         run: node tools/check-ugc-packs.mjs
 
+      - name: Перевірити експорт даних акаунта (GDPR)
+        run: node tools/check-account-export.mjs
+
       - name: Переконатись, що locales/ відповідають джерелу
         run: |
           if [ -n "$(git status --porcelain locales/)" ]; then

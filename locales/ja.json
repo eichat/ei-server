@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "ショップ非公開",
   "err_pack_not_approved": "パックはまだ承認されていません",
   "err_pack_price_daily": "本日の価格変更が多すぎます",
-  "ugc_mine": "あなたのパック"
+  "ugc_mine": "あなたのパック",
+  "err_export_daily_limit": "本日のエクスポート上限に達しました",
+  "export_title": "自分のデータのコピー",
+  "export_sub": "JSONファイル：プロフィール、チャット、コイン",
+  "export_progress": "アーカイブを作成中…",
+  "export_saved": "データのコピーを保存しました"
 }

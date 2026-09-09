@@ -920,5 +920,10 @@
   "ugc_not_in_shop": "Niet in de winkel",
   "err_pack_not_approved": "Het pakket is nog niet goedgekeurd",
   "err_pack_price_daily": "Te veel prijswijzigingen vandaag",
-  "ugc_mine": "Jouw pakket"
+  "ugc_mine": "Jouw pakket",
+  "err_export_daily_limit": "Je hebt de exportlimiet van vandaag bereikt",
+  "export_title": "Een kopie van mijn gegevens",
+  "export_sub": "Een JSON-bestand: profiel, chats, munten",
+  "export_progress": "Archief wordt samengesteld…",
+  "export_saved": "Kopie van je gegevens opgeslagen"
 }
