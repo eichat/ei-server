@@ -331,6 +331,8 @@ create table if not exists public.messages (
   content text NOT NULL,
   edited_at bigint,
   delivered boolean NOT NULL DEFAULT false,
+  delivered_devices text[] DEFAULT '{}'::text[],
+  synced_devices text[] DEFAULT '{}'::text[],
   duration_sec integer,
   file_data text,
   file_name text,
@@ -348,6 +350,23 @@ create table if not exists public.messages (
   waveform text,
   primary key (id)
 );
+
+-- Пристрої акаунта: свій ключ E2EE, свій токен пушів, свій час появи.
+-- Відправник шифрує для КОЖНОГО невідкликаного пристрою отримувача, а доставка
+-- рахується на пристрій (messages.delivered_devices), не на нік.
+create table if not exists public.user_devices (
+  nick text NOT NULL,
+  device_id text NOT NULL,
+  platform text,
+  e2ee_pubkey text,
+  fcm_token text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  last_seen bigint,
+  revoked_at bigint,
+  primary key (nick, device_id)
+);
+
+create index if not exists user_devices_nick_idx on public.user_devices (nick);
 
 create table if not exists public.pending_channel_invites (
   channel_id bigint NOT NULL,
@@ -721,6 +740,7 @@ alter table public.pending_channel_invites enable row level security;
 alter table public.pending_group_invites enable row level security;
 alter table public.pending_reactions enable row level security;
 alter table public.phone_codes enable row level security;
+alter table public.user_devices enable row level security;
 alter table public.platform_bans enable row level security;
 alter table public.reports enable row level security;
 alter table public.sticker_packs enable row level security;
@@ -986,6 +1006,9 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 grant delete, insert, references, select, trigger, truncate, update on table public.pending_reactions to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.phone_codes to service_role;
+-- Пристрої: лише сервер. anon/authenticated не отримують нічого (аудит #21).
+grant delete, insert, references, select, trigger, truncate, update on table public.user_devices to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.user_devices to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.reports to postgres;

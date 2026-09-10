@@ -2458,6 +2458,44 @@ function sendToUser(nick, payload) {
   return true;
 }
 
+// Копія власного повідомлення на ІНШІ пристрої відправника.
+//
+// 🔴 Без цього багатопристроєвість половинчаста: вхідні розходяться на всі
+// пристрої, а те, що ти написав з десктопа, на телефоні не зʼявляється взагалі.
+// Саме так це й виглядало в першому тесті — адресат отримував, другий власний
+// пристрій не бачив нічого.
+//
+// Шифротекст пересилається ЯК Є: клієнт кладе в конверт слот і для власних
+// ключів теж, тому кожен свій пристрій його відкриє. Якщо ключів немає (стара
+// збірка), текст і так відкритий — копія лишається читабельною.
+function syncOwnDevices(nick, fromWs, payload) {
+  if (!MULTI_DEVICE) return 0;
+  const socks = deviceSessions.get(nick);
+  if (!socks) return 0;
+  const raw = JSON.stringify(payload);
+  const reached = [];
+  for (const s of socks.values()) {
+    if (s.ws === fromWs || s.ws.readyState !== 1) continue;
+    try { s.ws.send(raw); if (s.deviceId) reached.push(s.deviceId); } catch (_) { /* сокет помер між перевіркою і записом */ }
+  }
+  // Позначаємо, що ці пристрої копію вже мають, — інакше при наступному вході
+  // догін надіслав би її вдруге. Без await: доставка не має чекати на БД, а
+  // повторна копія все одно відсіється дедупом по msgId на клієнті.
+  if (reached.length && payload.msgId) {
+    (async () => {
+      try {
+        const { data: row } = await supabase.from('messages')
+          .select('id, synced_devices').eq('from_nick', nick).eq('msg_id', payload.msgId).maybeSingle();
+        if (!row) return;
+        const have = Array.isArray(row.synced_devices) ? row.synced_devices : [];
+        const add = reached.filter(d => !have.includes(d));
+        if (add.length) await supabase.from('messages').update({ synced_devices: [...have, ...add] }).eq('id', row.id);
+      } catch (e) { console.error('[syncOwnDevices]', e.message); }
+    })();
+  }
+  return reached.length;
+}
+
 // Онлайн-запис адресата ЛИШЕ якщо сокет справді живий (readyState OPEN +
 // heartbeat). Мертвий сокет (code=1006 на Render, ще не прибраний delete/
 // heartbeat) прибираємо й вважаємо офлайн. Критично для доставки: інакше
@@ -7314,13 +7352,14 @@ wss.on('connection', (ws) => {
         // нього було, ми не можемо, тож чесно починаємо з моменту, коли пристрій
         // став нам відомий.
         let pendingQ = supabase.from('messages').select('*').eq('to_nick', userNick);
+        let deviceSince = null;
         if (MULTI_DEVICE && ws.sessionDevice) {
           const { data: devRow } = await supabase.from('user_devices')
             .select('created_at').eq('nick', userNick).eq('device_id', ws.sessionDevice).maybeSingle();
-          const since = devRow && devRow.created_at ? new Date(devRow.created_at).getTime() : Date.now();
+          deviceSince = devRow && devRow.created_at ? new Date(devRow.created_at).getTime() : Date.now();
           pendingQ = pendingQ
             .not('delivered_devices', 'cs', `{"${ws.sessionDevice}"}`)
-            .gte('timestamp', since);
+            .gte('timestamp', deviceSince);
         } else {
           pendingQ = pendingQ.eq('delivered', false);
         }
@@ -7346,6 +7385,33 @@ wss.on('connection', (ws) => {
             } else {
               await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
             }
+          }
+        }
+
+        // 🔴 Догін ВЛАСНИХ повідомлень, надісланих з іншого пристрою. Без нього
+        // багатопристроєвість половинчаста: вхідні розходяться на всі пристрої,
+        // а написане з десктопа на телефоні не зʼявляється ніколи — саме це й
+        // показав перший живий тест.
+        //
+        // Шифротекст віддаємо ЯК Є: клієнт кладе в конверт слот і для власних
+        // ключів, тож свій пристрій його відкриє. Стара збірка слот не клала —
+        // тоді копія буде нечитабельна, і клієнт покаже це як звичайну невдачу
+        // розшифрування, а не як зникле повідомлення.
+        if (MULTI_DEVICE && ws.sessionDevice && deviceSince != null) {
+          const { data: mine } = await supabase.from('messages').select('*')
+            .eq('from_nick', userNick)
+            .not('synced_devices', 'cs', `{"${ws.sessionDevice}"}`)
+            .gte('timestamp', deviceSince)
+            .order('timestamp', { ascending: true });
+          for (const m of (mine || [])) {
+            const base = m.type === 'sticker'
+              ? { type: 'own_message', kind: 'sticker', from: userNick, ...decodeStickerContent(m.content), timestamp: m.timestamp, msgId: m.msg_id }
+              : m.type === 'file'
+                ? { type: 'own_message', kind: 'file', from: userNick, fileName: m.file_name, ...(m.content && m.content !== m.file_name ? { caption: m.content } : {}), ...(m.file_data && /^(https?:\/\/|eion:\/\/)/.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }
+                : { type: 'own_message', kind: 'chat', from: userNick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}) };
+            try { ws.send(JSON.stringify(await signDeep({ ...base, to: m.to_nick }))); } catch (_) { continue; }
+            const have = Array.isArray(m.synced_devices) ? m.synced_devices : [];
+            await supabase.from('messages').update({ synced_devices: [...have, ws.sessionDevice] }).eq('id', m.id);
           }
         }
 
@@ -7427,7 +7493,10 @@ wss.on('connection', (ws) => {
         const status = (target && !ack) ? 'delivered' : 'sent';
         const hasFile = msg.isFile && (msg.fileData || msg.fileUrl);
         await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: hasFile ? 'file' : 'text', content: msg.text, timestamp: ts, delivered: !!target && !ack, msg_id: msgId, status, ...(hasFile ? { file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
-        if (target) { target.ws.send(JSON.stringify({ type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
+        const outChat = { type: 'chat_message', from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) };
+        // Копія на ІНШІ власні пристрої — незалежно від того, чи адресат онлайн.
+        syncOwnDevices(userNick, ws, { ...outChat, type: 'own_message', kind: 'chat', to: msg.to });
+        if (target) { target.ws.send(JSON.stringify(outChat)); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
         else {
           // Безтілесний push (приватність): лише сигнал + нік, без тексту.
           sendFcmPush(msg.to, { type: 'message', from_nick: userNick });
@@ -7479,7 +7548,10 @@ wss.on('connection', (ws) => {
           const ack = ackAware(target, msgId);
           const status = (target && !ack) ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'sticker', content, timestamp: ts, delivered: !!target && !ack, msg_id: msgId, status });
-          if (target) { target.ws.send(JSON.stringify({ type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId })); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
+          const outSticker = { type: 'sticker', from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId };
+        // Копія на ІНШІ власні пристрої — незалежно від того, чи адресат онлайн.
+        syncOwnDevices(userNick, ws, { ...outSticker, type: 'own_message', kind: 'sticker', to: msg.to });
+        if (target) { target.ws.send(JSON.stringify(outSticker)); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
           else { sendFcmPush(msg.to, { type: 'message', from_nick: userNick }); }
         }
       }
@@ -7507,7 +7579,10 @@ wss.on('connection', (ws) => {
           const status = (target && !ack) ? 'delivered' : 'sent';
           await supabase.from('messages').insert({ from_nick: userNick, to_nick: msg.to, type: 'file', content: mediaCaption(msg), file_name: msg.fileName, file_data: fileData, timestamp: ts, delivered: !!target && !ack, msg_id: msgId, status, ...(msg.waveform ? { waveform: JSON.stringify(msg.waveform) } : {}), ...(msg.durationSec != null ? { duration_sec: msg.durationSec } : {}) });
           await trackFileObject(fileData, [msg.to]); // 2C
-          if (target) { target.ws.send(JSON.stringify({ type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) })); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
+          const outFile = { type: 'file_message', from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) };
+        // Копія на ІНШІ власні пристрої — незалежно від того, чи адресат онлайн.
+        syncOwnDevices(userNick, ws, { ...outFile, type: 'own_message', kind: 'file', to: msg.to });
+        if (target) { target.ws.send(JSON.stringify(outFile)); if (!ack && msgId && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'status_update', status: 'delivered', msgIds: [msgId] })); if (ack) armAckFallback(msg.to, userNick, msgId); }
           else { sendFcmPush(msg.to, { type: 'message', from_nick: userNick }); }
         }
       }
