@@ -809,6 +809,15 @@ function dropSession(nick, ws) {
   return false;
 }
 
+/// FCM-токен саме цього пристрою. Потрібен, щоб відрізнити десктоп (пуша не
+/// має взагалі — для нього відкритий сокет це єдиний шлях) від телефона, якому
+/// при сумнівному сокеті краще надіслати пуш.
+async function getDeviceToken(nick, deviceId) {
+  if (!nick || !deviceId) return null;
+  const d = (await activeDevices(nick)).find(x => x.device_id === deviceId);
+  return (d && d.fcm_token) || null;
+}
+
 async function activeDevices(nick) {
   if (!nick) return [];
   try {
@@ -2179,19 +2188,23 @@ app.post('/ai/chat', async (req, res) => {
   res.status(502).json({ error: { message: 'AI помилка' }, code: 'err_ai_failed' });
 });
 
-async function sendCallPush(toNick, fromNick, hasVideo, offer) {
+// `skipDevices` — пристрої, яким offer уже пішов сокетом. Без цього пристрій,
+// що зараз онлайн, отримав би І offer, І пуш, тобто задзвонив би двічі.
+async function sendCallPush(toNick, fromNick, hasVideo, offer, skipDevices = new Set()) {
   // Дзвонити мають УСІ пристрої адресата, а не той один, чий токен випадково
   // лежав у колонці users.fcm_token.
   let tokens = [];
   if (MULTI_DEVICE) {
     const fromDev = nickDevices.get(fromNick);
     tokens = (await activeDevices(toNick))
-      .filter(d => d.fcm_token && d.device_id !== fromDev)
+      .filter(d => d.fcm_token && d.device_id !== fromDev && !skipDevices.has(d.device_id))
       .map(d => d.fcm_token);
   }
   if (tokens.length === 0) {
+    // Реєстр порожній або всі пристрої вже отримали offer сокетом.
+    if (MULTI_DEVICE && skipDevices.size) return 0;
     const token = await getFcmToken(toNick);
-    if (!token) return;
+    if (!token) return 0;
     tokens = [token];
   }
   const callId = `${fromNick}_${toNick}_${Date.now()}`;
@@ -2213,6 +2226,9 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
   // висів би в памʼяті до протухання й міг «ожити» на випадковому /call-offer.
   if (anyOk) console.log(`FCM push відправлено до ${toNick} (${tokens.length} пристр.), callId=${callId}`);
   else pendingCallOffers.delete(callId);
+  // Скільки пристроїв справді розбудили — викликач вирішує за цим, чи казати
+  // дзвонарю «не в мережі».
+  return anyOk ? tokens.length : 0;
 }
 
 // ttlMs — скільки Google ТРИМАЄ пуш, поки пристрій недоступний (Doze/екран
@@ -7864,19 +7880,45 @@ wss.on('connection', (ws) => {
         // мережі». Симптом (підтверджено логом 03.08): call_ice долітали ДЕСЯТКАМИ
         // (вони без гейту), а call_offer — жодного разу, вхідний не дзвенів. Для
         // Android із токеном поведінка НЕ змінюється (зомбі-сокет → FCM, як і було).
-        if (wsAlive || (openSocket && !hasToken)) {
-          target.ws.send(JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false }));
-        } else {
+        // 🔴 Розвилка «WS АБО пуш» була на рівні НІКА — і з двома пристроями це
+        // означало, що дзвонить лише той, у кого зараз живий сокет. Телефон із
+        // закритим екраном пуша не отримував узагалі: гілка `else` просто не
+        // виконувалась, бо десктоп (або зомбі-сокет після виходу з профілю)
+        // виглядав онлайн. Саме так «перший дзвінок не пройшов», а наступні —
+        // уже так: мертвий сокет устигав прибратись heartbeat'ом.
+        //
+        // Тепер дзвонять УСІ пристрої: живим сокетам — offer, решті з токеном —
+        // пуш. `skip` не дає пристрою задзвонити двічі.
+        const liveSocks = [];
+        const socks = MULTI_DEVICE ? deviceSessions.get(msg.to) : null;
+        if (socks) {
+          for (const sess of socks.values()) {
+            if (sess.ws.readyState !== 1) continue;
+            const alive = sess.ws.isAlive !== false || Date.now() - (sess.lastSeen || 0) < 35000;
+            // Десктоп без токена: евристика йому лише шкодить — фолбеку однаково
+            // немає, тож відкритий сокет вважаємо придатним (урок 03.08).
+            const deskNoPush = !sess.deviceId || !(await getDeviceToken(msg.to, sess.deviceId));
+            if (alive || deskNoPush) liveSocks.push(sess);
+          }
+        }
+        const raw = JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false });
+        if (liveSocks.length) {
+          for (const sess of liveSocks) { try { sess.ws.send(raw); } catch (_) { /* помер між перевіркою і записом */ } }
+        } else if (!MULTI_DEVICE && (wsAlive || (openSocket && !hasToken))) {
+          target.ws.send(raw);
+        }
+        const deliveredLive = liveSocks.length > 0 || (!MULTI_DEVICE && (wsAlive || (openSocket && !hasToken)));
+        const skip = new Set(liveSocks.map(x => x.deviceId).filter(Boolean));
+        // Пуш — пристроям, які offer сокетом НЕ отримали. Раніше він ішов лише
+        // коли онлайн не було НІКОГО.
+        const pushed = hasToken ? await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer, skip) : 0;
+        if (!deliveredLive) {
           if (target) { onlineUsers.delete(msg.to); console.log(`call_offer: ${msg.to} stale socket → FCM`); }
-          // Missed-лог створюємо ЗАВЖДИ, коли доставити наживо не вдалось —
-          // і для FCM (адресат у фоні/офлайн, пуш міг не розбудити), і без токена.
-          // Це єдиний запис, який БАЧИТЬ адресат: no_answer від того-хто-дзвонив
-          // для нього фільтрується. Якщо пуш розбудить і дзвінок приймуть —
-          // цей запис приберемо в call_answer (див. нижче).
+          // Missed-лог створюємо, коли доставити наживо не вдалось: пуш міг не
+          // розбудити. Якщо розбудить і дзвінок приймуть — запис приберемо в
+          // call_answer (див. нижче).
           await supabase.from('call_logs').insert({ from_nick: userNick, to_nick: msg.to, has_video: msg.hasVideo || false, started_at: Date.now(), status: 'missed' });
-          if (hasToken) {
-            await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer);
-          } else {
+          if (!pushed) {
             ws.send(JSON.stringify({ type: 'call_error', error: `${msg.to} не в мережі`, code: 'err_callee_offline' }));
           }
         }
