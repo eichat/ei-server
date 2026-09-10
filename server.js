@@ -2515,6 +2515,23 @@ function ownAlreadySent(ws, key) {
   return false;
 }
 
+/// Те саме, що `syncOwnDevices`, але для HTTP-обробників: у них немає сокета
+/// відправника, зате є `req.deviceId` із токена. Пристрій-джерело пропускаємо
+/// за ідентифікатором — він уже застосував дію в себе.
+function syncOwnDevicesByNick(nick, exceptDeviceId, payload) {
+  if (!MULTI_DEVICE) return 0;
+  const socks = deviceSessions.get(nick);
+  if (!socks) return 0;
+  const raw = JSON.stringify(payload);
+  let sent = 0;
+  for (const s of socks.values()) {
+    if (exceptDeviceId && s.deviceId === exceptDeviceId) continue;
+    if (s.ws.readyState !== 1) continue;
+    try { s.ws.send(raw); sent++; } catch (_) { /* помер між перевіркою і записом */ }
+  }
+  return sent;
+}
+
 function syncOwnDevices(nick, fromWs, payload) {
   if (!MULTI_DEVICE) return 0;
   const socks = deviceSessions.get(nick);
@@ -4839,6 +4856,63 @@ async function noteDeletion(nick, msgId, peerNick, scope) {
     console.error('[noteDeletion]', e.message);
   }
 }
+
+// ── «Мої наліпки» на всіх пристроях ──────────────────────────────────────────
+// Зображення вже в Storage (їх надсилають у чат), тож синхронізуємо лише
+// список. Надгробки (`deleted_at`) обовʼязкові: без них «немає на сервері»
+// означало б і «створено офлайн», і «видалено на іншому пристрої».
+
+app.get('/stickers/mine', async (req, res) => {
+  const nick = req.nick;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const since = parseInt(req.query.since, 10) || 0;
+  try {
+    const { data, error } = await supabase.from('user_stickers')
+      .select('sticker_id, image_url, crop_scale, crop_dx, crop_dy, created_at, updated_at, deleted_at')
+      .eq('nick', nick).gt('updated_at', since)
+      .order('updated_at', { ascending: true }).limit(300);
+    // Таблиці ще немає — віддаємо порожньо, а не 500: застосунок має працювати
+    // так само, як до фічі.
+    if (error) return res.json({ ok: true, stickers: [] });
+    res.json({ ok: true, stickers: data || [] });
+  } catch (_) { res.json({ ok: true, stickers: [] }); }
+});
+
+app.post('/stickers/mine', async (req, res) => {
+  const nick = req.nick;
+  const { id, imageUrl } = req.body || {};
+  if (!nick || typeof id !== 'string' || !id || typeof imageUrl !== 'string' || !imageUrl) {
+    return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  }
+  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  const now = Date.now();
+  try {
+    const { error } = await supabase.from('user_stickers').upsert({
+      nick, sticker_id: id.slice(0, 64), image_url: imageUrl.slice(0, 2000),
+      crop_scale: num(req.body.cropScale, 1), crop_dx: num(req.body.cropDx, 0), crop_dy: num(req.body.cropDy, 0),
+      created_at: num(req.body.createdAt, now), updated_at: now, deleted_at: null,
+    }, { onConflict: 'nick,sticker_id' });
+    if (error) return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  } catch (_) { return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' }); }
+  syncOwnDevicesByNick(nick, req.deviceId, { type: 'own_sticker', action: 'add', id });
+  res.json({ ok: true });
+});
+
+app.post('/stickers/mine/delete', async (req, res) => {
+  const nick = req.nick;
+  const { id } = req.body || {};
+  if (!nick || typeof id !== 'string' || !id) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const now = Date.now();
+  // 🔴 Позначаємо, а не видаляємо: рядок і є той надгробок, за яким інший
+  // пристрій зрозуміє, що наліпку прибрали, а не що її там ще немає.
+  // Файл у Storage не чіпаємо — наліпку могли вже надіслати в чат.
+  try {
+    await supabase.from('user_stickers').update({ deleted_at: now, updated_at: now })
+      .eq('nick', nick).eq('sticker_id', id);
+  } catch (_) { /* таблиці ще немає — локальне видалення однаково сталось */ }
+  syncOwnDevicesByNick(nick, req.deviceId, { type: 'own_sticker', action: 'delete', id });
+  res.json({ ok: true });
+});
 
 // Що видалено після `since`. Клієнт кличе на login_ok і зсуває свою позначку.
 app.get('/deletions', async (req, res) => {
