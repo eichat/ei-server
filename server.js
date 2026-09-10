@@ -345,8 +345,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.100',
-  code: 101,
+  version: '0.9.101',
+  code: 102,
   // 🔴 Обовʼязкове: клієнт до 98 не передає `deviceId` при вході, тож його
   // сесія лишається «безпристроєвою» — і на акаунті з двома пристроями
   // вхідні, які вже забрав другий пристрій, до нього не приходять НІКОЛИ.
@@ -5063,16 +5063,25 @@ app.post('/chat/mute', async (req, res) => {
     return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   }
   const chatId = String(id).slice(0, 64);
+  // 🔴 `error` ПЕРЕВІРЯЄМО: supabase його не кидає, а повертає в результаті —
+  // без цієї перевірки сервер відповідав «ok» на запис, якого не сталося
+  // (напр. доки немає міграції), і перемикач у застосунку виглядав робочим.
   try {
-    if (muted === true) {
-      await supabase.from('chat_mutes').upsert(
-        { nick, chat_type: type, chat_id: chatId, updated_at: Date.now() },
-        { onConflict: 'nick,chat_type,chat_id' });
-    } else {
-      await supabase.from('chat_mutes').delete()
-        .eq('nick', nick).eq('chat_type', type).eq('chat_id', chatId);
+    const q = muted === true
+      ? supabase.from('chat_mutes').upsert(
+          { nick, chat_type: type, chat_id: chatId, updated_at: Date.now() },
+          { onConflict: 'nick,chat_type,chat_id' })
+      : supabase.from('chat_mutes').delete()
+          .eq('nick', nick).eq('chat_type', type).eq('chat_id', chatId);
+    const { error } = await q;
+    if (error) {
+      console.error('[chat/mute]', error.message);
+      return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
     }
-  } catch (_) { return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' }); }
+  } catch (e) {
+    console.error('[chat/mute]', e.message);
+    return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  }
   mutedCache.delete(nick);
   syncOwnDevicesByNick(nick, req.deviceId, { type: 'own_mute', chatType: type, id: chatId, muted: muted === true });
   res.json({ ok: true });
