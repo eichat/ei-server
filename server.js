@@ -2504,12 +2504,14 @@ function sendToUser(nick, payload) {
 // рятує: повідомлення потрапляє в базу РАНІШЕ, ніж догін зробить вибірку.
 // Тримаємо на зʼєднанні, бо саме воно й отримує копії; після реконекту стан
 // не потрібен (сервер надішле те, що не підтверджене).
-function ownAlreadySent(ws, msgId) {
+/// `key` — це `тип:msgId`, а не самий ідентифікатор: одне повідомлення
+/// породжує кілька різних подій (копія, видалення), і всі вони мають дійти.
+function ownAlreadySent(ws, key) {
   if (!ws.ownSent) ws.ownSent = new Set();
-  if (ws.ownSent.has(msgId)) return true;
+  if (ws.ownSent.has(key)) return true;
   // Не даємо множині рости без меж на довгій сесії.
   if (ws.ownSent.size > 1000) ws.ownSent.clear();
-  ws.ownSent.add(msgId);
+  ws.ownSent.add(key);
   return false;
 }
 
@@ -2527,7 +2529,12 @@ function syncOwnDevices(nick, fromWs, payload) {
   const selfDev = fromWs && fromWs.sessionDevice;
   for (const s of socks.values()) {
     if (s.ws === fromWs || (selfDev && s.deviceId === selfDev) || s.ws.readyState !== 1) continue;
-    if (payload.msgId && ownAlreadySent(s.ws, payload.msgId)) continue;
+    // 🔴 Ключ дедупу — ТИП + msgId, а не самий msgId. Інакше `own_delete`
+    // глушиться копією `own_message` того самого повідомлення: воно вже в
+    // множині, тож видалення до пристрою не доходить. Знайдено тестом —
+    // видалення «для себе» і «для всіх» не доїжджали, хоча чистка чату й
+    // прочитання (у них msgId немає) працювали.
+    if (payload.msgId && ownAlreadySent(s.ws, `${payload.type}:${payload.msgId}`)) continue;
     try { s.ws.send(raw); if (s.deviceId) reached.push(s.deviceId); } catch (_) { /* сокет помер між перевіркою і записом */ }
   }
   // 🔴 Позначку `synced_devices` ставить САМ пристрій (`own_ack`), а не ми тут.
@@ -7507,7 +7514,9 @@ wss.on('connection', (ws) => {
                 : { type: 'own_message', kind: 'chat', from: userNick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}) };
             // Позначку ставить `own_ack` від самого пристрою — з тієї ж причини,
             // що і в syncOwnDevices: «надіслали в сокет» не означає «дійшло».
-            if (m.msg_id && ownAlreadySent(ws, m.msg_id)) continue;
+            // Ключ той самий, що в syncOwnDevices (`тип:msgId`) — інакше догін
+            // і жива розсилка не бачили б одне одного, і копія прийшла б двічі.
+            if (m.msg_id && ownAlreadySent(ws, `own_message:${m.msg_id}`)) continue;
             try { ws.send(JSON.stringify(await signDeep({ ...base, to: m.to_nick }))); } catch (_) { continue; }
           }
         }
