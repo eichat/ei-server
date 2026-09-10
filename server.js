@@ -345,9 +345,13 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.71',
-  code: 72,
-  minCode: 0,
+  version: '0.9.97',
+  code: 98,
+  // 🔴 Обовʼязкове: клієнт до 98 не передає `deviceId` при вході, тож його
+  // сесія лишається «безпристроєвою» — і на акаунті з двома пристроями
+  // вхідні, які вже забрав другий пристрій, до нього не приходять НІКОЛИ.
+  // Серверне виправлення цього не рятує: пристрій нема кому назвати.
+  minCode: 98,
   android: 'https://github.com/eichat/eion-network/releases/latest/download/EION.apk',
   linux: 'https://github.com/eichat/eion-network/releases/latest/download/EION-x86_64.AppImage',
 };
