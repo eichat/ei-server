@@ -368,6 +368,39 @@ create table if not exists public.user_devices (
 
 create index if not exists user_devices_nick_idx on public.user_devices (nick);
 
+-- Журнал видалень для догону на всі пристрої акаунта. Рядки НЕ прибираються
+-- при читанні: інакше перший пристрій, що зайшов, «спалив» би видалення для
+-- решти — саме цим хворіла стара `deleted_messages`.
+create table if not exists public.message_deletions (
+  id bigint generated always as identity,
+  nick text NOT NULL,
+  msg_id text NOT NULL,
+  peer_nick text,
+  scope text NOT NULL DEFAULT 'all',
+  created_at bigint NOT NULL,
+  primary key (id)
+);
+
+create index if not exists message_deletions_nick_ts_idx on public.message_deletions (nick, created_at);
+
+-- Список власних наліпок (UGC). Файли лежать у Storage; тут лише метадані й
+-- кроп. `deleted_at` — надгробок: без нього «немає на сервері» означало б і
+-- «створено офлайн», і «видалено на іншому пристрої».
+create table if not exists public.user_stickers (
+  nick text NOT NULL,
+  sticker_id text NOT NULL,
+  image_url text NOT NULL,
+  crop_scale double precision NOT NULL DEFAULT 1,
+  crop_dx double precision NOT NULL DEFAULT 0,
+  crop_dy double precision NOT NULL DEFAULT 0,
+  created_at bigint NOT NULL,
+  updated_at bigint NOT NULL,
+  deleted_at bigint,
+  primary key (nick, sticker_id)
+);
+
+create index if not exists user_stickers_sync_idx on public.user_stickers (nick, updated_at);
+
 create table if not exists public.pending_channel_invites (
   channel_id bigint NOT NULL,
   id bigint generated always as identity,
@@ -741,6 +774,8 @@ alter table public.pending_group_invites enable row level security;
 alter table public.pending_reactions enable row level security;
 alter table public.phone_codes enable row level security;
 alter table public.user_devices enable row level security;
+alter table public.message_deletions enable row level security;
+alter table public.user_stickers enable row level security;
 alter table public.platform_bans enable row level security;
 alter table public.reports enable row level security;
 alter table public.sticker_packs enable row level security;
@@ -1009,6 +1044,10 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 -- Пристрої: лише сервер. anon/authenticated не отримують нічого (аудит #21).
 grant delete, insert, references, select, trigger, truncate, update on table public.user_devices to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_devices to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.message_deletions to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.message_deletions to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.user_stickers to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.user_stickers to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.reports to postgres;
