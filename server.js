@@ -2484,21 +2484,12 @@ function syncOwnDevices(nick, fromWs, payload) {
     if (s.ws === fromWs || (selfDev && s.deviceId === selfDev) || s.ws.readyState !== 1) continue;
     try { s.ws.send(raw); if (s.deviceId) reached.push(s.deviceId); } catch (_) { /* сокет помер між перевіркою і записом */ }
   }
-  // Позначаємо, що ці пристрої копію вже мають, — інакше при наступному вході
-  // догін надіслав би її вдруге. Без await: доставка не має чекати на БД, а
-  // повторна копія все одно відсіється дедупом по msgId на клієнті.
-  if (reached.length && payload.msgId) {
-    (async () => {
-      try {
-        const { data: row } = await supabase.from('messages')
-          .select('id, synced_devices').eq('from_nick', nick).eq('msg_id', payload.msgId).maybeSingle();
-        if (!row) return;
-        const have = Array.isArray(row.synced_devices) ? row.synced_devices : [];
-        const add = reached.filter(d => !have.includes(d));
-        if (add.length) await supabase.from('messages').update({ synced_devices: [...have, ...add] }).eq('id', row.id);
-      } catch (e) { console.error('[syncOwnDevices]', e.message); }
-    })();
-  }
+  // 🔴 Позначку `synced_devices` ставить САМ пристрій (`own_ack`), а не ми тут.
+  // Перша версія позначала за фактом `send()` — і це та сама вада, через яку
+  // колись губились повідомлення: сокет може бути вже мертвим (клієнт закрився,
+  // close ще не дійшов), фрейм іде в нікуди, а позначка лишається — і догін те
+  // повідомлення більше не покаже. Виміряно на живому сервері: пристрій, який
+  // був офлайн, опинявся в `synced_devices` і копії не отримував ніколи.
   return reached.length;
 }
 
@@ -7415,9 +7406,9 @@ wss.on('connection', (ws) => {
               : m.type === 'file'
                 ? { type: 'own_message', kind: 'file', from: userNick, fileName: m.file_name, ...(m.content && m.content !== m.file_name ? { caption: m.content } : {}), ...(m.file_data && /^(https?:\/\/|eion:\/\/)/.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, ...(m.waveform ? { waveform: JSON.parse(m.waveform) } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }
                 : { type: 'own_message', kind: 'chat', from: userNick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}) };
+            // Позначку ставить `own_ack` від самого пристрою — з тієї ж причини,
+            // що і в syncOwnDevices: «надіслали в сокет» не означає «дійшло».
             try { ws.send(JSON.stringify(await signDeep({ ...base, to: m.to_nick }))); } catch (_) { continue; }
-            const have = Array.isArray(m.synced_devices) ? m.synced_devices : [];
-            await supabase.from('messages').update({ synced_devices: [...have, ws.sessionDevice] }).eq('id', m.id);
           }
         }
 
@@ -7595,6 +7586,27 @@ wss.on('connection', (ws) => {
 
       // Отримувач підтвердив, що повідомлення в нього. Лише ЗВІДСИ ставиться
       // delivered=true для ack-клієнтів — див. ackAware.
+      // Підтвердження ВЛАСНОЇ копії: пристрій отримав те, що надіслали з
+      // іншого мого пристрою. Доти повідомлення лишається в черзі догону —
+      // тобто втрата фрейму більше не робить копію невидимою назавжди.
+      if (msg.type === 'own_ack') {
+        if (!userNick || !MULTI_DEVICE || !ws.sessionDevice) return;
+        const ids = Array.isArray(msg.msgIds)
+          ? msg.msgIds.filter(x => typeof x === 'string' && x.length > 0 && x.length <= 128).slice(0, 200)
+          : [];
+        if (ids.length === 0) return;
+        const { data: rows, error } = await supabase.from('messages')
+          .select('msg_id, synced_devices').eq('from_nick', userNick).in('msg_id', ids);
+        if (error) { console.error('own_ack select', error.message); return; }
+        for (const r of (rows || [])) {
+          const have = Array.isArray(r.synced_devices) ? r.synced_devices : [];
+          if (have.includes(ws.sessionDevice)) continue;
+          await supabase.from('messages').update({ synced_devices: [...have, ws.sessionDevice] })
+            .eq('from_nick', userNick).eq('msg_id', r.msg_id);
+        }
+        return;
+      }
+
       if (msg.type === 'msg_ack') {
         if (!userNick) return;
         const ids = Array.isArray(msg.msgIds)
