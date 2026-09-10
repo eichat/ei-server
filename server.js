@@ -2468,6 +2468,22 @@ function sendToUser(nick, payload) {
 // Шифротекст пересилається ЯК Є: клієнт кладе в конверт слот і для власних
 // ключів теж, тому кожен свій пристрій його відкриє. Якщо ключів немає (стара
 // збірка), текст і так відкритий — копія лишається читабельною.
+// Чи цей сокет уже отримав копію з таким msgId. Потрібно через гонку догону з
+// живою розсилкою: пристрій входить, догін робить кілька запитів до БД, і за
+// цей час клієнт устигає надіслати нове повідомлення — жива розсилка віддає
+// копію, а `select` догону бачить її ж і шле вдруге. Обмеження часом тут не
+// рятує: повідомлення потрапляє в базу РАНІШЕ, ніж догін зробить вибірку.
+// Тримаємо на зʼєднанні, бо саме воно й отримує копії; після реконекту стан
+// не потрібен (сервер надішле те, що не підтверджене).
+function ownAlreadySent(ws, msgId) {
+  if (!ws.ownSent) ws.ownSent = new Set();
+  if (ws.ownSent.has(msgId)) return true;
+  // Не даємо множині рости без меж на довгій сесії.
+  if (ws.ownSent.size > 1000) ws.ownSent.clear();
+  ws.ownSent.add(msgId);
+  return false;
+}
+
 function syncOwnDevices(nick, fromWs, payload) {
   if (!MULTI_DEVICE) return 0;
   const socks = deviceSessions.get(nick);
@@ -2482,6 +2498,7 @@ function syncOwnDevices(nick, fromWs, payload) {
   const selfDev = fromWs && fromWs.sessionDevice;
   for (const s of socks.values()) {
     if (s.ws === fromWs || (selfDev && s.deviceId === selfDev) || s.ws.readyState !== 1) continue;
+    if (payload.msgId && ownAlreadySent(s.ws, payload.msgId)) continue;
     try { s.ws.send(raw); if (s.deviceId) reached.push(s.deviceId); } catch (_) { /* сокет помер між перевіркою і записом */ }
   }
   // 🔴 Позначку `synced_devices` ставить САМ пристрій (`own_ack`), а не ми тут.
@@ -7415,6 +7432,7 @@ wss.on('connection', (ws) => {
                 : { type: 'own_message', kind: 'chat', from: userNick, text: m.content, msgId: m.msg_id, timestamp: m.timestamp, ...(m.reply_to_msg_id ? { replyToMsgId: m.reply_to_msg_id } : {}), ...(m.reply_to_text ? { replyToText: m.reply_to_text } : {}), ...(m.reply_to_from ? { replyToFrom: m.reply_to_from } : {}) };
             // Позначку ставить `own_ack` від самого пристрою — з тієї ж причини,
             // що і в syncOwnDevices: «надіслали в сокет» не означає «дійшло».
+            if (m.msg_id && ownAlreadySent(ws, m.msg_id)) continue;
             try { ws.send(JSON.stringify(await signDeep({ ...base, to: m.to_nick }))); } catch (_) { continue; }
           }
         }
