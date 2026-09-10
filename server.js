@@ -2474,8 +2474,14 @@ function syncOwnDevices(nick, fromWs, payload) {
   if (!socks) return 0;
   const raw = JSON.stringify(payload);
   const reached = [];
+  // 🔴 Пристрій-відправник відсіюємо за ІДЕНТИФІКАТОРОМ, а не за ідентичністю
+  // сокета. Перевірка `s.ws === fromWs` на живому сервері не спрацьовувала —
+  // автор отримував копію власного повідомлення, тобто дубль на екрані. Та й
+  // по суті: копія не потрібна ПРИСТРОЮ, а не конкретному з'єднанню, і після
+  // реконекту об'єкт сокета вже інший.
+  const selfDev = fromWs && fromWs.sessionDevice;
   for (const s of socks.values()) {
-    if (s.ws === fromWs || s.ws.readyState !== 1) continue;
+    if (s.ws === fromWs || (selfDev && s.deviceId === selfDev) || s.ws.readyState !== 1) continue;
     try { s.ws.send(raw); if (s.deviceId) reached.push(s.deviceId); } catch (_) { /* сокет помер між перевіркою і записом */ }
   }
   // Позначаємо, що ці пристрої копію вже мають, — інакше при наступному вході
