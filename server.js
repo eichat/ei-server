@@ -3427,6 +3427,12 @@ async function purgeAccountData(nick, user) {
     'channel_post_views', 'channel_reactions', 'chat_reads', 'email_codes', 'group_bans',
     'group_history_cleared', 'group_join_requests', 'group_members', 'group_message_reactions',
     'token_payouts', 'usage_counters', 'user_sticker_packs',
+    // 🔴 Пристрої — обовʼязково. Нік після видалення ЗВІЛЬНЯЄТЬСЯ, і без цього
+    // рядка новий власник того самого ніка успадкував би чужі пристрої: їхні
+    // публічні ключі потрапили б у fan-out (відправники шифрували б і для
+    // сторонньої людини), а FCM-токени — у пуші. Плюс ключі й токени просто
+    // не мають переживати видалення акаунта, як обіцяє політика.
+    'user_devices',
   ];
   for (const t of byNick) await del(t, 'nick', nick);
 
