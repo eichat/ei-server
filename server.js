@@ -4849,7 +4849,7 @@ async function noteDeletion(nick, msgId, peerNick, scope) {
   try {
     await supabase.from('message_deletions').insert({
       nick, msg_id: msgId, peer_nick: peerNick || null,
-      scope: ['me', 'chat'].includes(scope) ? scope : 'all', created_at: Date.now(),
+      scope: ['me', 'chat', 'contact'].includes(scope) ? scope : 'all', created_at: Date.now(),
     });
   } catch (e) {
     // Міграції ще немає — не валимо саму дію: видалення наживо вже пішло.
@@ -8045,7 +8045,13 @@ wss.on('connection', (ws) => {
         // Ціла переписка («видалити чат»): та сама дія, лише масштабом більша.
         // msgId для неї немає, тому в журналі стоїть '*' — сам scope і каже
         // клієнту, що чистити треба весь чат із peer.
-        if (msg.chat === true && typeof msg.to === 'string' && msg.to) {
+        // Контакт: те саме, що чат, плюс сам запис контакту. Окремої таблиці й
+        // міграції не треба — журнал видалень уже вміє догін на всі пристрої,
+        // різниця лише в тому, ЩО клієнт прибирає в себе за цим сигналом.
+        if (msg.contact === true && typeof msg.to === 'string' && msg.to) {
+          syncOwnDevices(userNick, ws, { type: 'own_delete', peer: msg.to, scope: 'contact' });
+          await noteDeletion(userNick, '*', msg.to, 'contact');
+        } else if (msg.chat === true && typeof msg.to === 'string' && msg.to) {
           syncOwnDevices(userNick, ws, { type: 'own_delete', peer: msg.to, scope: 'chat' });
           await noteDeletion(userNick, '*', msg.to, 'chat');
         } else if (typeof msg.msgId === 'string' && msg.msgId) {
