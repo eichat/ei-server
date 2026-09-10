@@ -7395,10 +7395,17 @@ wss.on('connection', (ws) => {
         // тоді копія буде нечитабельна, і клієнт покаже це як звичайну невдачу
         // розшифрування, а не як зникле повідомлення.
         if (MULTI_DEVICE && ws.sessionDevice && deviceSince != null) {
+          // ⚠️ Верхня межа — момент входу. Догін робить кілька запитів до БД, і
+          // за цей час клієнт устигає надіслати нове повідомлення: жива розсилка
+          // віддає копію, а `select` догону бачить її ж і шле вдруге. Виміряно:
+          // дубль стабільно відтворювався, коли між `login_ok` і надсиланням не
+          // було паузи. Усе, що зʼявилось після входу, доставляє жива розсилка.
+          const catchupUntil = Date.now();
           const { data: mine } = await supabase.from('messages').select('*')
             .eq('from_nick', userNick)
             .not('synced_devices', 'cs', `{"${ws.sessionDevice}"}`)
             .gte('timestamp', deviceSince)
+            .lt('timestamp', catchupUntil)
             .order('timestamp', { ascending: true });
           for (const m of (mine || [])) {
             const base = m.type === 'sticker'
