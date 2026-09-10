@@ -4816,6 +4816,40 @@ app.get('/edits', async (req, res) => {
   res.json(out);
 });
 
+// Слід видалення для пристроїв, які зараз офлайн. Журнал, а не черга: рядки
+// НЕ прибираються при читанні, тож кожен пристрій наздоганяє своє за власною
+// позначкою часу. Стара `deleted_messages` цього не вміла — вона знищувалась
+// при першому ж вході, тобто перший пристрій «спалював» видалення для решти.
+async function noteDeletion(nick, msgId, peerNick, scope) {
+  if (!nick || !msgId) return;
+  try {
+    await supabase.from('message_deletions').insert({
+      nick, msg_id: msgId, peer_nick: peerNick || null,
+      scope: ['me', 'chat'].includes(scope) ? scope : 'all', created_at: Date.now(),
+    });
+  } catch (e) {
+    // Міграції ще немає — не валимо саму дію: видалення наживо вже пішло.
+    console.error('[noteDeletion]', e.message);
+  }
+}
+
+// Що видалено після `since`. Клієнт кличе на login_ok і зсуває свою позначку.
+app.get('/deletions', async (req, res) => {
+  const nick = req.nick;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const since = parseInt(req.query.since, 10) || 0;
+  try {
+    const { data, error } = await supabase.from('message_deletions')
+      .select('msg_id, peer_nick, scope, created_at')
+      .eq('nick', nick).gt('created_at', since)
+      .order('created_at', { ascending: true }).limit(500);
+    // Колонки ще немає (міграція не виконана) — віддаємо порожньо, а не 500:
+    // застосунок має працювати як до фічі.
+    if (error) return res.json({ ok: true, deletions: [] });
+    res.json({ ok: true, deletions: data || [] });
+  } catch (_) { res.json({ ok: true, deletions: [] }); }
+});
+
 app.get('/missed-calls', async (req, res) => {
   const { nick, since } = req.query;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
@@ -7820,8 +7854,39 @@ wss.on('connection', (ws) => {
         await removeChannelFile(c.file_data);
         await notifyChannelSubscribers(c.channel_id, { type: 'channel_comment_deleted', channelId: c.channel_id, postId: c.post_id, commentId: msg.commentId }, userNick);
       }
-      if (msg.type === 'read_receipt') { await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to); const target = onlineUsers.get(msg.to); if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); } }
-      if (msg.type === 'delete_message') { if (!sendToUser(msg.to, { type: 'delete_message', from: userNick, msgId: msg.msgId })) await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to }); }
+      if (msg.type === 'read_receipt') {
+        await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to);
+        const target = onlineUsers.get(msg.to);
+        if (target) { const { data: readMsgs } = await supabase.from('messages').select('msg_id').eq('to_nick', userNick).eq('from_nick', msg.to).not('msg_id', 'is', null); target.ws.send(JSON.stringify({ type: 'read_receipt', from: userNick, msgIds: (readMsgs || []).map(m => m.msg_id).filter(Boolean) })); }
+        // «Прочитав на телефоні» має гасити лічильник і на десктопі. Для груп і
+        // каналів це вже робить `chat_reads`, а особисті чати рахують unread
+        // локально — тож без цієї копії бейдж на другому пристрої лишався.
+        syncOwnDevices(userNick, ws, { type: 'own_read', peer: msg.to });
+      }
+      // Видалення «для всіх»: співрозмовнику — як було, плюс копія на ІНШІ
+      // власні пристрої. Без неї повідомлення зникало лише там, де його
+      // видалили, а на другому пристрої власника лишалось назавжди.
+      if (msg.type === 'delete_message') {
+        if (!sendToUser(msg.to, { type: 'delete_message', from: userNick, msgId: msg.msgId })) await supabase.from('deleted_messages').insert({ msg_id: msg.msgId, from_nick: userNick, to_nick: msg.to });
+        syncOwnDevices(userNick, ws, { type: 'own_delete', msgId: msg.msgId, peer: msg.to, scope: 'all' });
+        await noteDeletion(userNick, msg.msgId, msg.to, 'all');
+      }
+      // Видалення «лише в себе». Серверу воно раніше не повідомлялось узагалі,
+      // тож на інших пристроях власника повідомлення просто лишалось. Тут ми
+      // нічого не чіпаємо в чужих даних — тільки розводимо дію по СВОЇХ
+      // пристроях і лишаємо слід для тих, що зараз офлайн.
+      if (msg.type === 'delete_local') {
+        // Ціла переписка («видалити чат»): та сама дія, лише масштабом більша.
+        // msgId для неї немає, тому в журналі стоїть '*' — сам scope і каже
+        // клієнту, що чистити треба весь чат із peer.
+        if (msg.chat === true && typeof msg.to === 'string' && msg.to) {
+          syncOwnDevices(userNick, ws, { type: 'own_delete', peer: msg.to, scope: 'chat' });
+          await noteDeletion(userNick, '*', msg.to, 'chat');
+        } else if (typeof msg.msgId === 'string' && msg.msgId) {
+          syncOwnDevices(userNick, ws, { type: 'own_delete', msgId: msg.msgId, peer: msg.to, scope: 'me' });
+          await noteDeletion(userNick, msg.msgId, msg.to, 'me');
+        }
+      }
       if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
       // Застосунковий ping тримає сокет живим для heartbeat (isAlive), а не лише
       // оновлює lastSeen: якщо Render не пропускає ПРОТОКОЛЬНІ ping/pong, сервер
