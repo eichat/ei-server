@@ -649,6 +649,15 @@ loadRevokedDevices();
 /// Відмітити, що пристрій живий. Створює запис при першій появі.
 /// Без deviceId (старий клієнт) не робить нічого — такий пристрій лишається
 /// «спадковим» і працює за старою моделлю.
+/// Ідентифікатор пристрою з недовіреного джерела (тіло login). Секретом він не
+/// є — розділяє черги доставки в межах акаунта, — але формат звіряємо, щоб у
+/// `delivered_devices` не осідало сміття, за яким потім нічого не знайдеш.
+function sanitizeDeviceId(v) {
+  if (typeof v !== 'string') return null;
+  const d = v.trim().slice(0, 64);
+  return /^[A-Za-z0-9_.:-]{4,64}$/.test(d) ? d : null;
+}
+
 async function touchDevice(nick, deviceId, extra = {}) {
   if (!nick || !deviceId) return;
   try {
@@ -7296,7 +7305,19 @@ wss.on('connection', (ws) => {
         // Невалідний токен → close (жорсткий режим).
         const sess = resolveSession(msg.token);
         userNick = sess && sess.nick;
-        ws.sessionDevice = (sess && sess.dev) || null;
+        // 🔴 Пристрій — з токена, а якщо його там немає, з самого `login`.
+        // Токен без `d` видає кожен вхід ПАРОЛЕМ (клієнт `deviceId` у /login не
+        // передавав), а обмін на токен із пристроєм відбувається аж у відповідь
+        // на `login_ok` — тобто вже ПІСЛЯ догону. Наслідок був такий: сесія
+        // лишалась «безпристроєвою», догін падав у стару гілку `delivered=false`,
+        // а `delivered` до того вже поставив ІНШИЙ пристрій акаунта — і вхідні
+        // не приходили сюди ніколи. Саме так профіль, у який заходили паролем
+        // (перемикання профілю на десктопі), не бачив жодного вхідного, поки
+        // другий пристрій отримував усе.
+        //
+        // Брати з тіла безпечно: нік і далі ЛИШЕ з токена, а `deviceId` тільки
+        // розділяє черги доставки в межах того самого акаунта.
+        ws.sessionDevice = (sess && sess.dev) || sanitizeDeviceId(msg.deviceId) || null;
         if (!userNick) { ws.send(JSON.stringify({ type: 'kicked', reason: 'Сесія недійсна, увійдіть знову', code: 'err_kick_session_invalid' })); ws.close(); return; }
         const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', userNick).single();
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}`, ...(ban.reason ? { code: 'err_kick_banned_reason', banReason: ban.reason } : { code: 'err_kick_banned' }) })); ws.close(); return; }
