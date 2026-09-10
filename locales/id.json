@@ -926,5 +926,20 @@
   "export_sub": "Berkas JSON: profil, obrolan, koin",
   "export_progress": "Menyiapkan arsip…",
   "export_saved": "Salinan data Anda tersimpan",
-  "test_mode_notice": "Versi uji — mungkin ada kesalahan"
+  "test_mode_notice": "Versi uji — mungkin ada kesalahan",
+  "devices_title": "Perangkat",
+  "devices_sub": "Tempat akun Anda dibuka",
+  "devices_explain": "Setiap perangkat punya kunci enkripsi sendiri. Pesan dienkripsi untuk semua perangkat dalam daftar, jadi perangkat yang diputus tak bisa lagi membaca pesan baru.",
+  "device_this_one": "perangkat ini",
+  "device_unknown": "Perangkat",
+  "device_online": "daring",
+  "device_no_key": "tanpa kunci enkripsi",
+  "device_seen_now": "baru saja",
+  "device_seen_minutes": "{n} mnt lalu",
+  "device_seen_hours": "{n} jam lalu",
+  "device_seen_days": "{n} hari lalu",
+  "device_revoke_title": "Putuskan perangkat?",
+  "device_revoke_body": "Perangkat akan keluar dan berhenti menerima pesan baru. Obrolan yang sudah tersimpan tetap ada.",
+  "device_revoke_do": "Putuskan",
+  "device_added_notice": "Perangkat baru ditambahkan ke akun Anda"
 }

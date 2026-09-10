@@ -926,5 +926,20 @@
   "export_sub": "ملف JSON: الملف الشخصي، المراسلات، العملات",
   "export_progress": "جارٍ تجميع الأرشيف…",
   "export_saved": "تم حفظ نسخة بياناتك",
-  "test_mode_notice": "نسخة تجريبية — قد تحدث أخطاء"
+  "test_mode_notice": "نسخة تجريبية — قد تحدث أخطاء",
+  "devices_title": "الأجهزة",
+  "devices_sub": "أين تم فتح حسابك",
+  "devices_explain": "لكل جهاز مفتاح تشفير خاص به. تُشفَّر الرسائل لجميع الأجهزة في القائمة، لذا لن يتمكن الجهاز المفصول من قراءة الرسائل الجديدة.",
+  "device_this_one": "هذا الجهاز",
+  "device_unknown": "جهاز",
+  "device_online": "متصل",
+  "device_no_key": "بدون مفتاح تشفير",
+  "device_seen_now": "للتو",
+  "device_seen_minutes": "قبل {n} دقيقة",
+  "device_seen_hours": "قبل {n} ساعة",
+  "device_seen_days": "قبل {n} يوم",
+  "device_revoke_title": "فصل الجهاز؟",
+  "device_revoke_body": "سيتم تسجيل خروج الجهاز ولن يتلقى رسائل جديدة. تبقى المحادثات المحفوظة عليه.",
+  "device_revoke_do": "فصل",
+  "device_added_notice": "تمت إضافة جهاز جديد إلى حسابك"
 }

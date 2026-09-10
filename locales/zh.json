@@ -926,5 +926,20 @@
   "export_sub": "JSON 文件：个人资料、聊天、金币",
   "export_progress": "正在生成存档…",
   "export_saved": "已保存您的数据副本",
-  "test_mode_notice": "测试版本 — 可能存在问题"
+  "test_mode_notice": "测试版本 — 可能存在问题",
+  "devices_title": "设备",
+  "devices_sub": "您的账号在哪些设备上登录",
+  "devices_explain": "每台设备都有自己的加密密钥。消息会为列表中的所有设备加密，因此断开的设备将无法再读取新消息。",
+  "device_this_one": "当前设备",
+  "device_unknown": "设备",
+  "device_online": "在线",
+  "device_no_key": "无加密密钥",
+  "device_seen_now": "刚刚",
+  "device_seen_minutes": "{n} 分钟前",
+  "device_seen_hours": "{n} 小时前",
+  "device_seen_days": "{n} 天前",
+  "device_revoke_title": "断开该设备？",
+  "device_revoke_body": "该设备将退出登录，不再接收新消息。设备上已保存的聊天记录仍会保留。",
+  "device_revoke_do": "断开",
+  "device_added_notice": "您的账号已添加新设备"
 }

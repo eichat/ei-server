@@ -310,9 +310,10 @@ app.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/') || req.path.startsWith('/locales/') || req.path === '/coin/supply') return next();
   const auth = req.headers['authorization'] || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  const nick = resolveSession(token);
-  if (!nick) return res.status(401).json({ ok: false, error: 'Не авторизовано', code: 'err_unauthorized' });
-  req.nick = nick;
+  const sess = resolveSession(token);
+  if (!sess) return res.status(401).json({ ok: false, error: 'Не авторизовано', code: 'err_unauthorized' });
+  req.nick = sess.nick;
+  req.deviceId = sess.dev;
   next();
 });
 
@@ -535,6 +536,9 @@ async function saveFcmToken(nick, token, deviceId) {
   for (const [n, t] of fcmTokens) {
     if (t === token && n.toLowerCase() !== nick.toLowerCase()) fcmTokens.delete(n);
   }
+  // Токен належить ПРИСТРОЮ — тримаємо його ще й у реєстрі. Колонки в users
+  // лишаються для старого режиму: там пуш один на нік.
+  if (deviceId) await touchDevice(nick, deviceId, { fcm_token: token });
   try {
     const patch = { fcm_token: token };
     if (deviceId) patch.fcm_device_id = deviceId;
@@ -581,8 +585,13 @@ const linkPreviewCache = new Map();
 // не миттєве — прийнятно для пре-релізу; бан лишається дійсним, бо WS-login
 // окремо перевіряє platform_bans.
 const SESSION_SECRET = process.env.SESSION_SECRET || process.env.EION_ADMIN_SECRET || null;
-function createSessionToken(nick) {
-  const payload = Buffer.from(JSON.stringify({ n: nick, t: Date.now() })).toString('base64url');
+// `d` — ідентифікатор ПРИСТРОЮ. Він у токені навмисно: усе, що стосується
+// актора, виводиться з сесії (`req.nick`), і без цього поля сервер не може
+// сказати, ЯКИЙ пристрій підтвердив доставку чи опублікував ключ. Старі токени
+// без `d` лишаються валідними — тоді пристрій вважається «спадковим» (null).
+function createSessionToken(nick, deviceId) {
+  const dev = typeof deviceId === 'string' && deviceId ? deviceId.slice(0, 64) : null;
+  const payload = Buffer.from(JSON.stringify({ n: nick, t: Date.now(), ...(dev ? { d: dev } : {}) })).toString('base64url');
   const sig = crypto.createHmac('sha256', SESSION_SECRET || 'insecure-dev').update(payload).digest('base64url');
   return `${payload}.${sig}`;
 }
@@ -596,16 +605,207 @@ function resolveSession(token) {
   const a = Buffer.from(sig), b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   try {
-    const { n, t } = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    const { n, t, d } = JSON.parse(Buffer.from(payload, 'base64url').toString());
     if (!n) return null;
     // Відкликання: токени, випущені до межі, недійсні (зміна пароля, бан, …).
     const cut = sessionValidFrom.get(String(n).toLowerCase());
     if (cut && !(Number(t) >= cut)) return null;
-    return n;
+    const dev = typeof d === 'string' && d ? d : null;
+    // Пристрій відключили в налаштуваннях — токен саме цього пристрою мертвий,
+    // решта сесій акаунта живуть далі (на відміну від tokens_valid_from).
+    if (dev && revokedDevices.has(devKey(n, dev))) return null;
+    return { nick: n, dev };
   } catch (_) { return null; }
 }
-// Сумісність зі старими викликами (async). БД більше не потрібна.
-async function createSession(nick, _deviceId = null) { return createSessionToken(nick); }
+async function createSession(nick, deviceId = null) { return createSessionToken(nick, deviceId); }
+
+// ── Пристрої акаунта ─────────────────────────────────────────────────────────
+// 🔴 Прапорець вимикає НОВУ модель цілком, лишаючи стару поведінку (kick,
+// доставка на нік, один ключ). Робиться це заради одного раунду тесту: якщо
+// після збірки щось поповзе, перемикач в env за хвилину каже, чи винна нова
+// модель, чи щось стороннє. Без нього «дзвінок не проходить» довелось би
+// розплутувати між присутністю, адресуванням, пушем і кластером.
+const MULTI_DEVICE = process.env.MULTI_DEVICE === 'on';
+
+// Пристрій, який не з'являвся стільки часу, перестає отримувати копії: інакше
+// загублений телефон вічно отримував би слот у кожному повідомленні, а черга
+// доставки ніколи б не спорожніла.
+const DEVICE_STALE_MS = 30 * 24 * 60 * 60 * 1000;
+
+// Відкликані пристрої — кеш у памʼяті, бо перевірка стоїть у КОЖНОМУ запиті
+// (resolveSession синхронна). Джерело істини — user_devices.revoked_at.
+const revokedDevices = new Set();   // `нік_lower|device_id`
+const devKey = (nick, dev) => `${String(nick).toLowerCase()}|${dev}`;
+async function loadRevokedDevices() {
+  try {
+    const { data } = await supabase.from('user_devices').select('nick, device_id').not('revoked_at', 'is', null);
+    revokedDevices.clear();
+    for (const d of (data || [])) revokedDevices.add(devKey(d.nick, d.device_id));
+    console.log('[devices] відкликаних пристроїв:', revokedDevices.size);
+  } catch (e) { console.error('[loadRevokedDevices]', e.message); }
+}
+loadRevokedDevices();
+
+/// Відмітити, що пристрій живий. Створює запис при першій появі.
+/// Без deviceId (старий клієнт) не робить нічого — такий пристрій лишається
+/// «спадковим» і працює за старою моделлю.
+async function touchDevice(nick, deviceId, extra = {}) {
+  if (!nick || !deviceId) return;
+  try {
+    await supabase.from('user_devices').upsert({
+      nick, device_id: deviceId, last_seen: Date.now(), revoked_at: null, ...extra,
+    }, { onConflict: 'nick,device_id' });
+  } catch (e) { console.error('[touchDevice]', e.message); }
+}
+
+/// Пристрої акаунта, яким ще варто щось слати: не відкликані й не забуті.
+// ── Присутність на КІЛЬКА сокетів ────────────────────────────────────────────
+// 🔴 Хитрість, яка робить цю зміну підйомною. У коді 43 місця шлють у сокет
+// напряму (`t.ws.send(...)`) і 47 звертаються до `onlineUsers` — переписати
+// кожне означало б внести ризик у те, що зараз працює. Тому `onlineUsers`
+// лишається мапою «нік → ОДИН запис», але запис стає **мультиплексором**: його
+// `ws.send` пише в усі живі сокети акаунта. Той самий прийом уже випробуваний у
+// кластері (`remoteEntry`), тільки там підставний сокет ретранслює на інший
+// інстанс, а тут — роздає локально.
+const deviceSessions = new Map();   // нік -> Map<ключ, {ws, canAck, deviceId, lastSeen}>
+
+function sessionsOf(nick) {
+  let m = deviceSessions.get(nick);
+  if (!m) { m = new Map(); deviceSessions.set(nick, m); }
+  return m;
+}
+
+/// Скласти запис присутності з усіх сокетів ніка. Поверхня та сама, яку
+/// використовує код: send, close, readyState, isAlive, deviceId (+ lastSeen,
+/// canAck на самому записі).
+function multiEntry(nick) {
+  const socks = sessionsOf(nick);
+  const live = () => [...socks.values()].filter(s => s.ws.readyState === 1);
+  return {
+    multi: true,
+    get lastSeen() {
+      let m = 0;
+      for (const s of socks.values()) if ((s.lastSeen || 0) > m) m = s.lastSeen || 0;
+      return m;
+    },
+    set lastSeen(v) { for (const s of socks.values()) s.lastSeen = v; },
+    // Консервативно: якщо хоч один пристрій не вміє підтверджувати доставку,
+    // покладатись на ack не можна — інакше повідомлення для нього лишилось би
+    // недоставленим назавжди.
+    get canAck() { const l = [...socks.values()]; return l.length > 0 && l.every(s => s.canAck); },
+    get devices() { return socks; },
+    ws: {
+      get readyState() { return live().length > 0 ? 1 : 3; },
+      get isAlive() { return live().some(s => s.ws.isAlive !== false); },
+      get deviceId() { const f = live()[0]; return f ? f.deviceId : null; },
+      send: (raw) => {
+        const data = typeof raw === 'string' ? raw : JSON.stringify(raw);
+        for (const s of live()) { try { s.ws.send(data); } catch (_) { /* сокет помер між перевіркою і записом */ } }
+      },
+      close: () => { for (const s of socks.values()) { try { s.ws.close(); } catch (_) {} } },
+      terminate: () => { for (const s of socks.values()) { try { s.ws.terminate(); } catch (_) {} } },
+    },
+  };
+}
+
+/// Додати сокет до присутності ніка. У старому режимі — рівно одна сесія.
+function addSession(nick, ws, { canAck, deviceId }) {
+  const socks = sessionsOf(nick);
+  const key = deviceId || `ws_${socks.size}_${Date.now()}`;
+  const prev = socks.get(key);
+  // Той самий пристрій перепідключився — старий сокет закриваємо мовчки, без
+  // `kicked`: це реконект, а не чужий вхід.
+  if (prev && prev.ws !== ws) { try { prev.ws.close(); } catch (_) {} }
+  socks.set(key, { ws, canAck, deviceId: deviceId || null, lastSeen: Date.now() });
+  ws.sessionKey = key;
+  onlineUsers.set(nick, multiEntry(nick));
+}
+
+// ── Дзвінок і кілька пристроїв ───────────────────────────────────────────────
+// Сигналізація WebRTC точкова: вона має ходити між ДВОМА конкретними
+// пристроями. Мультиплексор для неї не годиться — ICE-кандидати полетіли б і на
+// той пристрій, який у дзвінку не бере участі. Тому дзвінок «прив'язується»:
+// хто зняв слухавку, той і веде розмову, решта пристроїв перестають дзвонити.
+const callBindings = new Map();   // `нік1|нік2` (посортовано) -> { нік: deviceId }
+const callKey = (a, b) => [a, b].sort().join('|');
+
+function bindCallDevice(a, b, nick, deviceId) {
+  if (!MULTI_DEVICE || !deviceId) return;
+  const k = callKey(a, b);
+  const cur = callBindings.get(k) || {};
+  cur[nick] = deviceId;
+  cur.at = Date.now();
+  callBindings.set(k, cur);
+}
+function unbindCall(a, b) { callBindings.delete(callKey(a, b)); }
+
+/// Надіслати учаснику дзвінка — САМЕ на його пристрій, якщо він уже відомий.
+/// Доки не відомий (дзвінок ще дзвонить), шлемо на всі: телефон і десктоп
+/// мають задзвонити обидва.
+function sendToCallPeer(toNick, otherNick, payload) {
+  const target = onlineUsers.get(toNick);
+  if (!target || !target.ws || target.ws.readyState !== 1) return false;
+  const bound = MULTI_DEVICE ? (callBindings.get(callKey(toNick, otherNick)) || {})[toNick] : null;
+  if (bound) {
+    const socks = deviceSessions.get(toNick);
+    if (socks) {
+      for (const sess of socks.values()) {
+        if (sess.deviceId === bound && sess.ws.readyState === 1) {
+          try { sess.ws.send(JSON.stringify(payload)); return true; } catch (_) { return false; }
+        }
+      }
+    }
+    // Прив'язаний пристрій відвалився — дзвінок фактично обірвано; не шлемо
+    // решті, інакше в чужого пристрою «оживе» чужа розмова.
+    return false;
+  }
+  try { target.ws.send(JSON.stringify(payload)); return true; } catch (_) { return false; }
+}
+
+/// Сказати РЕШТІ пристроїв акаунта, що дзвінок уже взяли (або відхилили) на
+/// іншому — щоб вони припинили дзвонити.
+function stopRingingOthers(nick, exceptDeviceId, fromNick) {
+  if (!MULTI_DEVICE) return;
+  const socks = deviceSessions.get(nick);
+  if (!socks) return;
+  const raw = JSON.stringify({ type: 'call_taken', from: fromNick });
+  for (const sess of socks.values()) {
+    if (sess.deviceId && sess.deviceId === exceptDeviceId) continue;
+    if (sess.ws.readyState !== 1) continue;
+    try { sess.ws.send(raw); } catch (_) {}
+  }
+}
+
+/// Освіжити ЦЕЙ сокет. 🔴 Не через `onlineUsers.get(nick).lastSeen = ...`:
+/// у мультиплексора цей сеттер пише всім сокетам ніка, тож pong від телефона
+/// тримав би живим і вже мертвий сокет десктопа — і той ніколи не зникав би з
+/// присутності.
+function touchSession(nick, ws) {
+  const socks = deviceSessions.get(nick);
+  if (!socks) return;
+  for (const s of socks.values()) if (s.ws === ws) { s.lastSeen = Date.now(); return; }
+}
+
+/// Прибрати сокет. Присутність зникає лише коли пішов ОСТАННІЙ пристрій.
+function dropSession(nick, ws) {
+  const socks = deviceSessions.get(nick);
+  if (!socks) return false;
+  for (const [k, s] of socks) if (s.ws === ws) socks.delete(k);
+  if (socks.size === 0) { deviceSessions.delete(nick); onlineUsers.delete(nick); return true; }
+  onlineUsers.set(nick, multiEntry(nick));
+  return false;
+}
+
+async function activeDevices(nick) {
+  if (!nick) return [];
+  try {
+    const { data } = await supabase.from('user_devices')
+      .select('device_id, e2ee_pubkey, fcm_token, last_seen, platform')
+      .eq('nick', nick).is('revoked_at', null);
+    const cutoff = Date.now() - DEVICE_STALE_MS;
+    return (data || []).filter(d => !d.last_seen || Number(d.last_seen) >= cutoff);
+  } catch (e) { console.error('[activeDevices]', e.message); return []; }
+}
 
 // ── Відкликання сесій ────────────────────────────────────────────────────────
 // Раніше це були заглушки, тобто НІЩО не гасило токен: зміна пароля лишала
@@ -651,6 +851,10 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
 setInterval(() => {
   const now = Date.now();
   for (const [id, data] of pendingCallOffers) if (now > data.expires) pendingCallOffers.delete(id);
+  // Прив'язки дзвінків живуть у памʼяті й без прибирання накопичувались би:
+  // обрив зв'язку не завжди доходить як call_end. Дві години з запасом більші
+  // за будь-яку розмову.
+  for (const [k, v] of callBindings) if (now - (v.at || 0) > 2 * 60 * 60 * 1000) callBindings.delete(k);
   for (const [url, data] of linkPreviewCache) if (now > data.expires) linkPreviewCache.delete(url);
   for (const [p, exp] of verifiedPhones) if (now > exp) verifiedPhones.delete(p);
 }, 120000);
@@ -1963,19 +2167,39 @@ app.post('/ai/chat', async (req, res) => {
 });
 
 async function sendCallPush(toNick, fromNick, hasVideo, offer) {
-  const token = await getFcmToken(toNick); if (!token) return;
+  // Дзвонити мають УСІ пристрої адресата, а не той один, чий токен випадково
+  // лежав у колонці users.fcm_token.
+  let tokens = [];
+  if (MULTI_DEVICE) {
+    const fromDev = nickDevices.get(fromNick);
+    tokens = (await activeDevices(toNick))
+      .filter(d => d.fcm_token && d.device_id !== fromDev)
+      .map(d => d.fcm_token);
+  }
+  if (tokens.length === 0) {
+    const token = await getFcmToken(toNick);
+    if (!token) return;
+    tokens = [token];
+  }
   const callId = `${fromNick}_${toNick}_${Date.now()}`;
   const offerRow = { fromNick, toNick, offer: typeof offer === 'string' ? offer : JSON.stringify(offer), hasVideo, expires: Date.now() + 60000 };
   pendingCallOffers.set(callId, offerRow);
   if (busReady()) { try { await busPub.set(`eion:offer:${callId}`, JSON.stringify(offerRow), 'EX', 90); } catch (e) { console.error('[cluster] offer:', e.message); } }
-  try {
-    await admin.messaging().send({ token, data: { type: 'call_offer', from_nick: fromNick, has_video: hasVideo ? 'true' : 'false', call_id: callId }, android: { priority: 'high', ttl: 30000 } });
-    console.log(`FCM push відправлено до ${toNick}, callId=${callId}`);
-  } catch (e) {
-    console.error(`Помилка FCM push до ${toNick}:`, e.message);
-    pendingCallOffers.delete(callId);
-    if (e.code === 'messaging/registration-token-not-registered') await clearFcmToken(toNick);
+  const data = { type: 'call_offer', from_nick: fromNick, has_video: hasVideo ? 'true' : 'false', call_id: callId };
+  let anyOk = false;
+  for (const token of tokens) {
+    try {
+      await admin.messaging().send({ token, data, android: { priority: 'high', ttl: 30000 } });
+      anyOk = true;
+    } catch (e) {
+      console.error(`Помилка FCM push до ${toNick}:`, e.message);
+      if (e.code === 'messaging/registration-token-not-registered') await clearFcmToken(toNick);
+    }
   }
+  // Оффер лишаємо, лише якщо хоч один пристрій справді розбудили: інакше він
+  // висів би в памʼяті до протухання й міг «ожити» на випадковому /call-offer.
+  if (anyOk) console.log(`FCM push відправлено до ${toNick} (${tokens.length} пристр.), callId=${callId}`);
+  else pendingCallOffers.delete(callId);
 }
 
 // ttlMs — скільки Google ТРИМАЄ пуш, поки пристрій недоступний (Doze/екран
@@ -1984,6 +2208,35 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer) {
 // після перезапуску»). Дефолт — 4 год для повідомлень; коротші значення
 // передаються явно там, де протухлий пуш недоречний (напр. call_end).
 async function sendFcmPush(toNick, data, ttlMs = 14400000) {
+  // 🔴 Пуш теж на пристрій. Досі токен був ОДИН на нік (колонка в users), тож
+  // із двома пристроями другий тихо забирав пуш у першого. Пристрою, що зараз
+  // онлайн, пуш не потрібен — він отримає повідомлення сокетом.
+  if (MULTI_DEVICE) {
+    const devs = await activeDevices(toNick);
+    const withToken = devs.filter(d => d.fcm_token);
+    if (withToken.length > 0) {
+      const onlineDevs = new Set();
+      const socks = deviceSessions.get(toNick);
+      if (socks) for (const s of socks.values()) if (s.deviceId && s.ws.readyState === 1) onlineDevs.add(s.deviceId);
+      const fromNick = data && data.from_nick;
+      const fromDev = fromNick ? nickDevices.get(fromNick) : null;
+      for (const d of withToken) {
+        if (onlineDevs.has(d.device_id)) continue;
+        // Той самий фізичний пристрій обслуговує обидва акаунти — сповіщення
+        // власнику ні до чого (повідомлення й так буде видно при перемиканні).
+        if (fromDev && fromDev === d.device_id) continue;
+        try { await admin.messaging().send({ token: d.fcm_token, data, android: { priority: 'high', ttl: ttlMs } }); }
+        catch (e) {
+          console.error(`FCM push error до ${toNick}/${d.device_id}:`, e.message);
+          if (e.code === 'messaging/registration-token-not-registered') {
+            try { await supabase.from('user_devices').update({ fcm_token: null }).eq('nick', toNick).eq('device_id', d.device_id); } catch (_) {}
+          }
+        }
+      }
+      return;
+    }
+    // Реєстр порожній (пристрій ще не встиг зареєструватись) — старий шлях.
+  }
   const token = await getFcmToken(toNick); if (!token) return;
   // Не шлемо пуш на ВЛАСНИЙ пристрій: якщо адресат — інший акаунт на тому
   // самому телефоні (спільний FCM-токен), сповіщення набридали б власнику.
@@ -3011,7 +3264,8 @@ app.post('/phone/verify-code', async (req, res) => {
   // лишається тільки реєстраційний шлях (verifiedPhones нижче) — саме заради
   // нього endpoint і публічний.
   const auth = req.headers['authorization'] || '';
-  const bindNick = auth.startsWith('Bearer ') ? resolveSession(auth.slice(7)) : null;
+  const bindSess = auth.startsWith('Bearer ') ? resolveSession(auth.slice(7)) : null;
+  const bindNick = bindSess && bindSess.nick;
   if (bindNick) {
     const nick = bindNick;
     const { data: user } = await supabase.from('users').select('nick').eq('nick_lower', nick.toLowerCase()).single();
@@ -4180,6 +4434,24 @@ app.post('/keys/publish', async (req, res) => {
   if (!E2EE_PUBKEY_RE.test(pubkey)) {
     return res.json({ ok: false, error: 'Невірний ключ', code: 'err_invalid_params' });
   }
+  // Ключ ПРИСТРОЮ — окремим записом. Реєстр наповнюється завжди, навіть коли
+  // MULTI_DEVICE вимкнено: інакше вмикання прапорця починалося б із порожнього
+  // списку, і перше повідомлення знову пішло б повз половину пристроїв.
+  if (req.deviceId) {
+    await touchDevice(req.nick, req.deviceId, { e2ee_pubkey: pubkey });
+    // Новий ключ у акаунті — подія, яку власник має бачити. Досі ключ мовчки
+    // перезаписувався, і поява чужого пристрою нічим не відрізнялась від
+    // звичайного входу.
+    try {
+      const { data: seen } = await supabase.from('user_devices')
+        .select('device_id').eq('nick', req.nick).is('revoked_at', null);
+      if ((seen || []).length > 1) {
+        sendToUser(req.nick, { type: 'device_added', deviceId: req.deviceId, total: seen.length });
+      }
+    } catch (_) { /* сповіщення — не привід валити публікацію ключа */ }
+  }
+  // `users.e2ee_pubkey` лишається як «найсвіжіший ключ»: його читають клієнти,
+  // які ще не вміють у список пристроїв.
   const { error } = await supabase.from('users').update({ e2ee_pubkey: pubkey }).eq('nick', req.nick);
   if (error) {
     // Колонки ще немає (міграція не виконана) — не падаємо: клієнт просто
@@ -4190,12 +4462,76 @@ app.post('/keys/publish', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Пристрої акаунта ─────────────────────────────────────────────────────────
+
+// 🔴 Обмін старого токена на токен ІЗ ПРИСТРОЄМ. Без цього фіча була б
+// мертвою: після оновлення застосунку в клієнта лишається токен, випущений до
+// появи поля `d`, тож сервер не знав би, який пристрій підтвердив доставку чи
+// опублікував ключ — і чекав би на повторний вхід паролем.
+app.post('/session/device', async (req, res) => {
+  const deviceId = typeof req.body.deviceId === 'string' ? req.body.deviceId.trim().slice(0, 64) : '';
+  if (!deviceId) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  await touchDevice(req.nick, deviceId, {
+    platform: typeof req.body.platform === 'string' ? req.body.platform.slice(0, 24) : null,
+  });
+  res.json({ ok: true, token: createSessionToken(req.nick, deviceId) });
+});
+
+// Список пристроїв для налаштувань. Доти новий ключ у акаунті зʼявлявся мовчки
+// й нічим не відрізнявся від звичайного входу — власник побачити його не міг.
+app.get('/devices', async (req, res) => {
+  const devs = await activeDevices(req.nick);
+  res.json({
+    ok: true,
+    current: req.deviceId || null,
+    devices: devs.map(d => ({
+      deviceId: d.device_id,
+      platform: d.platform || null,
+      lastSeen: d.last_seen ? Number(d.last_seen) : null,
+      hasKey: !!d.e2ee_pubkey,
+      online: !!(deviceSessions.get(req.nick) &&
+        [...deviceSessions.get(req.nick).values()].some(x => x.deviceId === d.device_id && x.ws.readyState === 1)),
+    })),
+  });
+});
+
+// Відключити пристрій. Гасить ЛИШЕ його токен (revokedDevices), решта сесій
+// акаунта живі — на відміну від зміни пароля, яка гасить усі.
+app.post('/devices/revoke', async (req, res) => {
+  const deviceId = typeof req.body.deviceId === 'string' ? req.body.deviceId.trim() : '';
+  if (!deviceId) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { error } = await supabase.from('user_devices')
+    .update({ revoked_at: Date.now(), fcm_token: null, e2ee_pubkey: null })
+    .eq('nick', req.nick).eq('device_id', deviceId);
+  if (error) return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  revokedDevices.add(devKey(req.nick, deviceId));
+  // Обриваємо його сокет, якщо він онлайн.
+  const socks = deviceSessions.get(req.nick);
+  if (socks) {
+    for (const sess of socks.values()) {
+      if (sess.deviceId !== deviceId) continue;
+      try { sess.ws.send(JSON.stringify({ type: 'kicked', reason: 'Пристрій відключено', code: 'err_kick_session_invalid' })); sess.ws.close(); } catch (_) {}
+    }
+  }
+  res.json({ ok: true });
+});
+
 app.get('/keys', async (req, res) => {
   const nick = typeof req.query.nick === 'string' ? req.query.nick : '';
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data, error } = await supabase.from('users').select('e2ee_pubkey').eq('nick', nick).maybeSingle();
   if (error) { console.error('[e2ee] fetch:', error.message); return res.json({ ok: true, pubkey: null }); }
-  res.json({ ok: true, pubkey: (data && data.e2ee_pubkey) || null });
+  const newest = (data && data.e2ee_pubkey) || null;
+  // `pubkey` — для старих клієнтів (один ключ, як було). `keys` — усі активні
+  // пристрої: відправник кладе слот кожному, тож перемикання пристрою більше не
+  // робить нову переписку нечитабельною на тому, що лишився.
+  let keys = newest ? [newest] : [];
+  if (MULTI_DEVICE) {
+    const devs = await activeDevices(nick);
+    const fromDevices = devs.map(d => d.e2ee_pubkey).filter(Boolean);
+    if (fromDevices.length) keys = [...new Set([...fromDevices, ...(newest ? [newest] : [])])];
+  }
+  res.json({ ok: true, pubkey: newest, keys });
 });
 
 app.post('/update-avatar', async (req, res) => {
@@ -6892,7 +7228,7 @@ wss.on('connection', (ws) => {
   };
   // Серверний heartbeat (проти code=1006: мертвий транспорт виявляємо швидко).
   ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); });
+  ws.on('pong', () => { ws.isAlive = true; if (userNick) touchSession(userNick, ws); });
   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw);
@@ -6900,13 +7236,24 @@ wss.on('connection', (ws) => {
       if (msg.type === 'login') {
         // Автентифікація WS (Фаза 1): нік беремо з ТОКЕНА, не з msg.nick.
         // Невалідний токен → close (жорсткий режим).
-        userNick = resolveSession(msg.token);
+        const sess = resolveSession(msg.token);
+        userNick = sess && sess.nick;
+        ws.sessionDevice = (sess && sess.dev) || null;
         if (!userNick) { ws.send(JSON.stringify({ type: 'kicked', reason: 'Сесія недійсна, увійдіть знову', code: 'err_kick_session_invalid' })); ws.close(); return; }
         const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', userNick).single();
         if (ban) { ws.send(JSON.stringify({ type: 'kicked', reason: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}`, ...(ban.reason ? { code: 'err_kick_banned_reason', banReason: ban.reason } : { code: 'err_kick_banned' }) })); ws.close(); return; }
-        if (onlineUsers.has(userNick)) { const old = onlineUsers.get(userNick); old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився', code: 'err_kick_new_device' })); old.ws.close(); }
+        // 🔴 Витіснення старого пристрою лишається ЛИШЕ у старому режимі. Саме
+        // воно й робило акаунт одномісним: вхід із десктопа вибивав телефон, і
+        // все, що приходило далі, телефон не отримував уже ніколи.
+        if (!MULTI_DEVICE && onlineUsers.has(userNick)) {
+          const old = onlineUsers.get(userNick);
+          old.ws.send(JSON.stringify({ type: 'kicked', reason: 'Новий пристрій підключився', code: 'err_kick_new_device' }));
+          old.ws.close();
+          deviceSessions.delete(userNick);
+        }
         // canAck: клієнт підтверджує доставку сам (див. ackAware).
-        onlineUsers.set(userNick, { ws, lastSeen: Date.now(), canAck: msg.ack === true });
+        addSession(userNick, ws, { canAck: msg.ack === true, deviceId: ws.sessionDevice });
+        if (ws.sessionDevice) await touchDevice(userNick, ws.sessionDevice, { platform: typeof msg.platform === 'string' ? msg.platform.slice(0, 24) : null });
         touchLastSeen(userNick);
         busPublish({ t: 'up', nick: userNick });
         // nickDevices має відображати, де нік ЗАРАЗ, а не де колись був.
@@ -6951,7 +7298,27 @@ wss.on('connection', (ws) => {
         const { data: myStatuses } = await supabase.from('messages').select('msg_id, status').eq('from_nick', userNick).neq('status', 'sent').not('msg_id', 'is', null);
         if (myStatuses && myStatuses.length > 0) ws.send(JSON.stringify({ type: 'status_sync', statuses: myStatuses }));
 
-        const { data: pending } = await supabase.from('messages').select('*').eq('to_nick', userNick).eq('delivered', false).order('timestamp', { ascending: true });
+        // 🔴 Догін на ПРИСТРІЙ. Було: «усе, чого ще ніхто не забрав». Стало:
+        // «усе, чого не забрав САМЕ цей пристрій» — інакше телефон, забравши
+        // повідомлення, робив його невидимим для десктопа назавжди.
+        //
+        // ⚠️ Вікно рахується від РЕЄСТРАЦІЇ пристрою, а не від нуля: інакше
+        // пристрій, який щойно вперше потрапив у реєстр, вивалив би на себе всю
+        // сімиденну історію, яку насправді вже має. Знати заднім числом, що в
+        // нього було, ми не можемо, тож чесно починаємо з моменту, коли пристрій
+        // став нам відомий.
+        let pendingQ = supabase.from('messages').select('*').eq('to_nick', userNick);
+        if (MULTI_DEVICE && ws.sessionDevice) {
+          const { data: devRow } = await supabase.from('user_devices')
+            .select('created_at').eq('nick', userNick).eq('device_id', ws.sessionDevice).maybeSingle();
+          const since = devRow && devRow.created_at ? new Date(devRow.created_at).getTime() : Date.now();
+          pendingQ = pendingQ
+            .not('delivered_devices', 'cs', `{"${ws.sessionDevice}"}`)
+            .gte('timestamp', since);
+        } else {
+          pendingQ = pendingQ.eq('delivered', false);
+        }
+        const { data: pending } = await pendingQ.order('timestamp', { ascending: true });
         if (pending && pending.length > 0) {
           for (const m of pending) {
             // Storage 2.3: реф (eion://) теж іде як fileUrl (не base64 data), а весь
@@ -6961,7 +7328,19 @@ wss.on('connection', (ws) => {
           }
           // Для ack-клієнта delivered ставить його власне підтвердження: інакше
           // догін «спалював» повідомлення так само, як жива доставка.
-          if (msg.ack !== true) await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
+          // Клієнт без ack — позначаємо самі, як раніше. З ack і пристроєм
+          // позначку ставить msg_ack, дописуючи саме цей пристрій.
+          if (msg.ack !== true) {
+            if (MULTI_DEVICE && ws.sessionDevice) {
+              for (const m of pending) {
+                const have = Array.isArray(m.delivered_devices) ? m.delivered_devices : [];
+                if (have.includes(ws.sessionDevice)) continue;
+                await supabase.from('messages').update({ delivered: true, delivered_devices: [...have, ws.sessionDevice] }).eq('id', m.id);
+              }
+            } else {
+              await supabase.from('messages').update({ delivered: true }).eq('to_nick', userNick).eq('delivered', false);
+            }
+          }
         }
 
         const { data: myGroups } = await supabase.from('group_members').select('group_id').eq('nick', userNick);
@@ -7135,13 +7514,32 @@ wss.on('connection', (ws) => {
           ? msg.msgIds.filter(x => typeof x === 'string' && x.length > 0 && x.length <= 128).slice(0, 200)
           : [];
         if (ids.length === 0) return;
-        const { data: rows, error } = await supabase.from('messages')
-          .select('msg_id, from_nick').eq('to_nick', userNick).in('msg_id', ids).eq('delivered', false);
+        // 🔴 У режимі кількох пристроїв підтвердження належить ПРИСТРОЮ, а не
+        // акаунту. Раніше `delivered=true` від телефона робило повідомлення
+        // невидимим для десктопа назавжди — саме так і виникла дводенна діра в
+        // історії. Тепер пристрій дописується в `delivered_devices`, а булеве
+        // `delivered` лишається «дійшло хоча б комусь»: на ньому тримаються
+        // галочки відправника й чистка через 7 днів.
+        const dev = MULTI_DEVICE ? ws.sessionDevice : null;
+        const sel = supabase.from('messages')
+          .select('msg_id, from_nick, delivered_devices').eq('to_nick', userNick).in('msg_id', ids);
+        const { data: rows, error } = await (dev ? sel : sel.eq('delivered', false));
         if (error) { console.error('msg_ack select', error.message); return; }
         if (!rows || rows.length === 0) return;
-        await supabase.from('messages')
-          .update({ delivered: true, status: 'delivered' })
-          .eq('to_nick', userNick).in('msg_id', rows.map(r => r.msg_id));
+        if (dev) {
+          // Пооднораз: масив у кожного рядка свій, спільним update не обійтись.
+          for (const r of rows) {
+            const have = Array.isArray(r.delivered_devices) ? r.delivered_devices : [];
+            if (have.includes(dev)) continue;
+            await supabase.from('messages')
+              .update({ delivered: true, status: 'delivered', delivered_devices: [...have, dev] })
+              .eq('to_nick', userNick).eq('msg_id', r.msg_id);
+          }
+        } else {
+          await supabase.from('messages')
+            .update({ delivered: true, status: 'delivered' })
+            .eq('to_nick', userNick).in('msg_id', rows.map(r => r.msg_id));
+        }
         // Відправникам — друга галочка, тепер за фактом, а не за здогадом.
         const bySender = {};
         for (const r of rows) (bySender[r.from_nick] ??= []).push(r.msg_id);
@@ -7263,9 +7661,12 @@ wss.on('connection', (ws) => {
       // Застосунковий ping тримає сокет живим для heartbeat (isAlive), а не лише
       // оновлює lastSeen: якщо Render не пропускає ПРОТОКОЛЬНІ ping/pong, сервер
       // інакше вбивав би живий сокет кожні 30с (флапінг presence/дзвінків).
-      if (msg.type === 'ping') { ws.isAlive = true; if (userNick && onlineUsers.has(userNick)) onlineUsers.get(userNick).lastSeen = Date.now(); ws.send(JSON.stringify({ type: 'pong' })); }
+      if (msg.type === 'ping') { ws.isAlive = true; if (userNick) touchSession(userNick, ws); ws.send(JSON.stringify({ type: 'pong' })); }
 
       if (msg.type === 'call_offer') {
+        // Пристрій дзвонаря відомий одразу: відповідь і ICE мають прийти саме
+        // на нього, а не на всі його пристрої.
+        if (typeof msg.to === 'string') bindCallDevice(userNick, msg.to, userNick, ws.sessionDevice);
         // Якщо адресат заблокував того, хто дзвонить — не з'єднуємо. Той самий
         // сигнал call_error, що й для інших "недоступний" сценаріїв.
         if (await isBlockedBy(msg.to, userNick)) {
@@ -7332,23 +7733,25 @@ wss.on('connection', (ws) => {
         }
       }
       if (msg.type === 'call_answer') {
-        const target = onlineUsers.get(msg.to);
-        if (target) target.ws.send(JSON.stringify({ type: 'call_answer', from: userNick, answer: msg.answer }));
+        // Слухавку зняли саме тут → дзвінок прив'язується до цього пристрою, а
+        // решта пристроїв акаунта припиняє дзвонити.
+        bindCallDevice(userNick, msg.to, userNick, ws.sessionDevice);
+        stopRingingOthers(userNick, ws.sessionDevice, msg.to);
+        sendToCallPeer(msg.to, userNick, { type: 'call_answer', from: userNick, answer: msg.answer });
         // Дзвінок таки прийняли (FCM розбудив) → прибираємо передчасний missed-лог
         // цієї пари (from=той-хто-дзвонив=msg.to, to=я=userNick).
         await clearPreemptiveMissed(msg.to, userNick);
       }
-      if (msg.type === 'call_ice') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_ice', from: userNick, candidate: msg.candidate })); }
+      if (msg.type === 'call_ice') { sendToCallPeer(msg.to, userNick, { type: 'call_ice', from: userNick, candidate: msg.candidate }); }
       // Перемикання аудіо↔відео посеред дзвінка (renegotiation)
-      if (msg.type === 'call_renegotiate') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_renegotiate', from: userNick, offer: msg.offer })); }
-      if (msg.type === 'call_renegotiate_answer') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_renegotiate_answer', from: userNick, answer: msg.answer })); }
-      if (msg.type === 'call_video_state') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'call_video_state', from: userNick, on: !!msg.on })); }
+      if (msg.type === 'call_renegotiate') { sendToCallPeer(msg.to, userNick, { type: 'call_renegotiate', from: userNick, offer: msg.offer }); }
+      if (msg.type === 'call_renegotiate_answer') { sendToCallPeer(msg.to, userNick, { type: 'call_renegotiate_answer', from: userNick, answer: msg.answer }); }
+      if (msg.type === 'call_video_state') { sendToCallPeer(msg.to, userNick, { type: 'call_video_state', from: userNick, on: !!msg.on }); }
       if (msg.type === 'call_reject') {
-        const target = onlineUsers.get(msg.to);
-        let delivered = false;
-        if (target && target.ws && target.ws.readyState === 1) {
-          try { target.ws.send(JSON.stringify({ type: 'call_reject', from: userNick })); delivered = true; } catch (_) {}
-        }
+        // Відхилили на одному пристрої — решта теж має замовкнути.
+        stopRingingOthers(userNick, ws.sessionDevice, msg.to);
+        const delivered = sendToCallPeer(msg.to, userNick, { type: 'call_reject', from: userNick });
+        unbindCall(userNick, msg.to);
         if (!delivered) { await sendFcmPush(msg.to, { type: 'call_end', from_nick: userNick }, 60000); }
         // Свідоме відхилення ≠ пропущений: прибираємо передчасний missed цієї пари
         // (from=той-хто-дзвонив=msg.to, to=я=userNick), інакше в адресата лишиться
@@ -7357,8 +7760,10 @@ wss.on('connection', (ws) => {
         console.log(`[calldiag] WS call_reject ${userNick}->${msg.to} delivered=${delivered}${delivered ? '' : ' (fallback FCM push)'}`);
       }
       if (msg.type === 'call_end') {
-        const target = onlineUsers.get(msg.to);
-        if (target) { try { target.ws.send(JSON.stringify({ type: 'call_end', from: userNick })); } catch (_) {} }
+        // Якщо дзвінок ще не взяли — «поклали» його на всіх пристроях адресата.
+        stopRingingOthers(msg.to, null, userNick);
+        sendToCallPeer(msg.to, userNick, { type: 'call_end', from: userNick });
+        unbindCall(userNick, msg.to);
         // ЗАВЖДИ шлемо й FCM (не лише коли офлайн): якщо вхідний показує НАТИВНИЙ
         // CallActivity (offer прийшов через FCM, поки Android був у фоні), а тепер
         // Android онлайн — сам WS-call_end нативний дзвінок не спинить. FCM-пуш
@@ -7373,15 +7778,29 @@ wss.on('connection', (ws) => {
     // ВАЖЛИВО: видаляємо presence ЛИШЕ якщо цей сокет — досі поточний. Інакше
     // гонка реконекту: закриття СТАРОГО сокета (після того, як login уже
     // зареєстрував НОВИЙ) стирало б запис нового → юзер «постійно офлайн».
-    if (userNick && onlineUsers.get(userNick)?.ws === ws) {
-      onlineUsers.delete(userNick);
+    // Присутність зникає лише коли пішов ОСТАННІЙ сокет акаунта. Перевірка
+    // «цей сокет — досі поточний» лишається всередині dropSession: вона й далі
+    // потрібна проти гонки реконекту (закриття старого сокета після того, як
+    // login зареєстрував новий, не має гасити присутність).
+    if (userNick && dropSession(userNick, ws)) {
       busPublish({ t: 'down', nick: userNick });
     }
   });
   ws.on('error', (e) => { console.log(`[ws] error nick=${userNick || '?'}: ${e && e.message}`); });
 });
 
-setInterval(() => { const now = Date.now(); for (const [nick, user] of onlineUsers) if (now - user.lastSeen > 60000) onlineUsers.delete(nick); }, 60000);
+setInterval(() => {
+  const now = Date.now();
+  for (const [nick, socks] of [...deviceSessions]) {
+    for (const [k, s] of [...socks]) if (now - (s.lastSeen || 0) > 60000) socks.delete(k);
+    if (socks.size === 0) { deviceSessions.delete(nick); onlineUsers.delete(nick); }
+    else onlineUsers.set(nick, multiEntry(nick));
+  }
+  // Записи інших інстансів кластера мультиплексора не мають — чистимо як раніше.
+  for (const [nick, user] of onlineUsers) {
+    if (!user.multi && now - user.lastSeen > 60000) onlineUsers.delete(nick);
+  }
+}, 60000);
 
 // Серверний WS-heartbeat: кожні 30с пінгуємо всі сокети; хто не відповів pong
 // з минулого циклу — транспорт мертвий (code=1006) → термінуємо й чистимо presence.

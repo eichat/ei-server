@@ -926,5 +926,20 @@
   "export_sub": "JSON फ़ाइल: प्रोफ़ाइल, चैट, सिक्के",
   "export_progress": "संग्रह तैयार हो रहा है…",
   "export_saved": "आपके डेटा की कॉपी सेव हो गई",
-  "test_mode_notice": "परीक्षण संस्करण — गड़बड़ियाँ संभव हैं"
+  "test_mode_notice": "परीक्षण संस्करण — गड़बड़ियाँ संभव हैं",
+  "devices_title": "डिवाइस",
+  "devices_sub": "आपका खाता कहाँ खुला है",
+  "devices_explain": "हर डिवाइस की अपनी एन्क्रिप्शन कुंजी होती है। संदेश सूची के सभी डिवाइस के लिए एन्क्रिप्ट होते हैं, इसलिए हटाया गया डिवाइस नए संदेश नहीं पढ़ पाएगा।",
+  "device_this_one": "यह डिवाइस",
+  "device_unknown": "डिवाइस",
+  "device_online": "ऑनलाइन",
+  "device_no_key": "एन्क्रिप्शन कुंजी नहीं",
+  "device_seen_now": "अभी",
+  "device_seen_minutes": "{n} मिनट पहले",
+  "device_seen_hours": "{n} घंटे पहले",
+  "device_seen_days": "{n} दिन पहले",
+  "device_revoke_title": "डिवाइस हटाएँ?",
+  "device_revoke_body": "डिवाइस साइन आउट हो जाएगा और नए संदेश नहीं मिलेंगे। उसमें सहेजी बातचीत बनी रहेगी।",
+  "device_revoke_do": "हटाएँ",
+  "device_added_notice": "आपके खाते में नया डिवाइस जोड़ा गया"
 }

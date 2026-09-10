@@ -926,5 +926,20 @@
   "export_sub": "JSONファイル：プロフィール、チャット、コイン",
   "export_progress": "アーカイブを作成中…",
   "export_saved": "データのコピーを保存しました",
-  "test_mode_notice": "テスト版 — 不具合が起こりえます"
+  "test_mode_notice": "テスト版 — 不具合が起こりえます",
+  "devices_title": "デバイス",
+  "devices_sub": "アカウントが開かれている場所",
+  "devices_explain": "各デバイスは独自の暗号鍵を持ちます。メッセージは一覧のすべてのデバイス向けに暗号化されるため、切断したデバイスは新しいメッセージを読めなくなります。",
+  "device_this_one": "このデバイス",
+  "device_unknown": "デバイス",
+  "device_online": "オンライン",
+  "device_no_key": "暗号鍵なし",
+  "device_seen_now": "たった今",
+  "device_seen_minutes": "{n}分前",
+  "device_seen_hours": "{n}時間前",
+  "device_seen_days": "{n}日前",
+  "device_revoke_title": "デバイスの接続を解除しますか？",
+  "device_revoke_body": "デバイスはサインアウトし、新しいメッセージを受信しなくなります。保存済みのチャットは残ります。",
+  "device_revoke_do": "接続を解除",
+  "device_added_notice": "アカウントに新しいデバイスが追加されました"
 }

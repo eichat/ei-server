@@ -926,5 +926,20 @@
   "export_sub": "Plik JSON: profil, czaty, monety",
   "export_progress": "Przygotowywanie archiwum…",
   "export_saved": "Kopia danych zapisana",
-  "test_mode_notice": "Wersja testowa — możliwe błędy"
+  "test_mode_notice": "Wersja testowa — możliwe błędy",
+  "devices_title": "Urządzenia",
+  "devices_sub": "Gdzie otwarte jest Twoje konto",
+  "devices_explain": "Każde urządzenie ma własny klucz. Wiadomości są szyfrowane dla wszystkich urządzeń z listy, więc odłączone nie odczyta już nowych.",
+  "device_this_one": "to urządzenie",
+  "device_unknown": "Urządzenie",
+  "device_online": "online",
+  "device_no_key": "bez klucza",
+  "device_seen_now": "przed chwilą",
+  "device_seen_minutes": "{n} min temu",
+  "device_seen_hours": "{n} godz. temu",
+  "device_seen_days": "{n} dni temu",
+  "device_revoke_title": "Odłączyć urządzenie?",
+  "device_revoke_body": "Urządzenie zostanie wylogowane i przestanie odbierać nowe wiadomości. Zapisane już rozmowy pozostaną.",
+  "device_revoke_do": "Odłącz",
+  "device_added_notice": "Do konta dodano nowe urządzenie"
 }

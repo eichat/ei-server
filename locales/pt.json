@@ -926,5 +926,20 @@
   "export_sub": "Um ficheiro JSON: perfil, conversas, moedas",
   "export_progress": "A preparar o arquivo…",
   "export_saved": "Cópia dos seus dados guardada",
-  "test_mode_notice": "Versão de teste — podem ocorrer erros"
+  "test_mode_notice": "Versão de teste — podem ocorrer erros",
+  "devices_title": "Dispositivos",
+  "devices_sub": "Onde a sua conta está aberta",
+  "devices_explain": "Cada dispositivo tem a sua própria chave. As mensagens são cifradas para todos os dispositivos da lista, por isso um desligado deixa de ler as novas.",
+  "device_this_one": "este dispositivo",
+  "device_unknown": "Dispositivo",
+  "device_online": "online",
+  "device_no_key": "sem chave de cifra",
+  "device_seen_now": "agora mesmo",
+  "device_seen_minutes": "há {n} min",
+  "device_seen_hours": "há {n} h",
+  "device_seen_days": "há {n} d",
+  "device_revoke_title": "Desligar o dispositivo?",
+  "device_revoke_body": "O dispositivo terminará a sessão e deixará de receber novas mensagens. As conversas já guardadas permanecem.",
+  "device_revoke_do": "Desligar",
+  "device_added_notice": "Foi adicionado um novo dispositivo à sua conta"
 }

@@ -926,5 +926,20 @@
   "export_sub": "Un archivo JSON: perfil, chats, monedas",
   "export_progress": "Preparando el archivo…",
   "export_saved": "Se guardó la copia de tus datos",
-  "test_mode_notice": "Versión de prueba: puede haber errores"
+  "test_mode_notice": "Versión de prueba: puede haber errores",
+  "devices_title": "Dispositivos",
+  "devices_sub": "Dónde está abierta tu cuenta",
+  "devices_explain": "Cada dispositivo tiene su propia clave. Los mensajes se cifran para todos los dispositivos de la lista, así que uno desconectado ya no podrá leer los nuevos.",
+  "device_this_one": "este dispositivo",
+  "device_unknown": "Dispositivo",
+  "device_online": "en línea",
+  "device_no_key": "sin clave de cifrado",
+  "device_seen_now": "ahora mismo",
+  "device_seen_minutes": "hace {n} min",
+  "device_seen_hours": "hace {n} h",
+  "device_seen_days": "hace {n} d",
+  "device_revoke_title": "¿Desconectar el dispositivo?",
+  "device_revoke_body": "El dispositivo cerrará sesión y dejará de recibir mensajes nuevos. Los chats ya guardados en él se mantienen.",
+  "device_revoke_do": "Desconectar",
+  "device_added_notice": "Se añadió un nuevo dispositivo a tu cuenta"
 }

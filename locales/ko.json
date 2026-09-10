@@ -926,5 +926,20 @@
   "export_sub": "JSON 파일: 프로필, 대화, 코인",
   "export_progress": "보관 파일을 만드는 중…",
   "export_saved": "데이터 사본을 저장했습니다",
-  "test_mode_notice": "테스트 버전 — 오류가 있을 수 있습니다"
+  "test_mode_notice": "테스트 버전 — 오류가 있을 수 있습니다",
+  "devices_title": "기기",
+  "devices_sub": "계정이 열려 있는 곳",
+  "devices_explain": "각 기기에는 자체 암호화 키가 있습니다. 메시지는 목록의 모든 기기용으로 암호화되므로 연결을 끊은 기기는 새 메시지를 읽을 수 없습니다.",
+  "device_this_one": "이 기기",
+  "device_unknown": "기기",
+  "device_online": "온라인",
+  "device_no_key": "암호화 키 없음",
+  "device_seen_now": "방금",
+  "device_seen_minutes": "{n}분 전",
+  "device_seen_hours": "{n}시간 전",
+  "device_seen_days": "{n}일 전",
+  "device_revoke_title": "기기 연결을 끊을까요?",
+  "device_revoke_body": "기기가 로그아웃되고 새 메시지를 받지 않습니다. 이미 저장된 대화는 남습니다.",
+  "device_revoke_do": "연결 끊기",
+  "device_added_notice": "계정에 새 기기가 추가되었습니다"
 }

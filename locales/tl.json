@@ -926,5 +926,20 @@
   "export_sub": "JSON file: profile, chat, barya",
   "export_progress": "Binubuo ang archive…",
   "export_saved": "Na-save ang kopya ng iyong data",
-  "test_mode_notice": "Test build — posibleng may bug"
+  "test_mode_notice": "Test build — posibleng may bug",
+  "devices_title": "Mga device",
+  "devices_sub": "Kung saan nakabukas ang account mo",
+  "devices_explain": "May sariling encryption key ang bawat device. Naka-encrypt ang mga mensahe para sa lahat ng device sa listahan, kaya hindi na mababasa ng na-disconnect ang mga bago.",
+  "device_this_one": "ang device na ito",
+  "device_unknown": "Device",
+  "device_online": "online",
+  "device_no_key": "walang encryption key",
+  "device_seen_now": "ngayon lang",
+  "device_seen_minutes": "{n} min ang nakalipas",
+  "device_seen_hours": "{n} oras ang nakalipas",
+  "device_seen_days": "{n} araw ang nakalipas",
+  "device_revoke_title": "I-disconnect ang device?",
+  "device_revoke_body": "Mala-log out ang device at hindi na makakatanggap ng bagong mensahe. Mananatili ang mga naka-save na chat.",
+  "device_revoke_do": "I-disconnect",
+  "device_added_notice": "May bagong device na naidagdag sa account mo"
 }

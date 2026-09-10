@@ -926,5 +926,20 @@
   "export_sub": "Un fichier JSON : profil, discussions, pièces",
   "export_progress": "Préparation de l’archive…",
   "export_saved": "Copie de vos données enregistrée",
-  "test_mode_notice": "Version de test — des bugs sont possibles"
+  "test_mode_notice": "Version de test — des bugs sont possibles",
+  "devices_title": "Appareils",
+  "devices_sub": "Où votre compte est ouvert",
+  "devices_explain": "Chaque appareil a sa propre clé. Les messages sont chiffrés pour tous les appareils listés : un appareil déconnecté ne pourra plus lire les nouveaux.",
+  "device_this_one": "cet appareil",
+  "device_unknown": "Appareil",
+  "device_online": "en ligne",
+  "device_no_key": "sans clé de chiffrement",
+  "device_seen_now": "à l'instant",
+  "device_seen_minutes": "il y a {n} min",
+  "device_seen_hours": "il y a {n} h",
+  "device_seen_days": "il y a {n} j",
+  "device_revoke_title": "Déconnecter l'appareil ?",
+  "device_revoke_body": "L'appareil sera déconnecté et ne recevra plus de nouveaux messages. Les conversations déjà enregistrées restent.",
+  "device_revoke_do": "Déconnecter",
+  "device_added_notice": "Un nouvel appareil a été ajouté à votre compte"
 }

@@ -926,5 +926,20 @@
   "export_sub": "JSON dosyası: profil, sohbetler, jetonlar",
   "export_progress": "Arşiv hazırlanıyor…",
   "export_saved": "Verilerinizin kopyası kaydedildi",
-  "test_mode_notice": "Test sürümü — hatalar olabilir"
+  "test_mode_notice": "Test sürümü — hatalar olabilir",
+  "devices_title": "Cihazlar",
+  "devices_sub": "Hesabınızın açık olduğu yerler",
+  "devices_explain": "Her cihazın kendi şifreleme anahtarı vardır. Mesajlar listedeki tüm cihazlar için şifrelenir; bağlantısı kesilen cihaz yeni mesajları okuyamaz.",
+  "device_this_one": "bu cihaz",
+  "device_unknown": "Cihaz",
+  "device_online": "çevrimiçi",
+  "device_no_key": "şifreleme anahtarı yok",
+  "device_seen_now": "az önce",
+  "device_seen_minutes": "{n} dk önce",
+  "device_seen_hours": "{n} sa önce",
+  "device_seen_days": "{n} gün önce",
+  "device_revoke_title": "Cihazın bağlantısı kesilsin mi?",
+  "device_revoke_body": "Cihazın oturumu kapanır ve yeni mesaj almaz. Cihazda kayıtlı sohbetler kalır.",
+  "device_revoke_do": "Bağlantıyı kes",
+  "device_added_notice": "Hesabınıza yeni bir cihaz eklendi"
 }

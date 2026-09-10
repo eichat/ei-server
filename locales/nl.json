@@ -926,5 +926,20 @@
   "export_sub": "Een JSON-bestand: profiel, chats, munten",
   "export_progress": "Archief wordt samengesteld…",
   "export_saved": "Kopie van je gegevens opgeslagen",
-  "test_mode_notice": "Testversie — fouten zijn mogelijk"
+  "test_mode_notice": "Testversie — fouten zijn mogelijk",
+  "devices_title": "Apparaten",
+  "devices_sub": "Waar je account open is",
+  "devices_explain": "Elk apparaat heeft een eigen sleutel. Berichten worden versleuteld voor alle apparaten in deze lijst, dus een losgekoppeld apparaat leest nieuwe berichten niet meer.",
+  "device_this_one": "dit apparaat",
+  "device_unknown": "Apparaat",
+  "device_online": "online",
+  "device_no_key": "zonder sleutel",
+  "device_seen_now": "zojuist",
+  "device_seen_minutes": "{n} min geleden",
+  "device_seen_hours": "{n} uur geleden",
+  "device_seen_days": "{n} dagen geleden",
+  "device_revoke_title": "Apparaat loskoppelen?",
+  "device_revoke_body": "Het apparaat wordt afgemeld en ontvangt geen nieuwe berichten meer. Reeds opgeslagen gesprekken blijven.",
+  "device_revoke_do": "Loskoppelen",
+  "device_added_notice": "Er is een nieuw apparaat aan je account toegevoegd"
 }

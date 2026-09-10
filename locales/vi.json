@@ -926,5 +926,20 @@
   "export_sub": "Tệp JSON: hồ sơ, trò chuyện, xu",
   "export_progress": "Đang tạo tệp lưu trữ…",
   "export_saved": "Đã lưu bản sao dữ liệu của bạn",
-  "test_mode_notice": "Bản thử nghiệm — có thể có lỗi"
+  "test_mode_notice": "Bản thử nghiệm — có thể có lỗi",
+  "devices_title": "Thiết bị",
+  "devices_sub": "Nơi tài khoản của bạn đang mở",
+  "devices_explain": "Mỗi thiết bị có khóa mã hóa riêng. Tin nhắn được mã hóa cho mọi thiết bị trong danh sách, nên thiết bị đã ngắt sẽ không đọc được tin mới.",
+  "device_this_one": "thiết bị này",
+  "device_unknown": "Thiết bị",
+  "device_online": "trực tuyến",
+  "device_no_key": "không có khóa mã hóa",
+  "device_seen_now": "vừa xong",
+  "device_seen_minutes": "{n} phút trước",
+  "device_seen_hours": "{n} giờ trước",
+  "device_seen_days": "{n} ngày trước",
+  "device_revoke_title": "Ngắt kết nối thiết bị?",
+  "device_revoke_body": "Thiết bị sẽ đăng xuất và ngừng nhận tin nhắn mới. Các cuộc trò chuyện đã lưu vẫn còn.",
+  "device_revoke_do": "Ngắt kết nối",
+  "device_added_notice": "Đã thêm thiết bị mới vào tài khoản của bạn"
 }

@@ -926,5 +926,20 @@
   "export_sub": "JSON-Datei: Profil, Chats, Münzen",
   "export_progress": "Archiv wird erstellt …",
   "export_saved": "Kopie deiner Daten gespeichert",
-  "test_mode_notice": "Testversion – Fehler sind möglich"
+  "test_mode_notice": "Testversion – Fehler sind möglich",
+  "devices_title": "Geräte",
+  "devices_sub": "Wo Ihr Konto geöffnet ist",
+  "devices_explain": "Jedes Gerät hat einen eigenen Schlüssel. Nachrichten werden für alle hier gelisteten Geräte verschlüsselt — ein getrenntes Gerät kann neue Nachrichten nicht mehr lesen.",
+  "device_this_one": "dieses Gerät",
+  "device_unknown": "Gerät",
+  "device_online": "online",
+  "device_no_key": "ohne Schlüssel",
+  "device_seen_now": "gerade eben",
+  "device_seen_minutes": "vor {n} Min.",
+  "device_seen_hours": "vor {n} Std.",
+  "device_seen_days": "vor {n} T.",
+  "device_revoke_title": "Gerät trennen?",
+  "device_revoke_body": "Das Gerät wird abgemeldet und erhält keine neuen Nachrichten mehr. Bereits gespeicherte Chats bleiben.",
+  "device_revoke_do": "Trennen",
+  "device_added_notice": "Ihrem Konto wurde ein neues Gerät hinzugefügt"
 }
