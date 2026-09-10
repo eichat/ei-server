@@ -5036,6 +5036,73 @@ app.get('/group/list', async (req, res) => {
 // Позначити групу/канал прочитаним — зсуває вказівник last_read_ts у Date.now(),
 // щоб наступний /group/list чи /channel/list дав unread=0. Клієнт кличе при
 // відкритті й закритті чату. actor-нік — із сесії (req.nick), не з тіла (аудит #1).
+// ── Вимкнені сповіщення ──────────────────────────────────────────────────────
+// Кеш у памʼяті, бо перевірка стоїть на шляху КОЖНОГО групового повідомлення:
+// запит до БД на кожного учасника був би найдорожчою операцією в чаті. Джерело
+// правди — таблиця; кеш скидається тим самим записом, що її змінює.
+const mutedCache = new Map();   // нік -> Set('group:12', 'channel:3')
+
+async function mutedSet(nick) {
+  if (mutedCache.has(nick)) return mutedCache.get(nick);
+  const set = new Set();
+  try {
+    const { data, error } = await supabase.from('chat_mutes')
+      .select('chat_type, chat_id').eq('nick', nick);
+    // Таблиці ще немає — вважаємо, що нічого не замучено (як було до фічі).
+    if (!error) for (const r of data || []) set.add(`${r.chat_type}:${r.chat_id}`);
+  } catch (_) { /* так само */ }
+  mutedCache.set(nick, set);
+  return set;
+}
+const isMuted = async (nick, type, id) => (await mutedSet(nick)).has(`${type}:${id}`);
+
+app.post('/chat/mute', async (req, res) => {
+  const nick = req.nick;
+  const { type, id, muted } = req.body || {};
+  if (!nick || (type !== 'group' && type !== 'channel') || id == null) {
+    return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  }
+  const chatId = String(id).slice(0, 64);
+  try {
+    if (muted === true) {
+      await supabase.from('chat_mutes').upsert(
+        { nick, chat_type: type, chat_id: chatId, updated_at: Date.now() },
+        { onConflict: 'nick,chat_type,chat_id' });
+    } else {
+      await supabase.from('chat_mutes').delete()
+        .eq('nick', nick).eq('chat_type', type).eq('chat_id', chatId);
+    }
+  } catch (_) { return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' }); }
+  mutedCache.delete(nick);
+  syncOwnDevicesByNick(nick, req.deviceId, { type: 'own_mute', chatType: type, id: chatId, muted: muted === true });
+  res.json({ ok: true });
+});
+
+app.get('/chat/mutes', async (req, res) => {
+  const nick = req.nick;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  try {
+    const { data, error } = await supabase.from('chat_mutes')
+      .select('chat_type, chat_id').eq('nick', nick).limit(500);
+    if (error) return res.json({ ok: true, mutes: [] });
+    res.json({ ok: true, mutes: (data || []).map(r => ({ type: r.chat_type, id: r.chat_id })) });
+  } catch (_) { res.json({ ok: true, mutes: [] }); }
+});
+
+// Пуш про групове повідомлення тим, хто зараз офлайн і не вимкнув сповіщення.
+// Безтілесний, як і в особистих чатах: назва групи й нік — усе, що йде назовні.
+async function pushGroupMessage(groupId, groupName, fromNick, memberNicks) {
+  for (const nick of memberNicks) {
+    if (nick === fromNick) continue;
+    if (isLive(nick)) continue;                       // отримає сокетом
+    if (await isMuted(nick, 'group', groupId)) continue;
+    sendFcmPush(nick, {
+      type: 'group', from_nick: fromNick,
+      group_id: String(groupId), group_name: (groupName || '').slice(0, 64),
+    });
+  }
+}
+
 app.post('/chat/mark-read', async (req, res) => {
   const nick = req.nick;
   const { type, id } = req.body;
@@ -7855,6 +7922,13 @@ wss.on('connection', (ws) => {
         await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], ...(msg.isFile ? { type: 'file', file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
         notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
+        // 🔴 Пуш для груп не існував узагалі: учасник, який зараз офлайн, про
+        // повідомлення не дізнавався до відкриття застосунку. Через це й
+        // перемикач «вимкнути сповіщення» був порожнім — глушити не було чого.
+        try {
+          const { data: g } = await supabase.from('groups').select('name').eq('id', msg.groupId).maybeSingle();
+          await pushGroupMessage(msg.groupId, g && g.name, userNick, (members || []).map(m => m.nick));
+        } catch (e) { console.error('[pushGroupMessage]', e.message); }
       }
 
       if (msg.type === 'ei_message') { /* нарахування прибрано */ }

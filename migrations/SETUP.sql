@@ -401,6 +401,18 @@ create table if not exists public.user_stickers (
 
 create index if not exists user_stickers_sync_idx on public.user_stickers (nick, updated_at);
 
+-- Замучені групи й канали. Наявність рядка = сповіщення вимкнені; надгробок
+-- не потрібен, бо «немає запису» і «увімкнено» — це один і той самий стан.
+create table if not exists public.chat_mutes (
+  nick text NOT NULL,
+  chat_type text NOT NULL,
+  chat_id text NOT NULL,
+  updated_at bigint NOT NULL,
+  primary key (nick, chat_type, chat_id)
+);
+
+create index if not exists chat_mutes_nick_idx on public.chat_mutes (nick, updated_at);
+
 create table if not exists public.pending_channel_invites (
   channel_id bigint NOT NULL,
   id bigint generated always as identity,
@@ -776,6 +788,7 @@ alter table public.phone_codes enable row level security;
 alter table public.user_devices enable row level security;
 alter table public.message_deletions enable row level security;
 alter table public.user_stickers enable row level security;
+alter table public.chat_mutes enable row level security;
 alter table public.platform_bans enable row level security;
 alter table public.reports enable row level security;
 alter table public.sticker_packs enable row level security;
@@ -1048,6 +1061,8 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 grant delete, insert, references, select, trigger, truncate, update on table public.message_deletions to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_stickers to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_stickers to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.chat_mutes to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.chat_mutes to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.reports to postgres;
