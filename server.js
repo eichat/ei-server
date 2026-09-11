@@ -4914,6 +4914,53 @@ app.post('/stickers/mine/delete', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Налаштування акаунта на всіх пристроях ───────────────────────────────────
+// Дрібні пари ключ-значення, які мають бути однакові скрізь (позначка
+// «очищено історію каналу», «недавні» наліпки). Налаштування ПРИСТРОЮ — тема,
+// мова, рінгтон — сюди свідомо не йдуть.
+
+app.get('/prefs', async (req, res) => {
+  const nick = req.nick;
+  if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const since = parseInt(req.query.since, 10) || 0;
+  try {
+    const { data, error } = await supabase.from('user_prefs')
+      .select('key, value, updated_at')
+      .eq('nick', nick).gt('updated_at', since)
+      .order('updated_at', { ascending: true }).limit(500);
+    if (error) return res.json({ ok: true, prefs: [] });   // міграції ще немає
+    res.json({ ok: true, prefs: data || [] });
+  } catch (_) { res.json({ ok: true, prefs: [] }); }
+});
+
+app.post('/prefs', async (req, res) => {
+  const nick = req.nick;
+  const { key, value } = req.body || {};
+  if (!nick || typeof key !== 'string' || !key || key.length > 128) {
+    return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  }
+  const now = Date.now();
+  try {
+    const q = value === null || value === undefined
+      ? supabase.from('user_prefs').delete().eq('nick', nick).eq('key', key)
+      : supabase.from('user_prefs').upsert(
+          { nick, key, value: String(value).slice(0, 4000), updated_at: now },
+          { onConflict: 'nick,key' });
+    // `error` перевіряємо: supabase його не кидає, а повертає — інакше сервер
+    // відповідав би «ok» на запис, якого не сталося.
+    const { error } = await q;
+    if (error) {
+      console.error('[prefs]', error.message);
+      return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+    }
+  } catch (e) {
+    console.error('[prefs]', e.message);
+    return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  }
+  syncOwnDevicesByNick(nick, req.deviceId, { type: 'own_pref', key, value: value ?? null });
+  res.json({ ok: true });
+});
+
 // Що видалено після `since`. Клієнт кличе на login_ok і зсуває свою позначку.
 app.get('/deletions', async (req, res) => {
   const nick = req.nick;
