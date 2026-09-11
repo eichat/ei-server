@@ -91,6 +91,7 @@ create table if not exists public.channel_comments (
   file_data text,
   file_name text,
   from_nick text NOT NULL,
+  fully_read boolean NOT NULL DEFAULT false,
   id bigint generated always as identity,
   post_id bigint NOT NULL,
   read_by text[] NOT NULL DEFAULT '{}'::text[],

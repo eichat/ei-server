@@ -6465,19 +6465,43 @@ app.post('/channel/comments/read', async (req, res) => {
   const { postId } = req.body; const nick = req.nick;
   if (!postId || !nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data: rows } = await supabase.from('channel_comments')
-    .select('id, from_nick, read_by')
+    .select('id, from_nick, read_by, channel_id')
     .eq('post_id', postId).neq('from_nick', nick)
     .not('read_by', 'cs', `{"${nick}"}`)
     .limit(500);
+  // Хто зараз підписаний — для синіх ✓✓ («бачили всі, крім автора»).
+  // Один запит на весь виклик: усі коментарі тут з одного каналу.
+  let members = null;
+  const chId = rows && rows[0] ? rows[0].channel_id : null;
+  if (chId != null) {
+    const { data: mem } = await supabase.from('channel_members').select('nick').eq('channel_id', chId);
+    if (mem) members = mem.map(m => m.nick);
+  }
   const firstSeenByAuthor = {}; // автор → commentIds, що аж тепер стали побаченими
+  const fullyByAuthor = {};     // автор → commentIds, які аж тепер побачили всі
   for (const c of rows || []) {
     const readBy = c.read_by || [];
     if (readBy.includes(nick)) continue;
-    await supabase.from('channel_comments').update({ read_by: [...readBy, nick] }).eq('id', c.id);
+    const nextReadBy = [...readBy, nick];
+    await supabase.from('channel_comments').update({ read_by: nextReadBy }).eq('id', c.id);
     if (readBy.length === 0) (firstSeenByAuthor[c.from_nick] ??= []).push(c.id);
+    if (members) {
+      const need = members.filter(m => m !== c.from_nick);
+      if (need.length > 0 && need.every(m => nextReadBy.includes(m))) {
+        // Окремим запитом: без міграції (`fully_read`) спільний update
+        // відхилився б цілком, і read_by теж не записався б. Раз посинів —
+        // назавжди: новий підписник прочитаного не відкликає.
+        const { error } = await supabase.from('channel_comments').update({ fully_read: true }).eq('id', c.id);
+        if (error) console.error('[comments/read] fully_read:', error.message);
+        else (fullyByAuthor[c.from_nick] ??= []).push(c.id);
+      }
+    }
   }
   for (const [author, commentIds] of Object.entries(firstSeenByAuthor)) {
     sendToUser(author, { type: 'channel_comment_status', postId: Number(postId), status: 'delivered', commentIds });
+  }
+  for (const [author, commentIds] of Object.entries(fullyByAuthor)) {
+    sendToUser(author, { type: 'channel_comment_status', postId: Number(postId), status: 'read', commentIds });
   }
   res.json({ ok: true });
 });
