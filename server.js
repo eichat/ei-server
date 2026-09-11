@@ -4994,8 +4994,12 @@ app.post('/prefs', async (req, res) => {
   }
   const now = Date.now();
   try {
+    // Зняте значення лишаємо РЯДКОМ із value=null (надгробок), а не видаляємо:
+    // видалений рядок не потрапляє у відповідь `/prefs?since=`, тож пристрій,
+    // який був офлайн, про зняття не дізнався б ніколи й тримав старе значення.
     const q = value === null || value === undefined
-      ? supabase.from('user_prefs').delete().eq('nick', nick).eq('key', key)
+      ? supabase.from('user_prefs').upsert(
+          { nick, key, value: null, updated_at: now }, { onConflict: 'nick,key' })
       : supabase.from('user_prefs').upsert(
           { nick, key, value: String(value).slice(0, 4000), updated_at: now },
           { onConflict: 'nick,key' });
