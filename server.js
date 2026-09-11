@@ -5436,8 +5436,16 @@ app.get('/group/messages', async (req, res) => {
 app.post('/group/clear-history', async (req, res) => {
   const { groupId } = req.body; const nick = req.nick;
   if (!groupId || !nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
-  await supabase.from('group_history_cleared').upsert({ nick, group_id: groupId, cleared_at: Date.now() }, { onConflict: 'nick,group_id' });
-  res.json({ ok: true });
+  const clearedAt = Date.now();
+  const { error } = await supabase.from('group_history_cleared').upsert({ nick, group_id: groupId, cleared_at: clearedAt }, { onConflict: 'nick,group_id' });
+  if (error) {
+    console.error('[group/clear-history]', error.message);
+    return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  }
+  // Іншим своїм пристроям — наживо. Без цього очищення там було видно лише
+  // після перезавантаження історії (/group/messages фільтрує за cleared_at).
+  syncOwnDevicesByNick(nick, req.deviceId, { type: 'group_history_cleared', groupId: Number(groupId), clearedAt });
+  res.json({ ok: true, clearedAt });
 });
 
 app.get('/check-phone', async (req, res) => {
