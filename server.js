@@ -2943,7 +2943,7 @@ async function notifyChannelSubscribers(channelId, payload, excludeNick = null, 
 //  • шлемо пачками, а не всі разом — щоб не відкрити тисячу зʼєднань до FCM;
 //  • є стеля CHANNEL_PUSH_MAX: краще не сповістити «хвіст», ніж покласти інстанс.
 const CHANNEL_PUSH_MAX = parseInt(process.env.CHANNEL_PUSH_MAX, 10) || 2000;
-async function pushChannelPost(channelId, channelName, fromNick, memberNicks, fromDeviceId) {
+async function pushChannelPost(channelId, channelName, fromNick, memberNicks, fromDeviceId, postId) {
   const offline = (memberNicks || []).filter(n => n !== fromNick && !isLive(n));
   if (offline.length === 0) return;
   const muted = new Set();
@@ -2956,6 +2956,8 @@ async function pushChannelPost(channelId, channelName, fromNick, memberNicks, fr
   const data = {
     type: 'channel', from_nick: fromNick,
     channel_id: String(channelId), channel_name: (channelName || '').slice(0, 64),
+    // Тап по сповіщенню має відкрити САМЕ цей пост, а не просто канал.
+    ...(postId != null ? { post_id: String(postId) } : {}),
   };
   for (let i = 0; i < list.length; i += 20) {
     const chunk = list.slice(i, i + 20);
@@ -6371,7 +6373,7 @@ app.post('/channel/message', async (req, res) => {
   const { data: chNameRow } = await supabase.from('channels').select('name').eq('id', channelId).single();
   const subs = await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}), message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } }, fromNick, req.deviceId);
   // Пуші — у фоні: відповідь клієнту не має чекати на тисячу підписників.
-  pushChannelPost(channelId, chNameRow && chNameRow.name, fromNick, subs, req.deviceId)
+  pushChannelPost(channelId, chNameRow && chNameRow.name, fromNick, subs, req.deviceId, msg.id)
     .catch(e => console.error('[channel/message push]', e.message));
   res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [], waveform: waveform || null, duration_sec: durationSec || null } });
 });
