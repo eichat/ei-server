@@ -7851,6 +7851,11 @@ wss.on('connection', (ws) => {
           await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], type: 'sticker' });
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'sticker', groupId: msg.groupId, from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId }));
           notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
+          // Копія на інші власні пристрої — ТИМ САМИМ типом, що й учасникам.
+          // Окремий `own_message` тут був би зайвим: клієнт має готові гілки для
+          // кожного типу, і копія під власним типом розбирається ними без змін
+          // (нік автора = ми, тож вона одразу стає «своєю»).
+          syncOwnDevices(userNick, ws, { type: 'sticker', groupId: msg.groupId, from: userNick, packId: msg.packId, stickerId: msg.stickerId, ...ugcOut, timestamp: ts, msgId });
         } else {
           // Стікер у direct
           if (await isBlockedBy(msg.to, userNick)) return;
@@ -7883,6 +7888,8 @@ wss.on('connection', (ws) => {
           await trackFileObject(fileData, (members || []).map(m => m.nick).filter(n => n !== userNick)); // 2C
           for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
           notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
+          // Те саме для файлів і голосових у групі.
+          syncOwnDevices(userNick, ws, { type: 'file_message', groupId: msg.groupId, from: userNick, fileName: msg.fileName, fileSize: msg.fileSize, ...(msg.caption ? { caption: String(msg.caption).slice(0, 4000) } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : { data: msg.data }), timestamp: ts, msgId, ...(msg.waveform ? { waveform: msg.waveform } : {}), ...(msg.durationSec != null ? { durationSec: msg.durationSec } : {}) });
         } else {
           if (await isBlockedBy(msg.to, userNick)) return;
           if (!(await canReceiveFrom(userNick, msg.to))) {
@@ -7994,8 +8001,13 @@ wss.on('connection', (ws) => {
         // 10.09, а групи лишились половинчастими: написане з телефона на
         // десктопі зʼявлялось аж після перезаходу (там його підтягувала
         // історія `/group/list`, а не жива подія).
+        //
+        // Шлемо ТИМ САМИМ типом, що й учасникам: у клієнта вже є гілки для
+        // кожного типу, і копія розбирається ними без жодного нового коду —
+        // на відміну від окремого `own_message`, який довелося б навчати
+        // текстів, наліпок і файлів окремо.
         syncOwnDevices(userNick, ws, {
-          type: 'own_message', kind: 'group', groupId: msg.groupId, from: userNick,
+          type: 'group_message', groupId: msg.groupId, from: userNick,
           text: msg.text, timestamp: ts, msgId,
           ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}),
           ...(msg.fileName ? { fileName: msg.fileName } : {}),
