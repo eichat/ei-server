@@ -946,5 +946,6 @@
   "action_select_posts": "投稿を選択",
   "confirm_delete_posts": "{n} 件の投稿を削除しますか？",
   "msg_delete_posts_hint": "コメントとファイルごと、すべての購読者から削除されます。",
-  "msg_posts_deleted": "{n} 件削除しました"
+  "msg_posts_deleted": "{n} 件削除しました",
+  "label_new_post": "新しい投稿"
 }

@@ -946,5 +946,6 @@
   "action_select_posts": "Pumili ng mga post",
   "confirm_delete_posts": "Burahin ang {n} post?",
   "msg_delete_posts_hint": "Mabubura para sa lahat ng subscriber, kasama ang mga komento at file.",
-  "msg_posts_deleted": "Nabura: {n}"
+  "msg_posts_deleted": "Nabura: {n}",
+  "label_new_post": "Bagong post"
 }

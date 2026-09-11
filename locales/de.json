@@ -946,5 +946,6 @@
   "action_select_posts": "Beiträge auswählen",
   "confirm_delete_posts": "{n} Beiträge löschen?",
   "msg_delete_posts_hint": "Wird bei allen Abonnenten samt Kommentaren und Dateien gelöscht.",
-  "msg_posts_deleted": "{n} gelöscht"
+  "msg_posts_deleted": "{n} gelöscht",
+  "label_new_post": "Neuer Beitrag"
 }

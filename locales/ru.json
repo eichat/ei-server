@@ -946,5 +946,6 @@
   "action_select_posts": "Выбрать посты",
   "confirm_delete_posts": "Удалить {n} постов?",
   "msg_delete_posts_hint": "Будут удалены у всех подписчиков вместе с комментариями и файлами.",
-  "msg_posts_deleted": "Удалено: {n}"
+  "msg_posts_deleted": "Удалено: {n}",
+  "label_new_post": "Новый пост"
 }

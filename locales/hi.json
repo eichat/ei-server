@@ -946,5 +946,6 @@
   "action_select_posts": "पोस्ट चुनें",
   "confirm_delete_posts": "{n} पोस्ट हटाएँ?",
   "msg_delete_posts_hint": "सभी सब्सक्राइबर्स के लिए टिप्पणियों और फ़ाइलों सहित हट जाएँगी।",
-  "msg_posts_deleted": "हटाई गईं: {n}"
+  "msg_posts_deleted": "हटाई गईं: {n}",
+  "label_new_post": "नई पोस्ट"
 }

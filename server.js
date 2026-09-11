@@ -2933,6 +2933,35 @@ async function notifyChannelSubscribers(channelId, payload, excludeNick = null, 
     // не дати одному битому сокету зірвати решту розсилки й сам HTTP-запит.
     if (t) { try { t.ws.send(msg); } catch (_) {} }
   }
+  return (members || []).map(m => m.nick);
+}
+
+// Пуш про новий пост каналу тим, хто офлайн і не вимкнув сповіщення.
+// ⚠️ Канал — не група: підписників можуть бути тисячі, тож
+//  • mute читаємо ОДНИМ запитом на канал, а не на кожного (інакше 1000 запитів
+//    до БД на один пост);
+//  • шлемо пачками, а не всі разом — щоб не відкрити тисячу зʼєднань до FCM;
+//  • є стеля CHANNEL_PUSH_MAX: краще не сповістити «хвіст», ніж покласти інстанс.
+const CHANNEL_PUSH_MAX = parseInt(process.env.CHANNEL_PUSH_MAX, 10) || 2000;
+async function pushChannelPost(channelId, channelName, fromNick, memberNicks, fromDeviceId) {
+  const offline = (memberNicks || []).filter(n => n !== fromNick && !isLive(n));
+  if (offline.length === 0) return;
+  const muted = new Set();
+  try {
+    const { data } = await supabase.from('chat_mutes').select('nick')
+      .eq('chat_type', 'channel').eq('chat_id', String(channelId));
+    for (const r of data || []) muted.add(r.nick);
+  } catch (e) { console.error('[pushChannelPost] mutes:', e.message); }
+  const list = offline.filter(n => !muted.has(n)).slice(0, CHANNEL_PUSH_MAX);
+  const data = {
+    type: 'channel', from_nick: fromNick,
+    channel_id: String(channelId), channel_name: (channelName || '').slice(0, 64),
+  };
+  for (let i = 0; i < list.length; i += 20) {
+    const chunk = list.slice(i, i + 20);
+    await Promise.all(chunk.map(n => sendFcmPush(n, data, 14400000, fromDeviceId)
+      .catch(e => console.error('[pushChannelPost]', n, e.message))));
+  }
 }
 
 app.get('/call-offer', async (req, res) => {
@@ -6339,7 +6368,11 @@ app.post('/channel/message', async (req, res) => {
   }).select().single();
   const lastText = text ? text.substring(0, 50) : (imageUrl ? '🖼 Зображення' : (isVideo ? '🎬 Відео' : (isVoice ? '🎤 Голосове' : (fileName ? '📎 ' + fileName.substring(0, 30) : ''))));
   await supabase.from('channels').update({ last_post_at: ts, last_post_text: lastText }).eq('id', channelId);
-  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}), message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } }, fromNick, req.deviceId);
+  const { data: chNameRow } = await supabase.from('channels').select('name').eq('id', channelId).single();
+  const subs = await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}), message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } }, fromNick, req.deviceId);
+  // Пуші — у фоні: відповідь клієнту не має чекати на тисячу підписників.
+  pushChannelPost(channelId, chNameRow && chNameRow.name, fromNick, subs, req.deviceId)
+    .catch(e => console.error('[channel/message push]', e.message));
   res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [], waveform: waveform || null, duration_sec: durationSec || null } });
 });
 

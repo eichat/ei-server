@@ -946,5 +946,6 @@
   "action_select_posts": "Seleccionar publicaciones",
   "confirm_delete_posts": "¿Eliminar {n} publicaciones?",
   "msg_delete_posts_hint": "Se eliminarán para todos los suscriptores, junto con los comentarios y archivos.",
-  "msg_posts_deleted": "Eliminadas: {n}"
+  "msg_posts_deleted": "Eliminadas: {n}",
+  "label_new_post": "Nueva publicación"
 }

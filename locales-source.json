@@ -21833,6 +21833,29 @@
    "uk": "Видалено: {n}",
    "vi": "Đã xóa: {n}",
    "zh": "已删除：{n}"
+  },
+  "label_new_post": {
+   "ar": "منشور جديد",
+   "bn": "নতুন পোস্ট",
+   "de": "Neuer Beitrag",
+   "en": "New post",
+   "es": "Nueva publicación",
+   "fr": "Nouvelle publication",
+   "hi": "नई पोस्ट",
+   "id": "Postingan baru",
+   "it": "Nuovo post",
+   "ja": "新しい投稿",
+   "ko": "새 게시물",
+   "nl": "Nieuw bericht",
+   "pl": "Nowy post",
+   "pt": "Nova publicação",
+   "ru": "Новый пост",
+   "th": "โพสต์ใหม่",
+   "tl": "Bagong post",
+   "tr": "Yeni gönderi",
+   "uk": "Новий пост",
+   "vi": "Bài đăng mới",
+   "zh": "新帖子"
   }
  }
 }

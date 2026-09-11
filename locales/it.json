@@ -946,5 +946,6 @@
   "action_select_posts": "Seleziona i post",
   "confirm_delete_posts": "Eliminare {n} post?",
   "msg_delete_posts_hint": "Verranno rimossi per tutti gli iscritti, insieme a commenti e file.",
-  "msg_posts_deleted": "Eliminati: {n}"
+  "msg_posts_deleted": "Eliminati: {n}",
+  "label_new_post": "Nuovo post"
 }

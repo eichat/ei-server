@@ -946,5 +946,6 @@
   "action_select_posts": "게시물 선택",
   "confirm_delete_posts": "게시물 {n}개를 삭제할까요?",
   "msg_delete_posts_hint": "댓글과 파일까지 모든 구독자에게서 삭제됩니다.",
-  "msg_posts_deleted": "{n}개 삭제"
+  "msg_posts_deleted": "{n}개 삭제",
+  "label_new_post": "새 게시물"
 }

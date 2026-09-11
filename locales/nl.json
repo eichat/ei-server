@@ -946,5 +946,6 @@
   "action_select_posts": "Berichten selecteren",
   "confirm_delete_posts": "{n} berichten verwijderen?",
   "msg_delete_posts_hint": "Ze worden bij alle abonnees verwijderd, samen met reacties en bestanden.",
-  "msg_posts_deleted": "Verwijderd: {n}"
+  "msg_posts_deleted": "Verwijderd: {n}",
+  "label_new_post": "Nieuw bericht"
 }

@@ -946,5 +946,6 @@
   "action_select_posts": "选择帖子",
   "confirm_delete_posts": "删除 {n} 条帖子？",
   "msg_delete_posts_hint": "将连同评论和文件在所有订阅者处删除。",
-  "msg_posts_deleted": "已删除：{n}"
+  "msg_posts_deleted": "已删除：{n}",
+  "label_new_post": "新帖子"
 }

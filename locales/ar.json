@@ -946,5 +946,6 @@
   "action_select_posts": "تحديد المنشورات",
   "confirm_delete_posts": "حذف {n} منشورًا؟",
   "msg_delete_posts_hint": "ستُحذف لدى جميع المشتركين مع التعليقات والملفات.",
-  "msg_posts_deleted": "تم حذف {n}"
+  "msg_posts_deleted": "تم حذف {n}",
+  "label_new_post": "منشور جديد"
 }

@@ -946,5 +946,6 @@
   "action_select_posts": "Вибрати пости",
   "confirm_delete_posts": "Видалити {n} постів?",
   "msg_delete_posts_hint": "Будуть видалені в усіх підписників разом із коментарями й файлами.",
-  "msg_posts_deleted": "Видалено: {n}"
+  "msg_posts_deleted": "Видалено: {n}",
+  "label_new_post": "Новий пост"
 }

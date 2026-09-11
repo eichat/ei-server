@@ -946,5 +946,6 @@
   "action_select_posts": "เลือกโพสต์",
   "confirm_delete_posts": "ลบ {n} โพสต์?",
   "msg_delete_posts_hint": "จะถูกลบสำหรับผู้ติดตามทุกคน พร้อมความคิดเห็นและไฟล์",
-  "msg_posts_deleted": "ลบแล้ว: {n}"
+  "msg_posts_deleted": "ลบแล้ว: {n}",
+  "label_new_post": "โพสต์ใหม่"
 }

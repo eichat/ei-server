@@ -946,5 +946,6 @@
   "action_select_posts": "পোস্ট নির্বাচন করুন",
   "confirm_delete_posts": "{n}টি পোস্ট মুছবেন?",
   "msg_delete_posts_hint": "সব সাবস্ক্রাইবারের কাছ থেকে মন্তব্য ও ফাইলসহ মুছে যাবে।",
-  "msg_posts_deleted": "{n}টি মুছে ফেলা হয়েছে"
+  "msg_posts_deleted": "{n}টি মুছে ফেলা হয়েছে",
+  "label_new_post": "নতুন পোস্ট"
 }

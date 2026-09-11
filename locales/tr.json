@@ -946,5 +946,6 @@
   "action_select_posts": "Gönderileri seç",
   "confirm_delete_posts": "{n} gönderi silinsin mi?",
   "msg_delete_posts_hint": "Tüm abonelerde yorum ve dosyalarıyla birlikte silinir.",
-  "msg_posts_deleted": "Silindi: {n}"
+  "msg_posts_deleted": "Silindi: {n}",
+  "label_new_post": "Yeni gönderi"
 }

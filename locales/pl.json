@@ -946,5 +946,6 @@
   "action_select_posts": "Wybierz posty",
   "confirm_delete_posts": "Usunąć {n} postów?",
   "msg_delete_posts_hint": "Zostaną usunięte u wszystkich subskrybentów wraz z komentarzami i plikami.",
-  "msg_posts_deleted": "Usunięto: {n}"
+  "msg_posts_deleted": "Usunięto: {n}",
+  "label_new_post": "Nowy post"
 }

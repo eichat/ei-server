@@ -946,5 +946,6 @@
   "action_select_posts": "Select posts",
   "confirm_delete_posts": "Delete {n} posts?",
   "msg_delete_posts_hint": "They will be removed for all subscribers, along with comments and files.",
-  "msg_posts_deleted": "Deleted: {n}"
+  "msg_posts_deleted": "Deleted: {n}",
+  "label_new_post": "New post"
 }
