@@ -942,5 +942,9 @@
   "device_revoke_body": "อุปกรณ์จะออกจากระบบและหยุดรับข้อความใหม่ แชทที่บันทึกไว้แล้วจะยังอยู่",
   "device_revoke_do": "ตัดการเชื่อมต่อ",
   "device_added_notice": "มีการเพิ่มอุปกรณ์ใหม่เข้าบัญชีของคุณ",
-  "action_show_hidden_posts": "แสดงโพสต์ที่ซ่อนไว้"
+  "action_show_hidden_posts": "แสดงโพสต์ที่ซ่อนไว้",
+  "action_select_posts": "เลือกโพสต์",
+  "confirm_delete_posts": "ลบ {n} โพสต์?",
+  "msg_delete_posts_hint": "จะถูกลบสำหรับผู้ติดตามทุกคน พร้อมความคิดเห็นและไฟล์",
+  "msg_posts_deleted": "ลบแล้ว: {n}"
 }

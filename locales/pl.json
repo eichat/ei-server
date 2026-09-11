@@ -942,5 +942,9 @@
   "device_revoke_body": "Urządzenie zostanie wylogowane i przestanie odbierać nowe wiadomości. Zapisane już rozmowy pozostaną.",
   "device_revoke_do": "Odłącz",
   "device_added_notice": "Do konta dodano nowe urządzenie",
-  "action_show_hidden_posts": "Pokaż ukryte posty"
+  "action_show_hidden_posts": "Pokaż ukryte posty",
+  "action_select_posts": "Wybierz posty",
+  "confirm_delete_posts": "Usunąć {n} postów?",
+  "msg_delete_posts_hint": "Zostaną usunięte u wszystkich subskrybentów wraz z komentarzami i plikami.",
+  "msg_posts_deleted": "Usunięto: {n}"
 }

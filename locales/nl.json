@@ -942,5 +942,9 @@
   "device_revoke_body": "Het apparaat wordt afgemeld en ontvangt geen nieuwe berichten meer. Reeds opgeslagen gesprekken blijven.",
   "device_revoke_do": "Loskoppelen",
   "device_added_notice": "Er is een nieuw apparaat aan je account toegevoegd",
-  "action_show_hidden_posts": "Verborgen berichten tonen"
+  "action_show_hidden_posts": "Verborgen berichten tonen",
+  "action_select_posts": "Berichten selecteren",
+  "confirm_delete_posts": "{n} berichten verwijderen?",
+  "msg_delete_posts_hint": "Ze worden bij alle abonnees verwijderd, samen met reacties en bestanden.",
+  "msg_posts_deleted": "Verwijderd: {n}"
 }

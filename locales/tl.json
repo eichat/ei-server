@@ -942,5 +942,9 @@
   "device_revoke_body": "Mala-log out ang device at hindi na makakatanggap ng bagong mensahe. Mananatili ang mga naka-save na chat.",
   "device_revoke_do": "I-disconnect",
   "device_added_notice": "May bagong device na naidagdag sa account mo",
-  "action_show_hidden_posts": "Ipakita ang mga nakatagong post"
+  "action_show_hidden_posts": "Ipakita ang mga nakatagong post",
+  "action_select_posts": "Pumili ng mga post",
+  "confirm_delete_posts": "Burahin ang {n} post?",
+  "msg_delete_posts_hint": "Mabubura para sa lahat ng subscriber, kasama ang mga komento at file.",
+  "msg_posts_deleted": "Nabura: {n}"
 }

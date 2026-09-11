@@ -942,5 +942,9 @@
   "device_revoke_body": "El dispositivo cerrará sesión y dejará de recibir mensajes nuevos. Los chats ya guardados en él se mantienen.",
   "device_revoke_do": "Desconectar",
   "device_added_notice": "Se añadió un nuevo dispositivo a tu cuenta",
-  "action_show_hidden_posts": "Mostrar publicaciones ocultas"
+  "action_show_hidden_posts": "Mostrar publicaciones ocultas",
+  "action_select_posts": "Seleccionar publicaciones",
+  "confirm_delete_posts": "¿Eliminar {n} publicaciones?",
+  "msg_delete_posts_hint": "Se eliminarán para todos los suscriptores, junto con los comentarios y archivos.",
+  "msg_posts_deleted": "Eliminadas: {n}"
 }

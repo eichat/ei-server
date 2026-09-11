@@ -6371,6 +6371,44 @@ app.post('/channel/edit-message', async (req, res) => {
 });
 
 // Видалення поста (обидва шляхи)
+// Прибрати один пост разом із коментарями, реакціями й файлами.
+// Спільне тіло для одиночного видалення й масового (/channel/messages/delete):
+// три копії цієї логіки розійшлися б при першій же зміні.
+async function purgeChannelPost(channelId, postId, post) {
+  const { data: postComments } = await supabase.from('channel_comments').select('file_data').eq('post_id', postId);
+  await supabase.from('channel_comments').delete().eq('post_id', postId);
+  await supabase.from('channel_reactions').delete().eq('post_id', postId);
+  await supabase.from('channel_messages').delete().eq('id', postId);
+  await removeChannelFile(post.image_url, post.file_data);
+  for (const c of (postComments || [])) await removeChannelFile(c.file_data);
+  await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
+}
+
+// Масове видалення: керівник вибирає кілька постів у стрічці. Стеля 100 —
+// щоб один запит не тримав інстанс хвилинами (кожен пост це кілька запитів до
+// БД плюс прибирання файлів).
+app.post('/channel/messages/delete', async (req, res) => {
+  const { channelId, postIds } = req.body; const nick = req.nick;
+  if (!channelId || !nick || !Array.isArray(postIds) || postIds.length === 0) {
+    return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  }
+  if (postIds.length > 100) return res.json({ ok: false, error: 'Занадто багато постів', code: 'err_too_many_posts' });
+  const ids = [...new Set(postIds.map(Number).filter(n => Number.isFinite(n)))];
+  const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
+  const isManager = !!(member && ['owner', 'admin'].includes(member.role));
+  const { data: posts } = await supabase.from('channel_messages')
+    .select('id, from_nick, image_url, file_data').eq('channel_id', channelId).in('id', ids);
+  const deleted = [];
+  for (const post of posts || []) {
+    // Права — на КОЖЕН пост окремо: у списку може бути чужий.
+    if (!(isManager || post.from_nick === nick)) continue;
+    await purgeChannelPost(channelId, post.id, post);
+    deleted.push(post.id);
+  }
+  if (deleted.length === 0) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  res.json({ ok: true, deleted });
+});
+
 app.post('/channel/message/delete', async (req, res) => {
   const { channelId, postId } = req.body; const nick = req.nick;
   if (!postId || !channelId || !nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
@@ -6379,13 +6417,7 @@ app.post('/channel/message/delete', async (req, res) => {
   if (!post) return res.json({ ok: false, error: 'Пост не знайдено', code: 'err_post_not_found' });
   const canDelete = post.from_nick === nick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
-  const { data: postComments } = await supabase.from('channel_comments').select('file_data').eq('post_id', postId);
-  await supabase.from('channel_comments').delete().eq('post_id', postId);
-  await supabase.from('channel_reactions').delete().eq('post_id', postId);
-  await supabase.from('channel_messages').delete().eq('id', postId);
-  await removeChannelFile(post.image_url, post.file_data);
-  for (const c of (postComments || [])) await removeChannelFile(c.file_data);
-  await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
+  await purgeChannelPost(channelId, postId, post);
   res.json({ ok: true });
 });
 
@@ -6397,13 +6429,7 @@ app.delete('/channel/post', async (req, res) => {
   if (!post) return res.json({ ok: false, error: 'Пост не знайдено', code: 'err_post_not_found' });
   const canDelete = post.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
   if (!canDelete) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
-  const { data: postComments } = await supabase.from('channel_comments').select('file_data').eq('post_id', postId);
-  await supabase.from('channel_comments').delete().eq('post_id', postId);
-  await supabase.from('channel_reactions').delete().eq('post_id', postId);
-  await supabase.from('channel_messages').delete().eq('id', postId);
-  await removeChannelFile(post.image_url, post.file_data);
-  for (const c of (postComments || [])) await removeChannelFile(c.file_data);
-  await notifyChannelSubscribers(channelId, { type: 'channel_post_deleted', channelId, postId }, null);
+  await purgeChannelPost(channelId, postId, post);
   res.json({ ok: true });
 });
 

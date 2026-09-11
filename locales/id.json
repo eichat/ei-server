@@ -942,5 +942,9 @@
   "device_revoke_body": "Perangkat akan keluar dan berhenti menerima pesan baru. Obrolan yang sudah tersimpan tetap ada.",
   "device_revoke_do": "Putuskan",
   "device_added_notice": "Perangkat baru ditambahkan ke akun Anda",
-  "action_show_hidden_posts": "Tampilkan postingan tersembunyi"
+  "action_show_hidden_posts": "Tampilkan postingan tersembunyi",
+  "action_select_posts": "Pilih postingan",
+  "confirm_delete_posts": "Hapus {n} postingan?",
+  "msg_delete_posts_hint": "Akan dihapus untuk semua pelanggan, beserta komentar dan berkas.",
+  "msg_posts_deleted": "Dihapus: {n}"
 }

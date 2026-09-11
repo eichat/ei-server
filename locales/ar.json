@@ -942,5 +942,9 @@
   "device_revoke_body": "سيتم تسجيل خروج الجهاز ولن يتلقى رسائل جديدة. تبقى المحادثات المحفوظة عليه.",
   "device_revoke_do": "فصل",
   "device_added_notice": "تمت إضافة جهاز جديد إلى حسابك",
-  "action_show_hidden_posts": "إظهار المنشورات المخفية"
+  "action_show_hidden_posts": "إظهار المنشورات المخفية",
+  "action_select_posts": "تحديد المنشورات",
+  "confirm_delete_posts": "حذف {n} منشورًا؟",
+  "msg_delete_posts_hint": "ستُحذف لدى جميع المشتركين مع التعليقات والملفات.",
+  "msg_posts_deleted": "تم حذف {n}"
 }

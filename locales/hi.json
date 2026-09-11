@@ -942,5 +942,9 @@
   "device_revoke_body": "डिवाइस साइन आउट हो जाएगा और नए संदेश नहीं मिलेंगे। उसमें सहेजी बातचीत बनी रहेगी।",
   "device_revoke_do": "हटाएँ",
   "device_added_notice": "आपके खाते में नया डिवाइस जोड़ा गया",
-  "action_show_hidden_posts": "छिपी पोस्ट दिखाएँ"
+  "action_show_hidden_posts": "छिपी पोस्ट दिखाएँ",
+  "action_select_posts": "पोस्ट चुनें",
+  "confirm_delete_posts": "{n} पोस्ट हटाएँ?",
+  "msg_delete_posts_hint": "सभी सब्सक्राइबर्स के लिए टिप्पणियों और फ़ाइलों सहित हट जाएँगी।",
+  "msg_posts_deleted": "हटाई गईं: {n}"
 }

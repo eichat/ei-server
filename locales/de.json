@@ -942,5 +942,9 @@
   "device_revoke_body": "Das Gerät wird abgemeldet und erhält keine neuen Nachrichten mehr. Bereits gespeicherte Chats bleiben.",
   "device_revoke_do": "Trennen",
   "device_added_notice": "Ihrem Konto wurde ein neues Gerät hinzugefügt",
-  "action_show_hidden_posts": "Ausgeblendete Beiträge anzeigen"
+  "action_show_hidden_posts": "Ausgeblendete Beiträge anzeigen",
+  "action_select_posts": "Beiträge auswählen",
+  "confirm_delete_posts": "{n} Beiträge löschen?",
+  "msg_delete_posts_hint": "Wird bei allen Abonnenten samt Kommentaren und Dateien gelöscht.",
+  "msg_posts_deleted": "{n} gelöscht"
 }

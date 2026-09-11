@@ -942,5 +942,9 @@
   "device_revoke_body": "기기가 로그아웃되고 새 메시지를 받지 않습니다. 이미 저장된 대화는 남습니다.",
   "device_revoke_do": "연결 끊기",
   "device_added_notice": "계정에 새 기기가 추가되었습니다",
-  "action_show_hidden_posts": "숨긴 게시물 보기"
+  "action_show_hidden_posts": "숨긴 게시물 보기",
+  "action_select_posts": "게시물 선택",
+  "confirm_delete_posts": "게시물 {n}개를 삭제할까요?",
+  "msg_delete_posts_hint": "댓글과 파일까지 모든 구독자에게서 삭제됩니다.",
+  "msg_posts_deleted": "{n}개 삭제"
 }
