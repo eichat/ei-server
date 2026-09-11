@@ -4861,7 +4861,7 @@ async function noteDeletion(nick, msgId, peerNick, scope) {
   try {
     await supabase.from('message_deletions').insert({
       nick, msg_id: msgId, peer_nick: peerNick || null,
-      scope: ['me', 'chat', 'contact'].includes(scope) ? scope : 'all', created_at: Date.now(),
+      scope: ['me', 'chat', 'contact', 'hide_group'].includes(scope) ? scope : 'all', created_at: Date.now(),
     });
   } catch (e) {
     // Міграції ще немає — не валимо саму дію: видалення наживо вже пішло.
@@ -8095,7 +8095,28 @@ wss.on('connection', (ws) => {
       }
       if (msg.type === 'edit_message') { await supabase.from('messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('from_nick', userNick); await markEdited('messages', { msg_id: msg.msgId, from_nick: userNick }); sendToUser(msg.to, { type: 'edit_message', from: userNick, msgId: msg.msgId, text: msg.text }); }
       if (msg.type === 'edit_group_message') { const { data: membership } = await supabase.from('group_members').select('nick').eq('group_id', msg.groupId).eq('nick', userNick).single(); if (!membership) return; await supabase.from('group_messages').update({ content: msg.text }).eq('msg_id', msg.msgId).eq('group_id', msg.groupId).eq('from_nick', userNick); await markEdited('group_messages', { msg_id: msg.msgId, group_id: msg.groupId, from_nick: userNick }); await notifyMembers(msg.groupId, { type: 'edit_group_message', groupId: msg.groupId, msgId: msg.msgId, text: msg.text }, userNick); }
-      if (msg.type === 'delete_group_message') { const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single(); if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return; await supabase.from('group_messages').delete().eq('msg_id', msg.msgId); await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick); }
+      if (msg.type === 'delete_group_message') {
+        const { data: gMsg } = await supabase.from('group_messages').select('from_nick').eq('msg_id', msg.msgId).single();
+        if (!gMsg || (gMsg.from_nick !== userNick && !(await isModOrCreator(msg.groupId, userNick)))) return;
+        await supabase.from('group_messages').delete().eq('msg_id', msg.msgId);
+        // 🔴 `notifyMembers` виключає автора за НІКОМ, тож інші НАШІ пристрої
+        // сигналу не бачили: повідомлення зникало лише там, де його видалили,
+        // а на другому лишалось до перезаходу. Те саме, що з копією власного
+        // повідомлення — виключати треба пристрій, а не акаунт.
+        await notifyMembers(msg.groupId, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId }, userNick);
+        syncOwnDevices(userNick, ws, { type: 'delete_group_message', groupId: msg.groupId, msgId: msg.msgId });
+      }
+      // Приховати групове повідомлення ЛИШЕ в себе — на всіх своїх пристроях.
+      // Нічого не видаляємо: для решти учасників воно лишається на місці.
+      if (msg.type === 'hide_group_message') {
+        const gid = msg.groupId, mid = msg.msgId;
+        if (gid != null && typeof mid === 'string' && mid) {
+          syncOwnDevices(userNick, ws, { type: 'hide_group_message', groupId: gid, msgId: mid });
+          // Окремий scope, а не префікс у `peer_nick`: нік `g1` сплутався б із
+          // групою 1, і чуже видалення застосувалось би не туди.
+          await noteDeletion(userNick, mid, String(gid), 'hide_group');
+        }
+      }
       if (msg.type === 'delete_comment') {
         const { data: c } = await supabase.from('channel_comments').select('from_nick, channel_id, post_id, file_data').eq('id', msg.commentId).single();
         if (!c) return;
