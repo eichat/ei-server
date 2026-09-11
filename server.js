@@ -2916,11 +2916,18 @@ async function chargeSink(nick, kind, units = 1) {
   return { ok: true, paid: price, free: Math.max(0, free - used - units), isPremium };
 }
 
-async function notifyChannelSubscribers(channelId, payload, excludeNick = null) {
+// `excludeDeviceId`: автору подію не шлемо лише на ТОЙ пристрій, з якого він
+// діяв, а його інші пристрої отримують копію. Раніше виключали НІК цілком — і
+// власний пост, коментар чи видалення не доходили на другий пристрій (той самий
+// корінь, що тричі вилазив у групах). Без deviceId — стара поведінка.
+async function notifyChannelSubscribers(channelId, payload, excludeNick = null, excludeDeviceId = null) {
   const { data: members } = await supabase.from('channel_members').select('nick').eq('channel_id', channelId);
   const msg = JSON.stringify(payload);
   for (const m of members || []) {
-    if (m.nick === excludeNick) continue;
+    if (m.nick === excludeNick) {
+      if (excludeDeviceId) syncOwnDevicesByNick(m.nick, excludeDeviceId, payload);
+      continue;
+    }
     const t = onlineUsers.get(m.nick);
     // ws.send кидає на мертвому/напіввідкритому сокеті (Render flapping) —
     // не дати одному битому сокету зірвати решту розсилки й сам HTTP-запит.
@@ -4895,7 +4902,7 @@ async function noteDeletion(nick, msgId, peerNick, scope) {
   try {
     await supabase.from('message_deletions').insert({
       nick, msg_id: msgId, peer_nick: peerNick || null,
-      scope: ['me', 'chat', 'contact', 'hide_group'].includes(scope) ? scope : 'all', created_at: Date.now(),
+      scope: ['me', 'chat', 'contact', 'hide_group', 'hide_comment'].includes(scope) ? scope : 'all', created_at: Date.now(),
     });
   } catch (e) {
     // Міграції ще немає — не валимо саму дію: видалення наживо вже пішло.
@@ -6328,7 +6335,7 @@ app.post('/channel/message', async (req, res) => {
   }).select().single();
   const lastText = text ? text.substring(0, 50) : (imageUrl ? '🖼 Зображення' : (isVideo ? '🎬 Відео' : (isVoice ? '🎤 Голосове' : (fileName ? '📎 ' + fileName.substring(0, 30) : ''))));
   await supabase.from('channels').update({ last_post_at: ts, last_post_text: lastText }).eq('id', channelId);
-  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}), message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } }, fromNick);
+  await notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: msg.id, from: fromNick, text: text || null, imageUrl: imageUrl || null, fileName: fileName || null, timestamp: ts, msgId, ...(forwardedFrom ? { forwardedFrom } : {}), message: { ...msg, commentCount: 0, reactions: [], topCommenters: [] } }, fromNick, req.deviceId);
   res.json({ ok: true, message: { ...msg, commentCount: 0, reactions: [], topCommenters: [], waveform: waveform || null, duration_sec: durationSec || null } });
 });
 
@@ -6438,7 +6445,7 @@ app.post('/channel/comment', async (req, res) => {
   const ts = Date.now();
   const { data: comment } = await supabase.from('channel_comments').insert({ channel_id: channelId, post_id: postId, from_nick: fromNick, content: text || fileName || '', file_data: fileData || null, file_name: fileName || null, timestamp: ts, reply_to_nick: replyToNick || null, reply_to_text: replyToText || null, reply_to_image: replyToImage || null, reply_to_id: replyToId || null, waveform: waveform ? JSON.stringify(waveform) : null, duration_sec: durationSec || null }).select().single();
   const { count: commentCount } = await supabase.from('channel_comments').select('*', { count: 'exact', head: true }).eq('post_id', postId);
-  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id, commentCount: commentCount || 0, comment }, fromNick);
+  await notifyChannelSubscribers(channelId, { type: 'channel_comment', channelId, postId, from: fromNick, text: text || null, timestamp: ts, commentId: comment.id, commentCount: commentCount || 0, comment }, fromNick, req.deviceId);
   res.json({ ok: true, comment: { ...comment, waveform: waveform || null } });
 });
 
@@ -6478,7 +6485,7 @@ app.post('/channel/comments/read', async (req, res) => {
 app.delete('/channel/comment', async (req, res) => {
   const { commentId, channelId } = req.body; const requesterNick = req.nick;
   if (!commentId || !channelId || !requesterNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
-  const { data: comment } = await supabase.from('channel_comments').select('from_nick, file_data').eq('id', commentId).single();
+  const { data: comment } = await supabase.from('channel_comments').select('from_nick, file_data, post_id').eq('id', commentId).single();
   if (!comment) return res.json({ ok: false, error: 'Коментар не знайдено', code: 'err_comment_not_found' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', requesterNick).single();
   const canDelete = comment.from_nick === requesterNick || (member && ['owner', 'admin'].includes(member.role));
@@ -6486,6 +6493,7 @@ app.delete('/channel/comment', async (req, res) => {
   await supabase.from('channel_comment_reactions').delete().eq('comment_id', commentId);
   await supabase.from('channel_comments').delete().eq('id', commentId);
   await removeChannelFile(comment.file_data);
+  await notifyChannelSubscribers(channelId, { type: 'channel_comment_deleted', channelId: Number(channelId), postId: comment.post_id, commentId }, requesterNick, req.deviceId);
   res.json({ ok: true });
 });
 
@@ -6801,7 +6809,7 @@ app.post('/channel/stream/start', async (req, res) => {
     last_post_text: '🔴 Трансляція',
   }).eq('id', channelId);
   // Сповіщаємо онлайн-підписників: і про новий пост, і про live-стан.
-  notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: post.id, from: ownerNick, text: `[stream]${videoId}`, timestamp: ts, msgId, message: { ...post, commentCount: 0, reactions: [], topCommenters: [] } }, ownerNick).catch(() => {});
+  notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: post.id, from: ownerNick, text: `[stream]${videoId}`, timestamp: ts, msgId, message: { ...post, commentCount: 0, reactions: [], topCommenters: [] } }, ownerNick, req.deviceId).catch(() => {});
   notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, videoId, active: true, postId: post.id }).catch(() => {});
   res.json({ ok: true, videoId, startedAt, postId: post.id });
 });
@@ -8168,7 +8176,15 @@ wss.on('connection', (ws) => {
         await supabase.from('channel_comment_reactions').delete().eq('comment_id', msg.commentId);
         await supabase.from('channel_comments').delete().eq('id', msg.commentId);
         await removeChannelFile(c.file_data);
-        await notifyChannelSubscribers(c.channel_id, { type: 'channel_comment_deleted', channelId: c.channel_id, postId: c.post_id, commentId: msg.commentId }, userNick);
+        await notifyChannelSubscribers(c.channel_id, { type: 'channel_comment_deleted', channelId: c.channel_id, postId: c.post_id, commentId: msg.commentId }, userNick, ws.sessionDevice);
+      }
+      // Сховати коментар ЛИШЕ в себе — на всіх своїх пристроях (як hide_group_message).
+      if (msg.type === 'hide_comment') {
+        const pid = msg.postId, cid = msg.commentId;
+        if (pid != null && cid != null) {
+          syncOwnDevices(userNick, ws, { type: 'hide_comment', postId: String(pid), commentId: String(cid) });
+          await noteDeletion(userNick, String(cid), String(pid), 'hide_comment');
+        }
       }
       if (msg.type === 'read_receipt') {
         await supabase.from('messages').update({ status: 'read' }).eq('to_nick', userNick).eq('from_nick', msg.to);
