@@ -550,6 +550,13 @@ async function saveFcmToken(nick, token, deviceId) {
     await supabase.from('users')
       .update({ fcm_token: null, fcm_device_id: null })
       .eq('fcm_token', token).neq('nick_lower', nick.toLowerCase());
+    // 🔴 І з РЕЄСТРУ ПРИСТРОЇВ теж. Чистка знімала токен лише з `fcmTokens` і
+    // `users`, а пуші тепер беруться з `user_devices` — тож у другого акаунта
+    // на тому самому телефоні лишався живий токен, і його сповіщення прилітало
+    // сюди. Саме так пуш «від себе» приходив на власний телефон.
+    await supabase.from('user_devices')
+      .update({ fcm_token: null })
+      .eq('fcm_token', token).neq('nick', nick);
   } catch (e) { console.error(`saveFcmToken(${nick}):`, e.message); }
 }
 
@@ -2236,7 +2243,12 @@ async function sendCallPush(toNick, fromNick, hasVideo, offer, skipDevices = new
 // сповіщення «спливало» лише при відкритті застосунку (симптом «приходить
 // після перезапуску»). Дефолт — 4 год для повідомлень; коротші значення
 // передаються явно там, де протухлий пуш недоречний (напр. call_end).
-async function sendFcmPush(toNick, data, ttlMs = 14400000) {
+/// `skipDeviceId` — фізичний пристрій, З ЯКОГО написали. Його треба виключати
+/// окремо від ніка: той самий телефон може обслуговувати два акаунти, і тоді
+/// пуш для співрозмовника прилітає авторові. `nickDevices` тут не годиться —
+/// це мапа «нік → ОДИН пристрій», а з багатопристроєвістю вона памʼятає лише
+/// останній вхід.
+async function sendFcmPush(toNick, data, ttlMs = 14400000, skipDeviceId = null) {
   // 🔴 Пуш теж на пристрій. Досі токен був ОДИН на нік (колонка в users), тож
   // із двома пристроями другий тихо забирав пуш у першого. Пристрою, що зараз
   // онлайн, пуш не потрібен — він отримає повідомлення сокетом.
@@ -2248,7 +2260,7 @@ async function sendFcmPush(toNick, data, ttlMs = 14400000) {
       const socks = deviceSessions.get(toNick);
       if (socks) for (const s of socks.values()) if (s.deviceId && s.ws.readyState === 1) onlineDevs.add(s.deviceId);
       const fromNick = data && data.from_nick;
-      const fromDev = fromNick ? nickDevices.get(fromNick) : null;
+      const fromDev = skipDeviceId || (fromNick ? nickDevices.get(fromNick) : null);
       for (const d of withToken) {
         if (onlineDevs.has(d.device_id)) continue;
         // Той самий фізичний пристрій обслуговує обидва акаунти — сповіщення
@@ -5147,7 +5159,7 @@ app.get('/chat/mutes', async (req, res) => {
 
 // Пуш про групове повідомлення тим, хто зараз офлайн і не вимкнув сповіщення.
 // Безтілесний, як і в особистих чатах: назва групи й нік — усе, що йде назовні.
-async function pushGroupMessage(groupId, groupName, fromNick, memberNicks) {
+async function pushGroupMessage(groupId, groupName, fromNick, memberNicks, fromDeviceId) {
   for (const nick of memberNicks) {
     if (nick === fromNick) continue;
     if (isLive(nick)) continue;                       // отримає сокетом
@@ -5155,7 +5167,7 @@ async function pushGroupMessage(groupId, groupName, fromNick, memberNicks) {
     sendFcmPush(nick, {
       type: 'group', from_nick: fromNick,
       group_id: String(groupId), group_name: (groupName || '').slice(0, 64),
-    });
+    }, 14400000, fromDeviceId);
   }
 }
 
@@ -7978,12 +7990,28 @@ wss.on('connection', (ws) => {
         await supabase.from('group_messages').insert({ group_id: msg.groupId, from_nick: userNick, content: msg.text, timestamp: ts, msg_id: msgId, delivered_to: [userNick, ...onlineMembers], ...(msg.isFile ? { type: 'file', file_name: msg.fileName, file_data: msg.fileData || msg.fileUrl } : {}), ...(msg.replyToMsgId ? { reply_to_msg_id: msg.replyToMsgId } : {}), ...(msg.replyToText ? { reply_to_text: msg.replyToText } : {}), ...(msg.replyToFrom ? { reply_to_from: msg.replyToFrom } : {}), ...(msg.replyToImage ? { reply_to_image: msg.replyToImage } : {}) });
         for (const nick of onlineMembers) onlineUsers.get(nick).ws.send(JSON.stringify({ type: 'group_message', groupId: msg.groupId, from: userNick, text: msg.text, timestamp: ts, msgId, ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}), ...(msg.fileName ? { fileName: msg.fileName } : {}), ...(msg.fileData ? { fileData: msg.fileData } : {}), ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}), ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}), ...(msg.replyToText ? { replyToText: msg.replyToText } : {}), ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}), ...(msg.replyToImage ? { replyToImage: msg.replyToImage } : {}), ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}) }));
         notifyGroupDelivered(ws, msg.groupId, msgId, onlineMembers);
+        // 🔴 Копія на ІНШІ власні пристрої. Для особистих чатів це зробили
+        // 10.09, а групи лишились половинчастими: написане з телефона на
+        // десктопі зʼявлялось аж після перезаходу (там його підтягувала
+        // історія `/group/list`, а не жива подія).
+        syncOwnDevices(userNick, ws, {
+          type: 'own_message', kind: 'group', groupId: msg.groupId, from: userNick,
+          text: msg.text, timestamp: ts, msgId,
+          ...(msg.isFile ? { isFile: true } : {}), ...(msg.isVoice ? { isVoice: true } : {}),
+          ...(msg.fileName ? { fileName: msg.fileName } : {}),
+          ...(msg.fileData ? { fileData: msg.fileData } : {}),
+          ...(msg.fileUrl ? { fileUrl: msg.fileUrl } : {}),
+          ...(msg.replyToMsgId ? { replyToMsgId: msg.replyToMsgId } : {}),
+          ...(msg.replyToText ? { replyToText: msg.replyToText } : {}),
+          ...(msg.replyToFrom ? { replyToFrom: msg.replyToFrom } : {}),
+          ...(msg.forwardedFrom ? { forwardedFrom: msg.forwardedFrom } : {}),
+        });
         // 🔴 Пуш для груп не існував узагалі: учасник, який зараз офлайн, про
         // повідомлення не дізнавався до відкриття застосунку. Через це й
         // перемикач «вимкнути сповіщення» був порожнім — глушити не було чого.
         try {
           const { data: g } = await supabase.from('groups').select('name').eq('id', msg.groupId).maybeSingle();
-          await pushGroupMessage(msg.groupId, g && g.name, userNick, (members || []).map(m => m.nick));
+          await pushGroupMessage(msg.groupId, g && g.name, userNick, (members || []).map(m => m.nick), ws.sessionDevice);
         } catch (e) { console.error('[pushGroupMessage]', e.message); }
       }
 
