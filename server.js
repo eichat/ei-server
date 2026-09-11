@@ -345,8 +345,8 @@ app.get('/usage/today', async (req, res) => {
 // `minCode` підвищувати лише тоді, коли старий клієнт СПРАВДІ несумісний
 // із сервером: він робить оновлення обовʼязковим, без кнопки «Пізніше».
 const APP_RELEASE = {
-  version: '0.9.108',
-  code: 109,
+  version: '0.9.109',
+  code: 110,
   // 🔴 Обовʼязкове: клієнт до 98 не передає `deviceId` при вході, тож його
   // сесія лишається «безпристроєвою» — і на акаунті з двома пристроями
   // вхідні, які вже забрав другий пристрій, до нього не приходять НІКОЛИ.
@@ -669,13 +669,48 @@ function sanitizeDeviceId(v) {
   return /^[A-Za-z0-9_.:-]{4,64}$/.test(d) ? d : null;
 }
 
+// Пари «нік|пристрій», про які вже знаємо, що запис існує. Кеш лише ПРОПУСКАЄ
+// зайвий select — після рестарту він порожній, і перший виклик чесно сходить у
+// базу. Потрібен тому, що вхід буває часто: на Android WS закривається при
+// згортанні застосунку, тож кожне розгортання — це новий login.
+const knownDevices = new Set();
+
 async function touchDevice(nick, deviceId, extra = {}) {
-  if (!nick || !deviceId) return;
+  if (!nick || !deviceId) return { created: false };
+  const cacheKey = `${nick}|${deviceId}`;
+  let created = false;
   try {
+    // 🔴 Чи це ПЕРША поява пристрою — питаємо ДО upsert. Раніше сповіщення
+    // «до акаунта додано новий пристрій» стояло в `/keys/publish` і слалось на
+    // КОЖНУ публікацію ключа, тобто на кожен `login_ok`. А на Android WS
+    // навмисно закривається при згортанні застосунку (щоб дзвінки йшли через
+    // FCM), тож кожне розгортання = новий login = ще один снек. Із двома
+    // пристроями на акаунті це виглядало як «додаток постійно перепідключається
+    // і пише, що додано новий пристрій».
+    //
+    // Збій запиту трактуємо як «не новий»: краще промовчати, ніж спамити.
+    if (!knownDevices.has(cacheKey)) {
+      const { data: seen, error } = await supabase.from('user_devices')
+        .select('device_id').eq('nick', nick).eq('device_id', deviceId).maybeSingle();
+      if (!error) { created = !seen; knownDevices.add(cacheKey); }
+    }
     await supabase.from('user_devices').upsert({
       nick, device_id: deviceId, last_seen: Date.now(), revoked_at: null, ...extra,
     }, { onConflict: 'nick,device_id' });
-  } catch (e) { console.error('[touchDevice]', e.message); }
+  } catch (e) { console.error('[touchDevice]', e.message); return { created: false }; }
+
+  if (created) {
+    // Сповіщаємо ІНШІ пристрої акаунта, а не всі сесії ніка: той, що щойно
+    // зʼявився, сам собі не новина. Те саме, на чому тричі спіткнулись у
+    // групах — «усім, крім автора» треба рахувати за ПРИСТРОЄМ, не за ніком.
+    try {
+      const { data: all } = await supabase.from('user_devices')
+        .select('device_id').eq('nick', nick).is('revoked_at', null);
+      const total = (all || []).length;
+      if (total > 1) syncOwnDevicesByNick(nick, deviceId, { type: 'device_added', deviceId, total });
+    } catch (_) { /* сповіщення — не привід валити реєстрацію пристрою */ }
+  }
+  return { created };
 }
 
 /// Пристрої акаунта, яким ще варто щось слати: не відкликані й не забуті.
@@ -4561,17 +4596,10 @@ app.post('/keys/publish', async (req, res) => {
   // MULTI_DEVICE вимкнено: інакше вмикання прапорця починалося б із порожнього
   // списку, і перше повідомлення знову пішло б повз половину пристроїв.
   if (req.deviceId) {
+    // Сповіщення про появу пристрою живе в `touchDevice` — там єдина точка, де
+    // запис справді СТВОРЮЄТЬСЯ. Тут воно стояло раніше й спрацьовувало на
+    // кожну публікацію ключа, тобто на кожен вхід.
     await touchDevice(req.nick, req.deviceId, { e2ee_pubkey: pubkey });
-    // Новий ключ у акаунті — подія, яку власник має бачити. Досі ключ мовчки
-    // перезаписувався, і поява чужого пристрою нічим не відрізнялась від
-    // звичайного входу.
-    try {
-      const { data: seen } = await supabase.from('user_devices')
-        .select('device_id').eq('nick', req.nick).is('revoked_at', null);
-      if ((seen || []).length > 1) {
-        sendToUser(req.nick, { type: 'device_added', deviceId: req.deviceId, total: seen.length });
-      }
-    } catch (_) { /* сповіщення — не привід валити публікацію ключа */ }
   }
   // `users.e2ee_pubkey` лишається як «найсвіжіший ключ»: його читають клієнти,
   // які ще не вміють у список пристроїв.
