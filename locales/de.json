@@ -941,5 +941,6 @@
   "device_revoke_title": "Gerät trennen?",
   "device_revoke_body": "Das Gerät wird abgemeldet und erhält keine neuen Nachrichten mehr. Bereits gespeicherte Chats bleiben.",
   "device_revoke_do": "Trennen",
-  "device_added_notice": "Ihrem Konto wurde ein neues Gerät hinzugefügt"
+  "device_added_notice": "Ihrem Konto wurde ein neues Gerät hinzugefügt",
+  "action_show_hidden_posts": "Ausgeblendete Beiträge anzeigen"
 }

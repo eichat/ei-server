@@ -941,5 +941,6 @@
   "device_revoke_title": "Putuskan perangkat?",
   "device_revoke_body": "Perangkat akan keluar dan berhenti menerima pesan baru. Obrolan yang sudah tersimpan tetap ada.",
   "device_revoke_do": "Putuskan",
-  "device_added_notice": "Perangkat baru ditambahkan ke akun Anda"
+  "device_added_notice": "Perangkat baru ditambahkan ke akun Anda",
+  "action_show_hidden_posts": "Tampilkan postingan tersembunyi"
 }

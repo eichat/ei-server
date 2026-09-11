@@ -941,5 +941,6 @@
   "device_revoke_title": "I-disconnect ang device?",
   "device_revoke_body": "Mala-log out ang device at hindi na makakatanggap ng bagong mensahe. Mananatili ang mga naka-save na chat.",
   "device_revoke_do": "I-disconnect",
-  "device_added_notice": "May bagong device na naidagdag sa account mo"
+  "device_added_notice": "May bagong device na naidagdag sa account mo",
+  "action_show_hidden_posts": "Ipakita ang mga nakatagong post"
 }

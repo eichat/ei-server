@@ -941,5 +941,6 @@
   "device_revoke_title": "Cihazın bağlantısı kesilsin mi?",
   "device_revoke_body": "Cihazın oturumu kapanır ve yeni mesaj almaz. Cihazda kayıtlı sohbetler kalır.",
   "device_revoke_do": "Bağlantıyı kes",
-  "device_added_notice": "Hesabınıza yeni bir cihaz eklendi"
+  "device_added_notice": "Hesabınıza yeni bir cihaz eklendi",
+  "action_show_hidden_posts": "Gizlenen gönderileri göster"
 }

@@ -941,5 +941,6 @@
   "device_revoke_title": "Disconnect device?",
   "device_revoke_body": "The device will be signed out and will stop receiving new messages. Chats already stored on it remain.",
   "device_revoke_do": "Disconnect",
-  "device_added_notice": "A new device was added to your account"
+  "device_added_notice": "A new device was added to your account",
+  "action_show_hidden_posts": "Show hidden posts"
 }

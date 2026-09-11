@@ -21718,6 +21718,29 @@
    "uk": "До акаунта додано новий пристрій",
    "vi": "Đã thêm thiết bị mới vào tài khoản của bạn",
    "zh": "您的账号已添加新设备"
+  },
+  "action_show_hidden_posts": {
+   "ar": "إظهار المنشورات المخفية",
+   "bn": "লুকানো পোস্ট দেখান",
+   "de": "Ausgeblendete Beiträge anzeigen",
+   "en": "Show hidden posts",
+   "es": "Mostrar publicaciones ocultas",
+   "fr": "Afficher les publications masquées",
+   "hi": "छिपी पोस्ट दिखाएँ",
+   "id": "Tampilkan postingan tersembunyi",
+   "it": "Mostra i post nascosti",
+   "ja": "非表示の投稿を表示",
+   "ko": "숨긴 게시물 보기",
+   "nl": "Verborgen berichten tonen",
+   "pl": "Pokaż ukryte posty",
+   "pt": "Mostrar publicações ocultas",
+   "ru": "Показать скрытые посты",
+   "th": "แสดงโพสต์ที่ซ่อนไว้",
+   "tl": "Ipakita ang mga nakatagong post",
+   "tr": "Gizlenen gönderileri göster",
+   "uk": "Показати приховані пости",
+   "vi": "Hiện bài đăng đã ẩn",
+   "zh": "显示已隐藏的帖子"
   }
  }
 }

@@ -941,5 +941,6 @@
   "device_revoke_title": "Apparaat loskoppelen?",
   "device_revoke_body": "Het apparaat wordt afgemeld en ontvangt geen nieuwe berichten meer. Reeds opgeslagen gesprekken blijven.",
   "device_revoke_do": "Loskoppelen",
-  "device_added_notice": "Er is een nieuw apparaat aan je account toegevoegd"
+  "device_added_notice": "Er is een nieuw apparaat aan je account toegevoegd",
+  "action_show_hidden_posts": "Verborgen berichten tonen"
 }

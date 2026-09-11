@@ -941,5 +941,6 @@
   "device_revoke_title": "¿Desconectar el dispositivo?",
   "device_revoke_body": "El dispositivo cerrará sesión y dejará de recibir mensajes nuevos. Los chats ya guardados en él se mantienen.",
   "device_revoke_do": "Desconectar",
-  "device_added_notice": "Se añadió un nuevo dispositivo a tu cuenta"
+  "device_added_notice": "Se añadió un nuevo dispositivo a tu cuenta",
+  "action_show_hidden_posts": "Mostrar publicaciones ocultas"
 }

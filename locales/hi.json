@@ -941,5 +941,6 @@
   "device_revoke_title": "डिवाइस हटाएँ?",
   "device_revoke_body": "डिवाइस साइन आउट हो जाएगा और नए संदेश नहीं मिलेंगे। उसमें सहेजी बातचीत बनी रहेगी।",
   "device_revoke_do": "हटाएँ",
-  "device_added_notice": "आपके खाते में नया डिवाइस जोड़ा गया"
+  "device_added_notice": "आपके खाते में नया डिवाइस जोड़ा गया",
+  "action_show_hidden_posts": "छिपी पोस्ट दिखाएँ"
 }

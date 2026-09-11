@@ -941,5 +941,6 @@
   "device_revoke_title": "Déconnecter l'appareil ?",
   "device_revoke_body": "L'appareil sera déconnecté et ne recevra plus de nouveaux messages. Les conversations déjà enregistrées restent.",
   "device_revoke_do": "Déconnecter",
-  "device_added_notice": "Un nouvel appareil a été ajouté à votre compte"
+  "device_added_notice": "Un nouvel appareil a été ajouté à votre compte",
+  "action_show_hidden_posts": "Afficher les publications masquées"
 }

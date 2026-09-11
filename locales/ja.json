@@ -941,5 +941,6 @@
   "device_revoke_title": "デバイスの接続を解除しますか？",
   "device_revoke_body": "デバイスはサインアウトし、新しいメッセージを受信しなくなります。保存済みのチャットは残ります。",
   "device_revoke_do": "接続を解除",
-  "device_added_notice": "アカウントに新しいデバイスが追加されました"
+  "device_added_notice": "アカウントに新しいデバイスが追加されました",
+  "action_show_hidden_posts": "非表示の投稿を表示"
 }

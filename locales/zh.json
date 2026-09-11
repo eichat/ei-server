@@ -941,5 +941,6 @@
   "device_revoke_title": "断开该设备？",
   "device_revoke_body": "该设备将退出登录，不再接收新消息。设备上已保存的聊天记录仍会保留。",
   "device_revoke_do": "断开",
-  "device_added_notice": "您的账号已添加新设备"
+  "device_added_notice": "您的账号已添加新设备",
+  "action_show_hidden_posts": "显示已隐藏的帖子"
 }
