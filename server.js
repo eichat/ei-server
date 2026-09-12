@@ -5090,7 +5090,24 @@ app.get('/missed-calls', async (req, res) => {
         && Math.abs(k.started_at - c.started_at) < 10000)) continue;
     missed.push(c);
   }
-  res.json({ ok: true, missed });
+  // Пропущений «знімається» успішною розмовою — так само, як у телефоні: якщо
+  // після нього ви з тією людиною ПОГОВОРИЛИ (у будь-який бік), показувати
+  // «пропущений» уже нема сенсу. Без цього банер спливав через півгодини після
+  // вдалого дзвінка й виглядав як несправність.
+  // Два окремі запити замість .or() зі вставкою ніка — нік у шаблонному рядку
+  // PostgREST це інʼєкція у фільтр (аудит 02.09).
+  const [outDone, inDone] = await Promise.all([
+    supabase.from('call_logs').select('to_nick, started_at')
+      .eq('from_nick', nick).eq('status', 'completed').gt('started_at', sinceTs),
+    supabase.from('call_logs').select('from_nick, started_at')
+      .eq('to_nick', nick).eq('status', 'completed').gt('started_at', sinceTs),
+  ]);
+  const talked = [];
+  for (const r of outDone.data || []) talked.push({ peer: r.to_nick, at: r.started_at });
+  for (const r of inDone.data || []) talked.push({ peer: r.from_nick, at: r.started_at });
+  const fresh = missed.filter(m =>
+    !talked.some(t => t.peer === m.from_nick && t.at > m.started_at));
+  res.json({ ok: true, missed: fresh });
 });
 
 // Прибирає передчасний 'missed'-лог пари (створюється при call_offer, коли
