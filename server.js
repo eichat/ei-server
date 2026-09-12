@@ -5353,17 +5353,34 @@ app.get('/group/join-requests', async (req, res) => {
   res.json({ ok: true, requests: data || [] });
 });
 
+// Видалити групу й УСІ її сліди. Окремою функцією, бо викликається з двох
+// місць (творець видаляє свою групу; адмін прибирає осиротілу) — і щоб перелік
+// таблиць жив в одному місці: доти /group/delete чистив 4 таблиці з 10, а
+// реакції, бани, позначки очищення, mute й «прочитано» лишались назавжди.
+async function purgeGroupById(groupId) {
+  const gid = Number(groupId);
+  const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', gid);
+  await supabase.from('group_messages').delete().eq('group_id', gid);
+  await supabase.from('group_message_reactions').delete().eq('group_id', gid);
+  await supabase.from('group_members').delete().eq('group_id', gid);
+  await supabase.from('group_bans').delete().eq('group_id', gid);
+  await supabase.from('group_join_requests').delete().eq('group_id', gid);
+  await supabase.from('group_history_cleared').delete().eq('group_id', gid);
+  await supabase.from('pending_group_invites').delete().eq('group_id', gid);
+  await supabase.from('pending_reactions').delete().eq('group_id', gid);
+  // chat_mutes.chat_id — text, chat_reads.chat_id — bigint (історична різниця).
+  await supabase.from('chat_mutes').delete().eq('chat_type', 'group').eq('chat_id', String(gid));
+  await supabase.from('chat_reads').delete().eq('chat_type', 'group').eq('chat_id', gid);
+  await supabase.from('groups').delete().eq('id', gid);
+  return (members || []).map(m => m.nick);
+}
+
 app.post('/group/delete', async (req, res) => {
   const { groupId } = req.body; const requesterNick = req.nick;
   const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
   if (!member || member.role !== 'creator') return res.json({ ok: false, error: 'Тільки творець може видалити групу', code: 'err_only_creator_delete_group' });
-  const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
-  await supabase.from('group_messages').delete().eq('group_id', groupId);
-  await supabase.from('group_members').delete().eq('group_id', groupId);
-  await supabase.from('group_join_requests').delete().eq('group_id', groupId);
-  await supabase.from('pending_group_invites').delete().eq('group_id', groupId);
-  await supabase.from('groups').delete().eq('id', groupId);
-  for (const m of members || []) { const t = onlineUsers.get(m.nick); if (t) t.ws.send(JSON.stringify({ type: 'group_deleted', groupId })); }
+  const members = await purgeGroupById(groupId);
+  for (const n of members) { const t = onlineUsers.get(n); if (t) t.ws.send(JSON.stringify({ type: 'group_deleted', groupId: Number(groupId) })); }
   res.json({ ok: true });
 });
 
@@ -6983,6 +7000,27 @@ app.get('/admin/orphan-channels', async (req, res) => {
     if (!owner) out.push({ id: ch.id, name: ch.name, ownerNick: ch.owner_nick });
   }
   res.json({ ok: true, total: (chans || []).length, orphans: out });
+});
+
+// Осиротілі групи: творця вже немає в users І не лишилось жодного учасника.
+// Такою групою не може керувати ніхто — ні видалити, ні поскаржитись.
+// ?delete=1 прибирає їх повністю (purgeGroupById), інакше лише рахує.
+app.get('/admin/orphan-groups', async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  const { data: groups } = await supabase.from('groups').select('id, name, creator_nick');
+  const out = [];
+  for (const g of (groups || [])) {
+    const { data: owner } = await supabase.from('users').select('nick').eq('nick', g.creator_nick).maybeSingle();
+    if (owner) continue;
+    const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', g.id).limit(1);
+    if (members && members.length) continue;   // є кому користуватись — не сирота
+    out.push({ id: g.id, name: g.name, creatorNick: g.creator_nick });
+  }
+  let deleted = [];
+  if (req.query.delete === '1') {
+    for (const g of out) { await purgeGroupById(g.id); deleted.push(g.id); }
+  }
+  res.json({ ok: true, total: (groups || []).length, orphans: out, deleted });
 });
 
 // ── Модерація платформи ────────────────────────
