@@ -338,6 +338,7 @@
   "err_password_locked": "Слишком много попыток, попробуйте через 15 минут",
   "err_password_required": "Требуется пароль",
   "err_password_too_short": "Пароль слишком короткий (минимум 8 символов)",
+  "err_path_not_yours": "Нет прав на этот файл",
   "err_payout_create": "Не удалось создать заявку на вывод",
   "err_payout_daily_limit": "Дневной лимит вывода исчерпан",
   "err_payout_disabled": "Выводы недоступны",

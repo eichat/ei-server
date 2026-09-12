@@ -338,6 +338,7 @@
   "err_password_locked": "Te veel pogingen, probeer het over 15 minuten opnieuw",
   "err_password_required": "Wachtwoord vereist",
   "err_password_too_short": "Wachtwoord te kort (min. 8 tekens)",
+  "err_path_not_yours": "Geen rechten voor dit bestand",
   "err_payout_create": "Kon het uitbetalingsverzoek niet aanmaken",
   "err_payout_daily_limit": "Daglimiet voor uitbetalingen bereikt",
   "err_payout_disabled": "Uitbetalingen zijn niet beschikbaar",

@@ -338,6 +338,7 @@
   "err_password_locked": "Trop de tentatives, réessayez dans 15 minutes",
   "err_password_required": "Mot de passe requis",
   "err_password_too_short": "Mot de passe trop court (min. 8 caractères)",
+  "err_path_not_yours": "Aucun droit sur ce fichier",
   "err_payout_create": "Impossible de créer la demande de retrait",
   "err_payout_daily_limit": "Limite quotidienne de retrait atteinte",
   "err_payout_disabled": "Les retraits sont indisponibles",

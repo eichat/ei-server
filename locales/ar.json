@@ -338,6 +338,7 @@
   "err_password_locked": "محاولات كثيرة، حاول بعد 15 دقيقة",
   "err_password_required": "مطلوب كلمة المرور",
   "err_password_too_short": "كلمة المرور قصيرة جدًا (8 أحرف على الأقل)",
+  "err_path_not_yours": "لا توجد صلاحية لهذا الملف",
   "err_payout_create": "تعذّر إنشاء طلب التحويل",
   "err_payout_daily_limit": "انتهى الحد اليومي للتحويل",
   "err_payout_disabled": "التحويلات غير متاحة",

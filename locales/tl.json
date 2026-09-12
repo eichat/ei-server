@@ -338,6 +338,7 @@
   "err_password_locked": "Masyadong maraming subok, subukan muli sa loob ng 15 minuto",
   "err_password_required": "Kailangan ang password",
   "err_password_too_short": "Masyadong maikli ang password (min. 8 karakter)",
+  "err_path_not_yours": "Walang pahintulot sa file na ito",
   "err_payout_create": "Hindi nagawa ang withdrawal request",
   "err_payout_daily_limit": "Naabot na ang daily withdrawal limit",
   "err_payout_disabled": "Hindi available ang withdrawal",

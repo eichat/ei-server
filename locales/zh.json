@@ -338,6 +338,7 @@
   "err_password_locked": "尝试次数过多，请在 15 分钟后重试",
   "err_password_required": "需要密码",
   "err_password_too_short": "密码太短（至少 8 个字符）",
+  "err_path_not_yours": "无权访问此文件",
   "err_payout_create": "无法创建提现申请",
   "err_payout_daily_limit": "已达每日提现上限",
   "err_payout_disabled": "当前无法提现",

@@ -338,6 +338,7 @@
   "err_password_locked": "Zbyt wiele prób, spróbuj za 15 minut",
   "err_password_required": "Wymagane hasło",
   "err_password_too_short": "Hasło za krótkie (min. 8 znaków)",
+  "err_path_not_yours": "Brak uprawnień do tego pliku",
   "err_payout_create": "Nie udało się utworzyć zlecenia wypłaty",
   "err_payout_daily_limit": "Osiągnięto dzienny limit wypłat",
   "err_payout_disabled": "Wypłaty są niedostępne",

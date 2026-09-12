@@ -338,6 +338,7 @@
   "err_password_locked": "बहुत सारे प्रयास, 15 मिनट बाद फिर कोशिश करें",
   "err_password_required": "पासवर्ड आवश्यक है",
   "err_password_too_short": "पासवर्ड बहुत छोटा है (कम से कम 8 अक्षर)",
+  "err_path_not_yours": "इस फ़ाइल की अनुमति नहीं",
   "err_payout_create": "निकासी अनुरोध नहीं बना",
   "err_payout_daily_limit": "दैनिक निकासी सीमा पूरी",
   "err_payout_disabled": "निकासी उपलब्ध नहीं है",

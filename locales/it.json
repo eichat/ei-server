@@ -338,6 +338,7 @@
   "err_password_locked": "Troppi tentativi, riprova tra 15 minuti",
   "err_password_required": "Password richiesta",
   "err_password_too_short": "Password troppo corta (min. 8 caratteri)",
+  "err_path_not_yours": "Nessun permesso per questo file",
   "err_payout_create": "Impossibile creare la richiesta di prelievo",
   "err_payout_daily_limit": "Limite giornaliero di prelievo raggiunto",
   "err_payout_disabled": "I prelievi non sono disponibili",

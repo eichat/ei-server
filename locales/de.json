@@ -338,6 +338,7 @@
   "err_password_locked": "Zu viele Versuche, versuche es in 15 Minuten erneut",
   "err_password_required": "Passwort erforderlich",
   "err_password_too_short": "Passwort zu kurz (mind. 8 Zeichen)",
+  "err_path_not_yours": "Keine Berechtigung für diese Datei",
   "err_payout_create": "Auszahlungsauftrag konnte nicht erstellt werden",
   "err_payout_daily_limit": "Tageslimit für Auszahlungen erreicht",
   "err_payout_disabled": "Auszahlungen sind nicht verfügbar",

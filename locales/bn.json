@@ -338,6 +338,7 @@
   "err_password_locked": "অনেকবার চেষ্টা হয়েছে, ১৫ মিনিট পরে চেষ্টা করুন",
   "err_password_required": "পাসওয়ার্ড প্রয়োজন",
   "err_password_too_short": "পাসওয়ার্ড খুব ছোট (কমপক্ষে ৮ অক্ষর)",
+  "err_path_not_yours": "এই ফাইলের অনুমতি নেই",
   "err_payout_create": "উত্তোলনের অনুরোধ তৈরি করা যায়নি",
   "err_payout_daily_limit": "দৈনিক উত্তোলনের সীমা শেষ",
   "err_payout_disabled": "উত্তোলন এখন বন্ধ",

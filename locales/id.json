@@ -338,6 +338,7 @@
   "err_password_locked": "Terlalu banyak percobaan, coba lagi dalam 15 menit",
   "err_password_required": "Kata sandi diperlukan",
   "err_password_too_short": "Kata sandi terlalu pendek (min. 8 karakter)",
+  "err_path_not_yours": "Tidak ada izin untuk file ini",
   "err_payout_create": "Gagal membuat permintaan penarikan",
   "err_payout_daily_limit": "Batas penarikan harian tercapai",
   "err_payout_disabled": "Penarikan tidak tersedia",

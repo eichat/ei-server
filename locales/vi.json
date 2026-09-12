@@ -338,6 +338,7 @@
   "err_password_locked": "Quá nhiều lần thử, hãy thử lại sau 15 phút",
   "err_password_required": "Cần mật khẩu",
   "err_password_too_short": "Mật khẩu quá ngắn (tối thiểu 8 ký tự)",
+  "err_path_not_yours": "Không có quyền với tệp này",
   "err_payout_create": "Không tạo được yêu cầu rút",
   "err_payout_daily_limit": "Đã đạt hạn mức rút trong ngày",
   "err_payout_disabled": "Chưa thể rút",

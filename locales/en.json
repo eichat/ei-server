@@ -338,6 +338,7 @@
   "err_password_locked": "Too many attempts, try again in 15 minutes",
   "err_password_required": "Password required",
   "err_password_too_short": "Password too short (min. 8 characters)",
+  "err_path_not_yours": "No permission for this file",
   "err_payout_create": "Couldn’t create the withdrawal request",
   "err_payout_daily_limit": "Daily withdrawal limit reached",
   "err_payout_disabled": "Withdrawals are unavailable",

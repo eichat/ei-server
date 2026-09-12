@@ -4883,6 +4883,35 @@ app.delete('/call-logs', async (req, res) => {
 // файли). Тепер заливка можлива лише в автентифікованій сесії: сервер service-
 // ключем видає одноразовий підписаний URL, клієнт заливає по ньому. Після переходу
 // всіх клієнтів прибираємо anon INSERT-політики (migrations/storage_lockdown_2_2.sql).
+// 🔴 Хто має право писати за цим шляхом. До аудиту 13.09 перевірки НЕ БУЛО
+// взагалі: підписаний URL видавався на будь-який шлях, ще й з upsert — тобто
+// можна було перезаписати чужий аватар (його адреса є в /user-info), чужі
+// наліпки чи файл у чужій переписці. Клієнтські шляхи вже мають цю форму, тож
+// для самого застосунку нічого не змінюється.
+async function uploadPathAllowed(nick, bucket, path) {
+  if (bucket === 'avatars') return true;   // імена без ніка; захист — заборона upsert нижче
+  const seg = path.split('/');
+  const kind = seg[0];
+  if (kind === 'direct' || kind === 'share' || kind === 'stickers') {
+    return seg.length >= 3 && seg[1] === nick;
+  }
+  if (kind === 'group') {
+    const gid = parseInt(seg[1], 10);
+    if (!Number.isFinite(gid)) return false;
+    const { data } = await supabase.from('group_members')
+      .select('nick').eq('group_id', gid).eq('nick', nick).maybeSingle();
+    return !!data;
+  }
+  if (kind === 'channel') {
+    const cid = parseInt(seg[1], 10);
+    if (!Number.isFinite(cid)) return false;
+    const { data } = await supabase.from('channel_members')
+      .select('role').eq('channel_id', cid).eq('nick', nick).maybeSingle();
+    return !!data && ['owner', 'admin'].includes(data.role);
+  }
+  return false;
+}
+
 app.post('/storage/signed-upload', async (req, res) => {
   const { bucket, path, upsert, size } = req.body;
   if (!bucket || !path || !STORAGE_BUCKETS_SET.has(bucket)) {
@@ -4891,6 +4920,9 @@ app.post('/storage/signed-upload', async (req, res) => {
   // Санітизація шляху: без обходу вгору й провідного слеша, розумна довжина.
   if (typeof path !== 'string' || path.includes('..') || path.startsWith('/') || path.length > 300) {
     return res.json({ ok: false, error: 'Невірний шлях', code: 'err_invalid_path' });
+  }
+  if (!(await uploadPathAllowed(req.nick, bucket, path))) {
+    return res.json({ ok: false, error: 'Немає прав на цей шлях', code: 'err_path_not_yours' });
   }
   // Сховище коштує грошей щомісяця, тож понад денну норму вивантажень платимо
   // монетами. Аватари не рахуємо — вони дрібні й міняються рідко.
@@ -4901,7 +4933,10 @@ app.post('/storage/signed-upload', async (req, res) => {
   }
   try {
     const { data, error } = await supabase.storage.from(bucket)
-      .createSignedUploadUrl(path, { upsert: upsert !== false });
+      // ⚠️ В avatars імена не несуть ніка (user_<id>_<ts>.jpg), тож перевірити
+      // володіння шляхом неможливо — натомість забороняємо ПЕРЕЗАПИС: нове імʼя
+      // завжди з timestamp, а чужий наявний аватар підмінити вже не можна.
+      .createSignedUploadUrl(path, { upsert: bucket !== 'avatars' && upsert !== false });
     if (error || !data) return res.json({ ok: false, error: error?.message || 'Не вдалось створити URL' });
     res.json({ ok: true, token: data.token, path: data.path, signedUrl: data.signedUrl });
   } catch (e) {

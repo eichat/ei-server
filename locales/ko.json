@@ -338,6 +338,7 @@
   "err_password_locked": "시도 횟수가 너무 많습니다. 15분 후에 다시 시도하세요",
   "err_password_required": "비밀번호가 필요합니다",
   "err_password_too_short": "비밀번호가 너무 짧습니다 (최소 8자)",
+  "err_path_not_yours": "이 파일에 대한 권한이 없습니다",
   "err_payout_create": "출금 요청을 만들지 못했습니다",
   "err_payout_daily_limit": "하루 출금 한도에 도달했습니다",
   "err_payout_disabled": "출금을 사용할 수 없습니다",

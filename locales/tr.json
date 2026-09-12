@@ -338,6 +338,7 @@
   "err_password_locked": "Çok fazla deneme, 15 dakika sonra tekrar deneyin",
   "err_password_required": "Şifre gerekli",
   "err_password_too_short": "Şifre çok kısa (en az 8 karakter)",
+  "err_path_not_yours": "Bu dosya için izin yok",
   "err_payout_create": "Çekim talebi oluşturulamadı",
   "err_payout_daily_limit": "Günlük çekim sınırına ulaşıldı",
   "err_payout_disabled": "Çekimler kullanılamıyor",

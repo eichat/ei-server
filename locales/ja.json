@@ -338,6 +338,7 @@
   "err_password_locked": "試行回数が多すぎます。15分後にお試しください",
   "err_password_required": "パスワードが必要です",
   "err_password_too_short": "パスワードが短すぎます（8文字以上）",
+  "err_path_not_yours": "このファイルの権限がありません",
   "err_payout_create": "出金リクエストを作成できませんでした",
   "err_payout_daily_limit": "1日の出金上限に達しました",
   "err_payout_disabled": "出金はご利用いただけません",

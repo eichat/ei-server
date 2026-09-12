@@ -338,6 +338,7 @@
   "err_password_locked": "พยายามมากเกินไป ลองใหม่ใน 15 นาที",
   "err_password_required": "ต้องใช้รหัสผ่าน",
   "err_password_too_short": "รหัสผ่านสั้นเกินไป (อย่างน้อย 8 ตัวอักษร)",
+  "err_path_not_yours": "ไม่มีสิทธิ์ในไฟล์นี้",
   "err_payout_create": "สร้างคำขอถอนไม่สำเร็จ",
   "err_payout_daily_limit": "ถึงขีดจำกัดการถอนรายวันแล้ว",
   "err_payout_disabled": "ยังถอนไม่ได้",

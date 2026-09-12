@@ -338,6 +338,7 @@
   "err_password_locked": "Muitas tentativas, tente novamente em 15 minutos",
   "err_password_required": "Senha necessária",
   "err_password_too_short": "Palavra-passe demasiado curta (mín. 8 caracteres)",
+  "err_path_not_yours": "Sem permissão para este ficheiro",
   "err_payout_create": "Não foi possível criar o pedido de saque",
   "err_payout_daily_limit": "Limite diário de saque atingido",
   "err_payout_disabled": "Os saques estão indisponíveis",
