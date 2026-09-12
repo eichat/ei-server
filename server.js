@@ -5190,10 +5190,19 @@ app.post('/group/create', async (req, res) => {
   await bumpUsage(creatorNick, 'entity_create');
   await supabase.from('group_members').insert({ group_id: group.id, nick: creatorNick, role: 'creator' });
   // Запрошення — пачкою з обмеженням: без нього один запит розсилав спам усім.
-  for (const nick of (members || []).slice(0, INVITE_BATCH_MAX)) {
-    if (nick === creatorNick) continue;
-    if (await isBlockedBy(nick, creatorNick)) continue; // заблокував творця — не турбуємо
-    await sendGroupInvite(group.id, group.name, creatorNick, nick);
+  // Блокування перевіряємо ОДНИМ запитом: по одному це 200 звернень до БД
+  // поспіль, і обробник падав би по таймауту.
+  const invitees = [...new Set((members || [])
+    .filter(n => typeof n === 'string' && n && n !== creatorNick))]
+    .slice(0, INVITE_BATCH_MAX);
+  if (invitees.length) {
+    const { data: blockedBy } = await supabase.from('blocked_contacts')
+      .select('blocker_nick').eq('blocked_nick', creatorNick).in('blocker_nick', invitees);
+    const blockSet = new Set((blockedBy || []).map(b => b.blocker_nick));
+    for (const nick of invitees) {
+      if (blockSet.has(nick)) continue; // заблокував творця — не турбуємо
+      await sendGroupInvite(group.id, group.name, creatorNick, nick);
+    }
   }
   res.json({ ok: true, group: { id: group.id, name: group.name, creator_nick: group.creator_nick, type: group.type }, members: [creatorNick] });
 });
@@ -6350,12 +6359,23 @@ app.post('/channel/create', async (req, res) => {
   // ⚠️ Тут підписка ПРИМУСОВА (на відміну від груп, де йде запрошення). Стеля
   // + пропуск тих, хто заблокував власника: інакше один запит підписував
   // тисячі людей на канал, чиї пости потім летять їм пушами (аудит 13.09).
+  // 🔴 ПАКЕТНО, не в циклі: перевірка блокування по одному давала 50 запитів
+  // до БД поспіль, і endpoint падав по таймауту (знайдено тим самим аудитом).
+  // Перевірку channel_blocked прибрано: канал щойно створено, вона порожня.
+  const wanted = [...new Set((subscribers || [])
+    .filter(n => typeof n === 'string' && n && n !== ownerNick))]
+    .slice(0, SUBSCRIBE_BATCH_MAX);
   let added = 0;
-  for (const nick of (subscribers || []).slice(0, SUBSCRIBE_BATCH_MAX)) {
-    if (nick === ownerNick) continue;
-    if (await isBlockedBy(nick, ownerNick)) continue;
-    const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channel.id).eq('nick', nick).single();
-    if (!blocked) { await supabase.from('channel_members').insert({ channel_id: channel.id, nick, role: 'subscriber' }).catch(() => {}); added++; }
+  if (wanted.length) {
+    const { data: blockedBy } = await supabase.from('blocked_contacts')
+      .select('blocker_nick').eq('blocked_nick', ownerNick).in('blocker_nick', wanted);
+    const blockSet = new Set((blockedBy || []).map(b => b.blocker_nick));
+    const allowed = wanted.filter(n => !blockSet.has(n));
+    if (allowed.length) {
+      await supabase.from('channel_members')
+        .insert(allowed.map(n => ({ channel_id: channel.id, nick: n, role: 'subscriber' })));
+      added = allowed.length;
+    }
   }
   res.json({ ok: true, channel: { ...channel, myRole: 'owner', subscriberCount: 1 + added, lastPostAt: null, lastPostText: null } });
 });
