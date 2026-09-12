@@ -230,6 +230,9 @@ async function refundSplit(nick, amount, earnedPart) {
 // із пристрою, а він лежить під паролем гаманця (Argon2id) — окремий рубіж.
 // Стеля ціни платної підписки на канал (монет за період).
 const CHANNEL_PRICE_MAX = 10000;
+// Скільки рядків чистка бере за один прогін. Менше за стелю PostgREST (1000):
+// решта дочекається наступної години, і жодна партія не «зрізається» мовчки.
+const CLEANUP_BATCH = 500;
 // Стелі на створення груп і каналів (аудит 13.09: не було жодної).
 // Без них скрипт створював тисячі груп, слав тисячі запрошень одним запитом
 // і клав у БД назву на кілька мегабайтів (express.json пропускає до 4 МБ).
@@ -4287,13 +4290,27 @@ async function scanTokenDeposits() {
   const mint = new PublicKey(SOLANA_TOKEN_MINT);
   const ata = await getAssociatedTokenAddress(mint, kp.publicKey);
 
-  const sigs = await c.getSignaturesForAddress(ata, { limit: 25 }, 'confirmed');
+  // 🔴 Сторінками, а не одним вікном на 25: якщо між сканами (5 хв) надійде
+  // більше транзакцій, ніж уміщається, старіші випали б назавжди — тобто чужі
+  // гроші зникли б тихо (аудит 13.09). Читаємо, доки не впремось у вже відому
+  // сигнатуру; стеля 10 сторінок захищає від нескінченного циклу при першому
+  // запуску на гаманці з довгою історією.
+  const sigs = [];
+  const seen = new Set();
+  let before;
+  for (let page = 0; page < 10; page++) {
+    const batch = await c.getSignaturesForAddress(ata, { limit: 100, before }, 'confirmed');
+    if (!batch.length) break;
+    const { data: known } = await supabase.from('token_deposits')
+      .select('signature').in('signature', batch.map(x => x.signature));
+    const knownSet = new Set((known || []).map(r => r.signature));
+    for (const k of knownSet) seen.add(k);
+    sigs.push(...batch);
+    if (knownSet.size) break;          // уперлись у вже оброблені
+    if (batch.length < 100) break;     // історія вичерпана
+    before = batch[batch.length - 1].signature;
+  }
   if (!sigs.length) return { ok: true, checked: 0, credited: 0 };
-
-  // Уже оброблені відсіюємо ОДНИМ запитом: інакше на кожен скан ішло б 25.
-  const { data: known } = await supabase.from('token_deposits')
-    .select('signature').in('signature', sigs.map(x => x.signature));
-  const seen = new Set((known || []).map(r => r.signature));
 
   let credited = 0;
   for (const s of sigs) {
@@ -8793,7 +8810,12 @@ async function removeOrphanFile(fileData, delDirectIds, delGroupIds) {
 
 async function cleanupDirect() {
   const cutoff = Date.now() - DIRECT_TTL_MS;
-  const { data: old } = await supabase.from('messages').select('id, file_data').eq('delivered', true).lt('timestamp', cutoff);
+  // 🔴 PostgREST віддає щонайбільше 1000 рядків. Раніше select бачив 1000, а
+  // delete зносив УСЕ за умовою — тож файли решти ставали сиротами назавжди
+  // (аудит 13.09). Тепер читаємо явною партією і видаляємо рівно її, за id.
+  const { data: old } = await supabase.from('messages')
+    .select('id, file_data').eq('delivered', true).lt('timestamp', cutoff)
+    .order('timestamp', { ascending: true }).limit(CLEANUP_BATCH);
   const rows = old || [];
   if (!rows.length) return;
   const delIds = new Set(rows.map(r => r.id));
@@ -8804,13 +8826,20 @@ async function cleanupDirect() {
     await removeOrphanFile(r.file_data, delIds, new Set());
   }
   if (CLEANUP_DRY_RUN) { console.log(`[cleanup][dry] direct: would delete ${rows.length} rows (${seen.size} unique files)`); return; }
-  await supabase.from('messages').delete().eq('delivered', true).lt('timestamp', cutoff);
+  const dIds = [...delIds];
+  for (let i = 0; i < dIds.length; i += 100) {
+    await supabase.from('messages').delete().in('id', dIds.slice(i, i + 100));
+  }
   console.log(`[cleanup] direct: deleted ${rows.length} rows`);
 }
 
 async function cleanupGroups() {
   const cutoff = Date.now() - GROUP_TTL_MS;
-  const { data: old } = await supabase.from('group_messages').select('id, group_id, file_data, delivered_to').lt('timestamp', cutoff);
+  // Явна партія: без limit PostgREST однаково віддав би не більше 1000, але
+  // мовчки — і було б неочевидно, що чистка бачить лише частину.
+  const { data: old } = await supabase.from('group_messages')
+    .select('id, group_id, file_data, delivered_to').lt('timestamp', cutoff)
+    .order('timestamp', { ascending: true }).limit(CLEANUP_BATCH);
   const rows = old || [];
   if (!rows.length) return;
   const byGroup = new Map();
@@ -8892,7 +8921,11 @@ async function fileObjectActive(path) {
 
 async function cleanupFileObjects() {
   const now = Date.now();
-  const { data: rows } = await supabase.from('file_objects').select('storage_path, recipients, downloaded_by, created_at, expires_at');
+  // Явна партія (див. cleanupDirect): найстаріші першими, щоб черга рухалась,
+  // а не топталась на тих самих рядках.
+  const { data: rows } = await supabase.from('file_objects')
+    .select('storage_path, recipients, downloaded_by, created_at, expires_at')
+    .order('created_at', { ascending: true }).limit(CLEANUP_BATCH);
   const list = rows || [];
   if (!list.length) return;
   let removed = 0;
