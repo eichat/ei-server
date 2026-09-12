@@ -230,6 +230,15 @@ async function refundSplit(nick, amount, earnedPart) {
 // із пристрою, а він лежить під паролем гаманця (Argon2id) — окремий рубіж.
 // Стеля ціни платної підписки на канал (монет за період).
 const CHANNEL_PRICE_MAX = 10000;
+// Стелі на створення груп і каналів (аудит 13.09: не було жодної).
+// Без них скрипт створював тисячі груп, слав тисячі запрошень одним запитом
+// і клав у БД назву на кілька мегабайтів (express.json пропускає до 4 МБ).
+const ENTITY_NAME_MAX = 64;      // назва групи/каналу
+const ENTITY_DESC_MAX = 512;     // опис каналу
+const ENTITY_PER_USER_MAX = 100; // скільки груп / каналів може мати акаунт
+const ENTITY_CREATE_DAILY = 20;  // створень на добу (груп+каналів разом)
+const INVITE_BATCH_MAX = 200;    // запрошень в один запит (групи)
+const SUBSCRIBE_BATCH_MAX = 50;  // примусових підписок при створенні каналу
 const PW_FAIL_MAX = 5;              // невдалих спроб поспіль
 const PW_LOCK_MS = 15 * 60 * 1000;  // пауза після вичерпання
 const pwFails = new Map(); // nick -> { count, lockedUntil, at }
@@ -5154,14 +5163,38 @@ async function clearPreemptiveMissed(callerNick, calleeNick) {
 }
 
 // ── Групи ──────────────────────────────────────
+// Спільна стеля для груп і каналів: скільки вже має акаунт і скільки створив
+// сьогодні. Повертає готову відповідь-помилку або null (можна створювати).
+async function checkEntityLimits(nick, table, ownerCol) {
+  const { count } = await supabase.from(table)
+    .select('id', { count: 'exact', head: true }).eq(ownerCol, nick);
+  if (typeof count === 'number' && count >= ENTITY_PER_USER_MAX) {
+    return { ok: false, error: 'Досягнуто ліміту', code: 'err_entity_limit' };
+  }
+  const today = await usageToday(nick, 'entity_create');
+  if (today !== null && today >= ENTITY_CREATE_DAILY) {
+    return { ok: false, error: 'Забагато створень сьогодні', code: 'err_entity_daily' };
+  }
+  return null;
+}
+
 app.post('/group/create', async (req, res) => {
   const { name, members, type } = req.body; const creatorNick = req.nick;
   if (!name || name.trim().length < 1) return res.json({ ok: false, error: 'Назва групи порожня', code: 'err_group_name_empty' });
+  const gName = name.trim().slice(0, ENTITY_NAME_MAX);
+  const limit = await checkEntityLimits(creatorNick, 'groups', 'creator_nick');
+  if (limit) return res.json(limit);
   const groupType = type || 'closed';
-  const { data: group, error } = await supabase.from('groups').insert({ name: name.trim(), creator_nick: creatorNick, type: groupType }).select().single();
+  const { data: group, error } = await supabase.from('groups').insert({ name: gName, creator_nick: creatorNick, type: groupType }).select().single();
   if (error) return res.json({ ok: false, error: 'Помилка створення групи', code: 'err_group_create_failed' });
+  await bumpUsage(creatorNick, 'entity_create');
   await supabase.from('group_members').insert({ group_id: group.id, nick: creatorNick, role: 'creator' });
-  for (const nick of (members || [])) { if (nick === creatorNick) continue; await sendGroupInvite(group.id, group.name, creatorNick, nick); }
+  // Запрошення — пачкою з обмеженням: без нього один запит розсилав спам усім.
+  for (const nick of (members || []).slice(0, INVITE_BATCH_MAX)) {
+    if (nick === creatorNick) continue;
+    if (await isBlockedBy(nick, creatorNick)) continue; // заблокував творця — не турбуємо
+    await sendGroupInvite(group.id, group.name, creatorNick, nick);
+  }
   res.json({ ok: true, group: { id: group.id, name: group.name, creator_nick: group.creator_nick, type: group.type }, members: [creatorNick] });
 });
 
@@ -6303,19 +6336,28 @@ app.post('/channel/unpin', async (req, res) => {
 app.post('/channel/create', async (req, res) => {
   const { name, description, type, subscribers } = req.body; const ownerNick = req.nick;
   if (!ownerNick || !name || name.trim().length < 1) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const limitC = await checkEntityLimits(ownerNick, 'channels', 'owner_nick');
+  if (limitC) return res.json(limitC);
   const { data: channel, error } = await supabase.from('channels').insert({
-    name: name.trim(), description: description || null,
+    name: name.trim().slice(0, ENTITY_NAME_MAX),
+    description: (description || '').slice(0, ENTITY_DESC_MAX) || null,
     owner_nick: ownerNick, type: type || 'public',
     created_at: Date.now(), last_post_at: null, last_post_text: null,
   }).select().single();
   if (error) return res.json({ ok: false, error: 'Помилка створення каналу', code: 'err_channel_create_failed' });
+  await bumpUsage(ownerNick, 'entity_create');
   await supabase.from('channel_members').insert({ channel_id: channel.id, nick: ownerNick, role: 'owner' });
-  for (const nick of (subscribers || [])) {
+  // ⚠️ Тут підписка ПРИМУСОВА (на відміну від груп, де йде запрошення). Стеля
+  // + пропуск тих, хто заблокував власника: інакше один запит підписував
+  // тисячі людей на канал, чиї пости потім летять їм пушами (аудит 13.09).
+  let added = 0;
+  for (const nick of (subscribers || []).slice(0, SUBSCRIBE_BATCH_MAX)) {
     if (nick === ownerNick) continue;
+    if (await isBlockedBy(nick, ownerNick)) continue;
     const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channel.id).eq('nick', nick).single();
-    if (!blocked) await supabase.from('channel_members').insert({ channel_id: channel.id, nick, role: 'subscriber' }).catch(() => {});
+    if (!blocked) { await supabase.from('channel_members').insert({ channel_id: channel.id, nick, role: 'subscriber' }).catch(() => {}); added++; }
   }
-  res.json({ ok: true, channel: { ...channel, myRole: 'owner', subscriberCount: 1 + (subscribers || []).length, lastPostAt: null, lastPostText: null } });
+  res.json({ ok: true, channel: { ...channel, myRole: 'owner', subscriberCount: 1 + added, lastPostAt: null, lastPostText: null } });
 });
 
 app.get('/channel/list', async (req, res) => {
