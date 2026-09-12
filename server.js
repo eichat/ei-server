@@ -3623,8 +3623,19 @@ async function purgeAccountData(nick, user) {
   const fileData = new Set();
   const msgIds = new Set();
   for (const col of ['from_nick', 'to_nick']) {
-    const { data } = await supabase.from('messages').select('id, file_data').eq(col, nick);
-    for (const r of (data || [])) { msgIds.add(r.id); if (r.file_data) fileData.add(r.file_data); }
+    // 🔴 Сторінками: PostgREST мовчки віддає щонайбільше 1000 рядків, а
+    // видаляються ВСІ повідомлення — тож у акаунта з довгою перепискою файли
+    // решти лишались би сиротами назавжди, попри обіцянку в політиці
+    // «видаляємо файли особистих переписок» (аудит 13.09).
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase.from('messages')
+        .select('id, file_data').eq(col, nick).range(from, from + 999);
+      if (error) break;
+      const rows = data || [];
+      for (const r of rows) { msgIds.add(r.id); if (r.file_data) fileData.add(r.file_data); }
+      if (rows.length < 1000) break;
+      if (from > 200000) break;   // запобіжник від нескінченного циклу
+    }
   }
 
   // 2. Особисті переписки. Два окремі .eq замість рядкового or= — див.
@@ -6503,8 +6514,15 @@ app.get('/channel/messages', async (req, res) => {
     }
     if (!hasAccess) return res.json({ ok: true, locked: true, price: paidCh.price || 0, subDays: paidCh.sub_days || 30, messages: [] });
   }
-  const { data: posts } = await supabase.from('channel_messages').select('*').eq('channel_id', channelId).order('timestamp', { ascending: true });
-  if (!posts || posts.length === 0) return res.json({ ok: true, messages: [] });
+  // 🔴 Без limit PostgREST мовчки віддає перші 1000 — а з ascending це
+  // НАЙСТАРІШІ: активний канал із часом перестав би показувати свіже взагалі
+  // (аудит 13.09). Беремо найновіші й повертаємо в звичному порядку.
+  // Повна пагінація стрічки — окрема робота; 500 постів перекривають усе, що
+  // зараз є, і клієнт нічого не втрачає.
+  const { data: newest } = await supabase.from('channel_messages').select('*')
+    .eq('channel_id', channelId).order('timestamp', { ascending: false }).limit(500);
+  const posts = (newest || []).slice().reverse();
+  if (!posts.length) return res.json({ ok: true, messages: [] });
   const postIds = posts.map(p => p.id);
   // Завантажуємо всі коментарі і реакції одним запитом
   const [commentsRes, reactionsRes] = await Promise.all([
