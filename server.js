@@ -5079,9 +5079,15 @@ app.get('/missed-calls', async (req, res) => {
   // Дедуп: один дзвінок може лишити і 'missed' (сервер, offer-time), і
   // 'no_answer' (той-хто-дзвонив, скасування) — близькі за часом від того ж
   // відправника. Згортаємо в один запис, щоб не рахувати двічі.
+  // ВАЖЛИВО: склеюємо лише записи з РІЗНИМИ статусами. Вікно 10 с саме по собі
+  // схлопувало й два РІЗНІ дзвінки поспіль від тієї самої людини (12.09: аудіо
+  // о 17:54:34 і відео о 17:54:42 — 7,6 с — злились в один, відеодзвінок зник
+  // із видачі). Пара одного дзвінка — це завжди 'missed' + 'no_answer'.
   const missed = [];
   for (const c of data || []) {
-    if (missed.some(k => k.from_nick === c.from_nick && Math.abs(k.started_at - c.started_at) < 10000)) continue;
+    if (missed.some(k => k.from_nick === c.from_nick
+        && k.status !== c.status
+        && Math.abs(k.started_at - c.started_at) < 10000)) continue;
     missed.push(c);
   }
   res.json({ ok: true, missed });
