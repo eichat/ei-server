@@ -7093,7 +7093,13 @@ app.get('/admin/orphan-channels', async (req, res) => {
     const { data: owner } = await supabase.from('users').select('nick').eq('nick', ch.owner_nick).maybeSingle();
     if (!owner) out.push({ id: ch.id, name: ch.name, ownerNick: ch.owner_nick });
   }
-  res.json({ ok: true, total: (chans || []).length, orphans: out });
+  // ?delete=1 — як у /admin/orphan-groups. Без цього канал без власника не
+  // прибирався НІЧИМ, окрім поштучного /admin/channel/delete (аудит 13.09).
+  let deleted = [];
+  if (req.query.delete === '1') {
+    for (const ch of out) { await deleteChannelById(ch.id); deleted.push(ch.id); }
+  }
+  res.json({ ok: true, total: (chans || []).length, orphans: out, deleted });
 });
 
 // Осиротілі групи: творця вже немає в users І не лишилось жодного учасника.
