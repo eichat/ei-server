@@ -5199,10 +5199,19 @@ app.post('/group/create', async (req, res) => {
     const { data: blockedBy } = await supabase.from('blocked_contacts')
       .select('blocker_nick').eq('blocked_nick', creatorNick).in('blocker_nick', invitees);
     const blockSet = new Set((blockedBy || []).map(b => b.blocker_nick));
+    // Онлайн — миттєво в сокет; офлайн — ОДНИМ upsert. По одному це був
+    // запит до БД на кожного: 200 запрошень = 31 с, на межі таймауту.
+    const offline = [];
     for (const nick of invitees) {
       if (blockSet.has(nick)) continue; // заблокував творця — не турбуємо
-      await sendGroupInvite(group.id, group.name, creatorNick, nick);
+      const target = onlineUsers.get(nick);
+      if (target) {
+        try { target.ws.send(JSON.stringify({ type: 'group_invite', groupId: group.id, groupName: group.name, inviterNick: creatorNick })); } catch (_) {}
+      } else {
+        offline.push({ group_id: group.id, target_nick: nick, inviter_nick: creatorNick });
+      }
     }
+    if (offline.length) await supabase.from('pending_group_invites').upsert(offline);
   }
   res.json({ ok: true, group: { id: group.id, name: group.name, creator_nick: group.creator_nick, type: group.type }, members: [creatorNick] });
 });
