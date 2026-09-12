@@ -8032,8 +8032,24 @@ wss.on('connection', (ws) => {
         }
       }
 
-      if (msg.type === 'register_fcm_token') { if (userNick && msg.token) { if (msg.deviceId) ws.deviceId = msg.deviceId; await saveFcmToken(userNick, msg.token, msg.deviceId); } }
-      if (msg.type === 'check_online') ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: onlineUsers.has(msg.nick) }));
+      if (msg.type === 'register_fcm_token') {
+        if (userNick && msg.token) {
+          // deviceId санітизуємо: він іде в ключ таблиці user_devices і в
+          // порівняння пристроїв при дзвінку. Сирий рядок із клієнта тут
+          // лишався єдиним несанітизованим входом (аудит 13.09).
+          const dev = sanitizeDeviceId(msg.deviceId);
+          if (dev) ws.deviceId = dev;
+          await saveFcmToken(userNick, msg.token, dev || undefined);
+        }
+      }
+      if (msg.type === 'check_online') {
+        // Невидимий завжди «офлайн»: без цього фільтра невидимість обходилась
+        // одним WS-запитом, хоча /online-users і broadcast її поважають
+        // (аудит 13.09).
+        const target = typeof msg.nick === 'string' ? msg.nick : '';
+        const visible = onlineUsers.has(target) && !invisibleNicks.has(target);
+        ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: visible }));
+      }
       if (msg.type === 'connect_request') { if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі`, code: 'err_user_offline', nick: msg.to })); }
       if (msg.type === 'connect_response') { sendToUser(msg.to, { type: 'connect_response', from: userNick, accepted: msg.accepted }); }
 

@@ -764,6 +764,30 @@ grant execute on function public.add_coins_earned(text, integer) to postgres, se
 grant execute on function public.spend_coins_earned(text, integer) to postgres, service_role;
 grant execute on function public.spend_coins_split(text, integer) to postgres, service_role;
 
+-- Спалювання частки комісій. Бракувало в SETUP.sql (аудит 13.09): на чистій
+-- базі `creditCompany` ловила б помилку в try/catch і мовчки не спалювала —
+-- тобто лічильник `burned` і публічний burn-дашборд назавжди лишались би на
+-- нулі, без жодного видимого збою.
+create or replace function public.burn_coins(p_amount integer)
+returns bigint
+language plpgsql
+as $$
+declare v_total bigint;
+begin
+  if p_amount is null or p_amount <= 0 then
+    select burned into v_total from public.coin_supply where id = 1;
+    return v_total;
+  end if;
+  update public.coin_supply
+     set burned = burned + p_amount, updated_at = now()
+   where id = 1
+  returning burned into v_total;
+  return v_total;
+end;
+$$;
+revoke all on function public.burn_coins(integer) from public, anon, authenticated;
+grant execute on function public.burn_coins(integer) to postgres, service_role;
+
 -- ─────────────────────────────────────────────────────────────────
 -- 5. ROW LEVEL SECURITY
 -- ─────────────────────────────────────────────────────────────────
