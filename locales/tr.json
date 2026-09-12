@@ -942,6 +942,8 @@
   "device_revoke_body": "Cihazın oturumu kapanır ve yeni mesaj almaz. Cihazda kayıtlı sohbetler kalır.",
   "device_revoke_do": "Bağlantıyı kes",
   "device_added_notice": "Hesabınıza yeni bir cihaz eklendi",
+  "err_too_many_posts": "Çok fazla gönderi",
+  "action_show_hidden_messages": "Gizlenen mesajları göster",
   "action_show_hidden_posts": "Gizlenen gönderileri göster",
   "action_select_posts": "Gönderileri seç",
   "confirm_delete_posts": "{n} gönderi silinsin mi?",

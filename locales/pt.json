@@ -942,6 +942,8 @@
   "device_revoke_body": "O dispositivo terminará a sessão e deixará de receber novas mensagens. As conversas já guardadas permanecem.",
   "device_revoke_do": "Desligar",
   "device_added_notice": "Foi adicionado um novo dispositivo à sua conta",
+  "err_too_many_posts": "Demasiadas publicações",
+  "action_show_hidden_messages": "Mostrar mensagens ocultas",
   "action_show_hidden_posts": "Mostrar publicações ocultas",
   "action_select_posts": "Selecionar publicações",
   "confirm_delete_posts": "Excluir {n} publicações?",

@@ -942,6 +942,8 @@
   "device_revoke_body": "อุปกรณ์จะออกจากระบบและหยุดรับข้อความใหม่ แชทที่บันทึกไว้แล้วจะยังอยู่",
   "device_revoke_do": "ตัดการเชื่อมต่อ",
   "device_added_notice": "มีการเพิ่มอุปกรณ์ใหม่เข้าบัญชีของคุณ",
+  "err_too_many_posts": "โพสต์มากเกินไป",
+  "action_show_hidden_messages": "แสดงข้อความที่ซ่อนไว้",
   "action_show_hidden_posts": "แสดงโพสต์ที่ซ่อนไว้",
   "action_select_posts": "เลือกโพสต์",
   "confirm_delete_posts": "ลบ {n} โพสต์?",

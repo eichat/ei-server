@@ -942,6 +942,8 @@
   "device_revoke_body": "Mala-log out ang device at hindi na makakatanggap ng bagong mensahe. Mananatili ang mga naka-save na chat.",
   "device_revoke_do": "I-disconnect",
   "device_added_notice": "May bagong device na naidagdag sa account mo",
+  "err_too_many_posts": "Masyadong maraming post",
+  "action_show_hidden_messages": "Ipakita ang mga nakatagong mensahe",
   "action_show_hidden_posts": "Ipakita ang mga nakatagong post",
   "action_select_posts": "Pumili ng mga post",
   "confirm_delete_posts": "Burahin ang {n} post?",

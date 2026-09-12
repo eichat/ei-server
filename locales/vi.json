@@ -942,6 +942,8 @@
   "device_revoke_body": "Thiết bị sẽ đăng xuất và ngừng nhận tin nhắn mới. Các cuộc trò chuyện đã lưu vẫn còn.",
   "device_revoke_do": "Ngắt kết nối",
   "device_added_notice": "Đã thêm thiết bị mới vào tài khoản của bạn",
+  "err_too_many_posts": "Quá nhiều bài đăng",
+  "action_show_hidden_messages": "Hiện tin nhắn đã ẩn",
   "action_show_hidden_posts": "Hiện bài đăng đã ẩn",
   "action_select_posts": "Chọn bài đăng",
   "confirm_delete_posts": "Xóa {n} bài đăng?",

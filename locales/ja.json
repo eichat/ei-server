@@ -942,6 +942,8 @@
   "device_revoke_body": "デバイスはサインアウトし、新しいメッセージを受信しなくなります。保存済みのチャットは残ります。",
   "device_revoke_do": "接続を解除",
   "device_added_notice": "アカウントに新しいデバイスが追加されました",
+  "err_too_many_posts": "投稿が多すぎます",
+  "action_show_hidden_messages": "非表示のメッセージを表示",
   "action_show_hidden_posts": "非表示の投稿を表示",
   "action_select_posts": "投稿を選択",
   "confirm_delete_posts": "{n} 件の投稿を削除しますか？",

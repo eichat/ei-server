@@ -942,6 +942,8 @@
   "device_revoke_body": "Пристрій вийде з акаунта й перестане отримувати нові повідомлення. Переписка, збережена на ньому, залишиться.",
   "device_revoke_do": "Відключити",
   "device_added_notice": "До акаунта додано новий пристрій",
+  "err_too_many_posts": "Занадто багато постів",
+  "action_show_hidden_messages": "Показати приховані повідомлення",
   "action_show_hidden_posts": "Показати приховані пости",
   "action_select_posts": "Вибрати пости",
   "confirm_delete_posts": "Видалити {n} постів?",

@@ -942,6 +942,8 @@
   "device_revoke_body": "ডিভাইসটি সাইন আউট হবে এবং নতুন বার্তা পাবে না। এতে সংরক্ষিত চ্যাট থেকে যাবে।",
   "device_revoke_do": "বিচ্ছিন্ন করুন",
   "device_added_notice": "আপনার অ্যাকাউন্টে নতুন ডিভাইস যোগ হয়েছে",
+  "err_too_many_posts": "অনেক বেশি পোস্ট",
+  "action_show_hidden_messages": "লুকানো বার্তা দেখান",
   "action_show_hidden_posts": "লুকানো পোস্ট দেখান",
   "action_select_posts": "পোস্ট নির্বাচন করুন",
   "confirm_delete_posts": "{n}টি পোস্ট মুছবেন?",

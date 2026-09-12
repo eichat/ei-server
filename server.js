@@ -5471,7 +5471,7 @@ app.get('/group/messages', async (req, res) => {
       reactionsByMsg[r.msg_id][r.emoji].push(r.nick);
     }
   }
-  res.json({ ok: true, hasMore, oldest: visible[0]?.timestamp ?? null, messages: visible.map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null, duration_sec: m.duration_sec || null, replyToMsgId: m.reply_to_msg_id || null, replyToText: m.reply_to_text || null, replyToFrom: m.reply_to_from || null, replyToImage: m.reply_to_image || null, reactions: reactionsByMsg[m.msg_id] || {} })) });
+  res.json({ ok: true, hasMore, clearedAt, oldest: visible[0]?.timestamp ?? null, messages: visible.map(m => ({ ...m, type: m.type || 'text', file_name: m.file_name || null, file_data: m.file_data || null, waveform: m.waveform || null, duration_sec: m.duration_sec || null, replyToMsgId: m.reply_to_msg_id || null, replyToText: m.reply_to_text || null, replyToFrom: m.reply_to_from || null, replyToImage: m.reply_to_image || null, reactions: reactionsByMsg[m.msg_id] || {} })) });
 });
 
 // Очистити історію групи лише для себе (персистентний маркер часу)
@@ -5488,6 +5488,23 @@ app.post('/group/clear-history', async (req, res) => {
   // після перезавантаження історії (/group/messages фільтрує за cleared_at).
   syncOwnDevicesByNick(nick, req.deviceId, { type: 'group_history_cleared', groupId: Number(groupId), clearedAt });
   res.json({ ok: true, clearedAt });
+});
+
+// Скасувати очищення: повідомлення на сервері нікуди не зникали, очищення було
+// лише персональною позначкою часу. Тут саме DELETE, а не надгробок (як для
+// user_prefs у каналах): стан читається ПОВНІСТЮ при кожному /group/messages
+// (поле clearedAt), догону «що змінилось після ts» тут немає — тож пристрій,
+// який був офлайн, побачить відсутність рядка як «не очищено».
+app.post('/group/restore-history', async (req, res) => {
+  const { groupId } = req.body; const nick = req.nick;
+  if (!groupId || !nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { error } = await supabase.from('group_history_cleared').delete().eq('nick', nick).eq('group_id', groupId);
+  if (error) {
+    console.error('[group/restore-history]', error.message);
+    return res.json({ ok: false, error: 'Не вдалося зберегти', code: 'err_save_failed' });
+  }
+  syncOwnDevicesByNick(nick, req.deviceId, { type: 'group_history_restored', groupId: Number(groupId) });
+  res.json({ ok: true });
 });
 
 app.get('/check-phone', async (req, res) => {

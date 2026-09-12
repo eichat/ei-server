@@ -942,6 +942,8 @@
   "device_revoke_body": "Il dispositivo verrà disconnesso e non riceverà più nuovi messaggi. Le chat già salvate restano.",
   "device_revoke_do": "Disconnetti",
   "device_added_notice": "Un nuovo dispositivo è stato aggiunto al tuo account",
+  "err_too_many_posts": "Troppi post",
+  "action_show_hidden_messages": "Mostra i messaggi nascosti",
   "action_show_hidden_posts": "Mostra i post nascosti",
   "action_select_posts": "Seleziona i post",
   "confirm_delete_posts": "Eliminare {n} post?",

@@ -942,6 +942,8 @@
   "device_revoke_body": "L'appareil sera déconnecté et ne recevra plus de nouveaux messages. Les conversations déjà enregistrées restent.",
   "device_revoke_do": "Déconnecter",
   "device_added_notice": "Un nouvel appareil a été ajouté à votre compte",
+  "err_too_many_posts": "Trop de publications",
+  "action_show_hidden_messages": "Afficher les messages masqués",
   "action_show_hidden_posts": "Afficher les publications masquées",
   "action_select_posts": "Sélectionner des publications",
   "confirm_delete_posts": "Supprimer {n} publications ?",

@@ -942,6 +942,8 @@
   "device_revoke_body": "Perangkat akan keluar dan berhenti menerima pesan baru. Obrolan yang sudah tersimpan tetap ada.",
   "device_revoke_do": "Putuskan",
   "device_added_notice": "Perangkat baru ditambahkan ke akun Anda",
+  "err_too_many_posts": "Terlalu banyak postingan",
+  "action_show_hidden_messages": "Tampilkan pesan tersembunyi",
   "action_show_hidden_posts": "Tampilkan postingan tersembunyi",
   "action_select_posts": "Pilih postingan",
   "confirm_delete_posts": "Hapus {n} postingan?",
