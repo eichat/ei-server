@@ -3906,14 +3906,25 @@ app.get('/user-info', async (req, res) => {
   const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий', code: 'err_param_nick' });
   const { data: user } = await supabase.from('users').select('nick, coins, avatar_url, premium_expires_at, premium_plan, nick_color, color, block_incoming, invisible, solana_address').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
+  // 🔴 Endpoint кличуть і для ЧУЖИХ профілів (аватар, колір ніка, рамка
+  // преміуму) — тому нік лишається з query. Але баланс і адреса гаманця
+  // приватні: до аудиту 13.09 їх віддавало про будь-кого.
+  const self = nick === req.nick;
   const ei = await earnedInfo(nick, user.coins || 0);
   // Ціна відкриття — 0, якщо гаманець уже відкривали або є преміум: клієнт
   // показує цю примітку ДО створення, і обіцяти плату, якої не буде, не можна.
   const premiumNow = !!(user.premium_expires_at && new Date(user.premium_expires_at).getTime() > Date.now());
-  res.json({ ok: true, nick: user.nick, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true, solana_address: user.solana_address || null,
-    // Скільки з балансу дозволено виводити в токен і чи вже сплачено відкриття
-    // гаманця — клієнт має показувати це чесно, а не обіцяти вивід усього.
-    ...ei, wallet_open_fee: (ei.wallet_opened || premiumNow) ? 0 : WALLET_OPEN_FEE, signup_bonus: NEW_USER_COINS });
+  res.json({ ok: true, nick: user.nick, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, color: user.color || null, block_incoming: user.block_incoming === true, invisible: user.invisible === true,
+    // Приватне — лише собі. Скільки з балансу дозволено виводити в токен і чи
+    // вже сплачено відкриття гаманця клієнт має показувати чесно, а не
+    // обіцяти вивід усього.
+    ...(self ? {
+      coins: user.coins || 0,
+      solana_address: user.solana_address || null,
+      ...ei,
+      wallet_open_fee: (ei.wallet_opened || premiumNow) ? 0 : WALLET_OPEN_FEE,
+      signup_bonus: NEW_USER_COINS,
+    } : {}) });
 });
 
 // ── Гаманець Solana: тільки АДРЕСА, без ключів ───────────────────────────
@@ -5168,7 +5179,9 @@ app.post('/group/invite-response', async (req, res) => {
 });
 
 app.get('/group/list', async (req, res) => {
-  const { nick } = req.query;
+  // Нік ІЗ СЕСІЇ: з ніком із query endpoint розкривав групи будь-кого разом зі
+  // складом учасників — тобто соціальний граф (аудит 13.09).
+  const nick = req.nick;
   const { data: memberships } = await supabase.from('group_members').select('group_id, role').eq('nick', nick);
   if (!memberships || memberships.length === 0) return res.json({ ok: true, groups: [] });
   const ids = memberships.map(m => m.group_id);
@@ -5464,7 +5477,8 @@ app.post('/contact/unblock', async (req, res) => {
 });
 
 app.get('/contact/blocked-list', async (req, res) => {
-  const { nick } = req.query;
+  // Нік ІЗ СЕСІЇ: список заблокованих — приватний (аудит 13.09).
+  const nick = req.nick;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data } = await supabase.from('blocked_contacts').select('blocked_nick, blocked_at').eq('blocker_nick', nick);
   res.json({ ok: true, blocked: (data || []).map(r => r.blocked_nick) });
@@ -6305,7 +6319,8 @@ app.post('/channel/create', async (req, res) => {
 });
 
 app.get('/channel/list', async (req, res) => {
-  const { nick } = req.query; if (!nick) return res.json({ ok: false, error: 'nick обов\'язковий', code: 'err_param_nick' });
+  // Нік ІЗ СЕСІЇ: підписки на канали (зокрема приватні) — приватні (аудит 13.09).
+  const nick = req.nick; if (!nick) return res.json({ ok: false, error: 'nick обов\'язковий', code: 'err_param_nick' });
   const { data: memberships } = await supabase.from('channel_members').select('channel_id, role').eq('nick', nick);
   if (!memberships || memberships.length === 0) return res.json({ ok: true, channels: [] });
   const ids = memberships.map(m => m.channel_id);
