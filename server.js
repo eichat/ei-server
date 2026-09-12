@@ -150,9 +150,18 @@ app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/re
 // Значення ми більше не вставляємо у фільтр рядком (див. /delete-account і
 // /call-logs), але забороняємо їх і на вході — другий рубіж, бо нік їде ще й
 // у шляхи сховища та в підписи.
-const NICK_FORBIDDEN = /[,()"'\\]|[\u0000-\u001f\u007f]/;
+// `/` заборонений НЕ ЗАРАДИ КРАСИ: нік іде у шляхи Storage
+// (`stickers/<нік>/…`, `direct/<нік>/…`), а перевірки володіння —
+// це startsWith по цьому префіксу. Нік `x/y` лежав би всередині простору
+// користувача `x`, і той міг би включити чужу наліпку у свій платний набір
+// (знайдено аудитом 13.09.2026). Ніки з самих крапок — з тієї ж причини:
+// `..` у сегменті шляху.
+const NICK_FORBIDDEN = /[,()"'\\/]|[\u0000-\u001f\u007f]/;
 function nickLooksSafe(nick) {
-  return typeof nick === 'string' && !NICK_FORBIDDEN.test(nick);
+  if (typeof nick !== 'string') return false;
+  if (NICK_FORBIDDEN.test(nick)) return false;
+  if (nick.replace(/\./g, '') === '') return false; // '.', '..', '...'
+  return true;
 }
 
 // ── Класи монет при переказі між людьми ─────────────────────────────────────
@@ -5660,7 +5669,10 @@ app.post('/admin/sticker-pack', async (req, res) => {
 });
 
 app.get('/shop/sticker-packs', async (req, res) => {
-  const nick = req.query.nick;
+  // Нік — ІЗ СЕСІЇ, не з query: grantFreePacks пише у власність, і з ніком із
+  // запиту це був запис у ЧУЖІ дані (аудит 13.09). Параметр nick лишається
+  // прийнятним для старих клієнтів, але більше ні на що не впливає.
+  const nick = req.nick;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   await grantFreePacks(nick); // безкоштовні одразу у власності
   // Безкоштовні — завжди зверху: вони й так уже у власності, тож саме з них
@@ -5738,7 +5750,9 @@ app.get('/shop/sticker-packs', async (req, res) => {
 
 // Список ID паків, якими користувач володіє (для панелі наліпок).
 app.get('/shop/my-packs', async (req, res) => {
-  const nick = req.query.nick;
+  // Нік — ІЗ СЕСІЇ: з ніком із query endpoint розкривав, якими наборами
+  // володіє ІНШИЙ користувач, і теж роздавав безкоштовні від його імені.
+  const nick = req.nick;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   await grantFreePacks(nick);
   const { data: owned } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick);
