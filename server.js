@@ -359,6 +359,10 @@ const PUBLIC_PATHS = new Set([
   // Перебір прикриває authLimiter нижче — 20 запитів на IP за 15 хв.
   '/check-phone',
   '/download-ping', '/app/version',
+  // Картинку прев'ю тягне Image.network, який Bearer не додає. Відкритим
+  // проксі це не робить: посилання підписане, і підпис видає лише
+  // автентифікований /link-preview.
+  '/preview-image',
 ]);
 app.use((req, res, next) => {
   if (PUBLIC_PATHS.has(req.path) || req.path.startsWith('/admin/') || req.path.startsWith('/locales/') || req.path === '/coin/supply') return next();
@@ -1013,11 +1017,63 @@ async function assertPublicUrl(u) {
 }
 
 // ── Link Preview ──────────────────────────────
+// ── Проксі зображень прев'ю ───────────────────────────────────────────────
+// 🔴 Доти клієнт тягнув картинку прев'ю НАПРЯМУ з чужого сайту, і спрацьовувало
+// це при показі чату — навіть без відкриття повідомлення. Тобто відправник
+// обирав сайт, а отримувач ішов туди своїм IP: адреса, приблизна геолокація й
+// підтвердження, що чат відкрито. Telegram і Signal закривають це так само —
+// картинку віддає їхній сервер.
+//
+// Посилання підписане, бо `Image.network` не додає Bearer: без підпису це був
+// би відкритий проксі для будь-якого URL. Підпис видає /link-preview, який
+// автентифікований, тож ланцюг лишається закритим.
+// Базова адреса, з якої клієнт тягне проксі-картинку. Через env — щоб при
+// переїзді на власний домен не правити код.
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || 'https://ei-server.onrender.com').replace(/\/$/, '');
+const PREVIEW_IMG_TTL_MS = 24 * 60 * 60 * 1000;   // прев'ю показується щоразу при відкритті чату
+const PREVIEW_IMG_MAX_BYTES = 3 * 1024 * 1024;
+function signPreviewImage(imgUrl) {
+  if (typeof imgUrl !== 'string' || !/^https?:\/\//i.test(imgUrl)) return null;
+  const payload = Buffer.from(JSON.stringify({ u: imgUrl, e: Date.now() + PREVIEW_IMG_TTL_MS })).toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET || 'insecure-dev').update(payload).digest('base64url');
+  return `${PUBLIC_BASE_URL}/preview-image?s=${payload}.${sig}`;
+}
+/// Підміняє зовнішнє посилання на картинку нашим підписаним. Підписуємо саме
+/// при віддачі, а не при кешуванні: у linkPreviewCache лежить оригінальний URL,
+/// інакше кеш роздавав би протухлі підписи.
+function withProxiedImage(preview) {
+  if (!preview || typeof preview !== 'object') return preview;
+  const signed = signPreviewImage(preview.image);
+  return signed ? { ...preview, image: signed } : { ...preview, image: null };
+}
+app.get('/preview-image', async (req, res) => {
+  const token = typeof req.query.s === 'string' ? req.query.s : '';
+  const i = token.lastIndexOf('.');
+  if (i <= 0 || !SESSION_SECRET) return res.status(400).end();
+  const payload = token.slice(0, i), sig = token.slice(i + 1);
+  const expected = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('base64url');
+  const a = Buffer.from(sig), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(403).end();
+  let u, e;
+  try { ({ u, e } = JSON.parse(Buffer.from(payload, 'base64url').toString())); } catch (_) { return res.status(400).end(); }
+  if (!u || !e || Date.now() > Number(e)) return res.status(403).end();
+  try {
+    await assertPublicUrl(u);   // той самий SSRF-захист, що й для самого прев'ю
+    const r = await fetchBinary(u, PREVIEW_IMG_MAX_BYTES);
+    if (!r || !/^image\//i.test(r.type || '')) return res.status(404).end();
+    res.set('Content-Type', r.type.split(';')[0]);
+    res.set('Cache-Control', 'public, max-age=86400');
+    return res.end(r.body);
+  } catch (err) {
+    return res.status(404).end();
+  }
+});
+
 app.get('/link-preview', async (req, res) => {
   const { url } = req.query;
   if (!url) return res.json({ ok: false, error: 'url обов\'язковий', code: 'err_param_url' });
   const cached = linkPreviewCache.get(url);
-  if (cached) return res.json({ ok: true, ...cached.data });
+  if (cached) return res.json({ ok: true, ...withProxiedImage(cached.data) });
   // Стеля рахується ПІСЛЯ кешу: повторне відкриття того самого посилання
   // зовнішнього запиту не робить, тож і норму витрачати не має.
   const usedLp = await usageToday(req.nick, 'link_preview');
@@ -1034,7 +1090,7 @@ app.get('/link-preview', async (req, res) => {
       try { const oembed = await fetchJson(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`); title = oembed.title || null; } catch (_) {}
       const preview = { title, description: null, image: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`, siteName: 'YouTube', domain: 'youtube.com', url };
       linkPreviewCache.set(url, { data: preview, expires: Date.now() + 3600000 });
-      return res.json({ ok: true, ...preview });
+      return res.json({ ok: true, ...withProxiedImage(preview) });
     }
     // Перша спроба — своїм іменем; якщо повернулась сторінка захисту,
     // пробуємо агентами соцмереж (їх пропускають заради прев'ю посилань).
@@ -1045,7 +1101,7 @@ app.get('/link-preview', async (req, res) => {
     }
     delete preview.blocked;
     linkPreviewCache.set(url, { data: preview, expires: Date.now() + 3600000 });
-    res.json({ ok: true, ...preview });
+    res.json({ ok: true, ...withProxiedImage(preview) });
   } catch (e) { res.json({ ok: false, error: e.message }); }
 });
 
@@ -1089,6 +1145,38 @@ function fetchUrl(url, depth = 0, agent = PREVIEW_AGENTS[0]) {
       let data = ''; resp.setEncoding('utf8');
       resp.on('data', chunk => { data += chunk; if (data.length > 100000) { resp.destroy(); resolve(data); } });
       resp.on('end', () => resolve(data));
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+  });
+}
+
+/// Як fetchUrl, але для зображення: бінарне тіло, стеля розміру й тип із
+/// заголовка. Стеля обов'язкова — інакше нас використають як трафік-проксі,
+/// і один запит витягне з інстансу скільки завгодно памʼяті.
+function fetchBinary(url, maxBytes, depth = 0) {
+  return new Promise((resolve, reject) => {
+    if (depth > 4) return reject(new Error('Забагато редіректів'));
+    const client = url.startsWith('https') ? https : httpModule;
+    const req = client.get(url, { headers: { 'User-Agent': PREVIEW_AGENTS[0], 'Accept': 'image/*' }, timeout: 8000 }, (resp) => {
+      if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
+        const loc = new URL(resp.headers.location, url).toString();
+        resp.destroy();
+        return assertPublicUrl(loc).then(() => fetchBinary(loc, maxBytes, depth + 1)).then(resolve).catch(reject);
+      }
+      if (resp.statusCode !== 200) { resp.destroy(); return reject(new Error('HTTP ' + resp.statusCode)); }
+      const type = String(resp.headers['content-type'] || '');
+      if (!/^image\//i.test(type)) { resp.destroy(); return reject(new Error('не зображення')); }
+      const declared = Number(resp.headers['content-length'] || 0);
+      if (declared && declared > maxBytes) { resp.destroy(); return reject(new Error('завелике')); }
+      const chunks = []; let size = 0;
+      resp.on('data', (c) => {
+        size += c.length;
+        // Заголовку довіряти не можна — рахуємо фактичні байти.
+        if (size > maxBytes) { resp.destroy(); return reject(new Error('завелике')); }
+        chunks.push(c);
+      });
+      resp.on('end', () => resolve({ body: Buffer.concat(chunks), type }));
     });
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
