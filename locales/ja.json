@@ -227,6 +227,7 @@
   "e2ee_undecryptable": "🔒 復号できません — 別の端末宛てに送信されています",
   "earn_contact_owner": "チャンネル所有者としてのあなたへの連絡",
   "earn_paid_channel": "自分のチャンネルの有料購読",
+  "earn_short": "獲得",
   "earn_withdraw_note": "引き出せるのは他の人から支払われたコインだけです。アプリが付与したもの（登録ボーナス）は EION 内で使います。",
   "edited_mark": "編集済み {t}",
   "ei_chat": "チャット",

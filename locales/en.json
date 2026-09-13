@@ -227,6 +227,7 @@
   "e2ee_undecryptable": "🔒 Could not decrypt — sent to a different device",
   "earn_contact_owner": "Someone contacting you as channel owner",
   "earn_paid_channel": "Paid subscription to your channel",
+  "earn_short": "Earn",
   "earn_withdraw_note": "Only coins another person paid you can be withdrawn. What the app granted itself (the sign-up bonus) is spent inside EION.",
   "edited_mark": "edited {t}",
   "ei_chat": "Chat",

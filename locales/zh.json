@@ -227,6 +227,7 @@
   "e2ee_undecryptable": "🔒 无法解密——发送给了另一台设备",
   "earn_contact_owner": "他人付费联系你（频道主）",
   "earn_paid_channel": "他人付费订阅你的频道",
+  "earn_short": "赚取",
   "earn_withdraw_note": "只有他人支付给你的金币可以提现。应用自身赠送的（注册奖励）只能在 EION 内使用。",
   "edited_mark": "已编辑 {t}",
   "ei_chat": "聊天",

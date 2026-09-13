@@ -227,6 +227,7 @@
   "e2ee_undecryptable": "🔒 Entschlüsselung fehlgeschlagen — an ein anderes Gerät gesendet",
   "earn_contact_owner": "Kontaktaufnahme mit dir als Kanalinhaber",
   "earn_paid_channel": "Kostenpflichtiges Abo deines Kanals",
+  "earn_short": "Verdienen",
   "earn_withdraw_note": "Auszahlen lässt sich nur, was dir jemand anderes bezahlt hat. Was die App selbst gutgeschrieben hat (Registrierungsbonus), wird innerhalb von EION ausgegeben.",
   "edited_mark": "bearbeitet {t}",
   "ei_chat": "Chat",

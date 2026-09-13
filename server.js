@@ -4088,7 +4088,9 @@ app.get('/token/balance', async (req, res) => {
   if (!SOLANA_TOKEN_MINT) return res.json({ ok: false, error: 'Токен ще не випущено', code: 'err_token_disabled' });
   const { data: user } = await supabase.from('users').select('solana_address').eq('nick', req.nick).single();
   const owner = user && user.solana_address;
-  if (!owner) return res.json({ ok: true, address: null, amount: null, cluster: SOLANA_CLUSTER });
+  // mint віддаємо й без гаманця: адреса токена публічна, а клієнт будує з неї
+  // посилання на біржу — інакше йому довелось би тримати власну копію.
+  if (!owner) return res.json({ ok: true, address: null, amount: null, mint: SOLANA_TOKEN_MINT, cluster: SOLANA_CLUSTER });
   const r = await httpPostJson(SOLANA_RPC, {}, {
     jsonrpc: '2.0', id: 1, method: 'getTokenAccountsByOwner',
     params: [owner, { mint: SOLANA_TOKEN_MINT }, { encoding: 'jsonParsed' }],
