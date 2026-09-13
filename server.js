@@ -6747,22 +6747,32 @@ async function canAccessChannel(nick, channelId) {
   return !!mem;
 }
 
+/// Платний канал: доступ мають власник, адмін і той, у кого підписка ще діє.
+/// Нік ЗАВЖДИ з сесії — доти гейт у /channel/messages брав його з query, і
+/// досить було підставити нік власника, щоб читати платне безкоштовно.
+/// Повертає { paid, allowed, price, subDays }.
+async function paidChannelAccess(nick, channelId) {
+  const { data: ch } = await supabase.from('channels')
+    .select('is_paid, price, sub_days').eq('id', channelId).maybeSingle();
+  if (!ch || !ch.is_paid) return { paid: false, allowed: true, price: 0, subDays: 0 };
+  const out = { paid: true, allowed: false, price: ch.price || 0, subDays: ch.sub_days || 30 };
+  if (!nick) return out;
+  const { data: mem } = await supabase.from('channel_members')
+    .select('role').eq('channel_id', channelId).eq('nick', nick).maybeSingle();
+  if (mem && ['owner', 'admin'].includes(mem.role)) { out.allowed = true; return out; }
+  const { data: sub } = await supabase.from('channel_paid_subs')
+    .select('expires_at').eq('channel_id', channelId).eq('nick', nick)
+    .order('expires_at', { ascending: false }).limit(1);
+  if (sub && sub[0] && Number(sub[0].expires_at) > Date.now()) out.allowed = true;
+  return out;
+}
+
 app.get('/channel/messages', async (req, res) => {
-  const { channelId, nick } = req.query; if (!channelId) return res.json({ ok: false, error: 'channelId обов\'язковий', code: 'err_param_channel_id' });
+  const { channelId } = req.query; if (!channelId) return res.json({ ok: false, error: 'channelId обов\'язковий', code: 'err_param_channel_id' });
   if (!(await canAccessChannel(req.nick, channelId))) return res.json({ ok: false, error: 'Немає доступу до каналу', code: 'err_channel_private' });
-  // Гейт платного каналу: доступ мають власник/адмін або активна підписка
-  const { data: paidCh } = await supabase.from('channels').select('is_paid, price, sub_days').eq('id', channelId).single();
-  if (paidCh && paidCh.is_paid) {
-    let hasAccess = false;
-    if (nick) {
-      const { data: mem } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
-      if (mem && ['owner', 'admin'].includes(mem.role)) hasAccess = true;
-      if (!hasAccess) {
-        const { data: psubArr } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).order('expires_at', { ascending: false }).limit(1);
-        if (psubArr && psubArr[0] && Number(psubArr[0].expires_at) > Date.now()) hasAccess = true;
-      }
-    }
-    if (!hasAccess) return res.json({ ok: true, locked: true, price: paidCh.price || 0, subDays: paidCh.sub_days || 30, messages: [] });
+  const paid = await paidChannelAccess(req.nick, channelId);
+  if (paid.paid && !paid.allowed) {
+    return res.json({ ok: true, locked: true, price: paid.price, subDays: paid.subDays, messages: [] });
   }
   // 🔴 Без limit PostgREST мовчки віддає перші 1000 — а з ascending це
   // НАЙСТАРІШІ: активний канал із часом перестав би показувати свіже взагалі
@@ -6918,6 +6928,12 @@ app.get('/channel/comments', async (req, res) => {
   const { data: ownerPost } = await supabase.from('channel_messages').select('channel_id').eq('id', postId).maybeSingle();
   if (!ownerPost) return res.json({ ok: true, comments: [] });
   if (!(await canAccessChannel(req.nick, ownerPost.channel_id))) return res.json({ ok: false, error: 'Немає доступу до каналу', code: 'err_channel_private' });
+  // Коментарі платного каналу — теж платний вміст. Гейта тут не було взагалі:
+  // самі пости віддавались як locked, а обговорення під ними читалось вільно.
+  const paidC = await paidChannelAccess(req.nick, ownerPost.channel_id);
+  if (paidC.paid && !paidC.allowed) {
+    return res.json({ ok: true, locked: true, price: paidC.price, subDays: paidC.subDays, comments: [] });
+  }
   const limit = Math.min(parseInt(req.query.limit) || 100, 200);
   // Той самий двигун, що й /group/messages: беремо ОСТАННІ limit коментарів
   // (descending + limit), потім розвертаємо в ascending. before (timestamp) —
@@ -7036,8 +7052,23 @@ app.delete('/channel/comment', async (req, res) => {
 
 // Реакція на коментар (toggle) — дзеркало /channel/reaction
 app.post('/channel/comment/reaction', async (req, res) => {
-  const { commentId, channelId, emoji } = req.body; const nick = req.nick;
-  if (!commentId || !channelId || !nick || !emoji) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { commentId, emoji } = req.body; const nick = req.nick;
+  if (!commentId || !nick || !emoji) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  // 🔴 Канал беремо з САМОГО коментаря, а не з тіла запиту. Доти channelId
+  // приходив від клієнта й ніяк не звірявся з коментарем: перевірка блокування
+  // ставала фікцією (вкажи канал, де тебе не блокували), а доступу до
+  // приватного каналу не перевіряли взагалі — тобто сторонній ставив реакції
+  // під коментарями закритого каналу.
+  const { data: cRow } = await supabase.from('channel_comments')
+    .select('post_id').eq('id', commentId).maybeSingle();
+  if (!cRow) return res.json({ ok: false, error: 'Коментар не знайдено', code: 'err_comment_not_found' });
+  const { data: cPost } = await supabase.from('channel_messages')
+    .select('channel_id').eq('id', cRow.post_id).maybeSingle();
+  const channelId = cPost && cPost.channel_id;
+  if (!channelId) return res.json({ ok: false, error: 'Коментар не знайдено', code: 'err_comment_not_found' });
+  if (!(await canAccessChannel(nick, channelId))) return res.json({ ok: false, error: 'Немає доступу до каналу', code: 'err_channel_private' });
+  const paidR = await paidChannelAccess(nick, channelId);
+  if (paidR.paid && !paidR.allowed) return res.json({ ok: false, error: 'Немає доступу до каналу', code: 'err_channel_private' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані', code: 'err_you_blocked' });
   const { data: existing } = await supabase.from('channel_comment_reactions').select('id').eq('comment_id', commentId).eq('nick', nick).eq('emoji', emoji).single();
@@ -7073,6 +7104,9 @@ app.post('/channel/view', async (req, res) => {
   if (!postId) return res.json({ ok: false });
   const { data: post } = await supabase.from('channel_messages').select('view_count, channel_id').eq('id', postId).single();
   if (!post) return res.json({ ok: false });
+  // Перегляд зараховуємо лише тому, хто справді може відкрити пост: інакше
+  // приватному чи платному каналу можна накрутити лічильник ззовні.
+  if (!(await canAccessChannel(nick, post.channel_id))) return res.json({ ok: false });
   // Рахуємо лише унікальних глядачів: 1 людина = 1 перегляд.
   if (nick) {
     const { data: seen } = await supabase.from('channel_post_views').select('id').eq('post_id', postId).eq('nick', nick).maybeSingle();
