@@ -8181,6 +8181,11 @@ wss.on('connection', (ws) => {
         }
       }
 
+      // Частота — перед усім іншим: інакше флуд усе одно доходив би до БД.
+      if (wsRateExceeded(ws, msg.type)) {
+        try { ws.send(JSON.stringify({ type: 'error', error: 'Забагато повідомлень, зачекайте', code: 'err_too_fast' })); } catch (_) {}
+        return;
+      }
       // Стеля текстових полів — один гард на всі типи: інакше кожен обробник
       // мав би власну перевірку, і новий тип неминуче лишився б без неї.
       if (textTooLong(msg)) {
@@ -8956,6 +8961,25 @@ const TEXT_MAX = 20000;
 const REPLY_TEXT_MAX = 8000;
 const REPLY_IMAGE_MAX = 200000;   // base64-мініатюра цитати
 const FILE_NAME_MAX = 255;
+// 🔴 Частота WS. До аудиту 13.09 її не було ВЗАГАЛІ: залогінений акаунт міг
+// слати тисячі повідомлень на секунду — кожне це запис у Postgres, розсилка
+// всім учасникам групи і пуш. Найдешевший DoS, ще й зсередини.
+// Рахуємо ОКРЕМО: створення вмісту (людина стільки не друкує) і всі кадри
+// разом (службові — ack, typing, ICE дзвінка — ідуть часто й законно).
+const WS_CONTENT_TYPES = new Set(['chat_message', 'group_message', 'sticker', 'file_message']);
+const WS_CONTENT_MAX = 20;      // створень вмісту за вікно
+const WS_FRAMES_MAX = 400;      // усіх кадрів за вікно
+const WS_WINDOW_MS = 10000;
+function wsRateExceeded(ws, type) {
+  const now = Date.now();
+  if (!ws.rateWin || now - ws.rateWin > WS_WINDOW_MS) {
+    ws.rateWin = now; ws.rateContent = 0; ws.rateFrames = 0;
+  }
+  ws.rateFrames++;
+  if (WS_CONTENT_TYPES.has(type)) ws.rateContent++;
+  return ws.rateFrames > WS_FRAMES_MAX || ws.rateContent > WS_CONTENT_MAX;
+}
+
 function textTooLong(o) {
   if (!o) return false;
   const over = (v, max) => typeof v === 'string' && v.length > max;

@@ -369,6 +369,7 @@
   "err_text_too_long": "লেখাটি খুব দীর্ঘ",
   "err_token_balance": "ব্যালেন্স পড়া যায়নি",
   "err_token_disabled": "EION এখনো চালু হয়নি",
+  "err_too_fast": "অনেক বেশি বার্তা, অপেক্ষা করুন",
   "err_too_many_posts": "অনেক বেশি পোস্ট",
   "err_too_many_refs": "একসাথে অনেক ফাইল",
   "err_transfer_daily_limit": "আজকের স্থানান্তর সীমা শেষ",

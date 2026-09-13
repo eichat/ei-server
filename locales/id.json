@@ -369,6 +369,7 @@
   "err_text_too_long": "Teksnya terlalu panjang",
   "err_token_balance": "Gagal membaca saldo",
   "err_token_disabled": "EION belum diterbitkan",
+  "err_too_fast": "Terlalu banyak pesan, tunggu",
   "err_too_many_posts": "Terlalu banyak postingan",
   "err_too_many_refs": "Terlalu banyak berkas sekaligus",
   "err_transfer_daily_limit": "Batas transfer hari ini telah tercapai",

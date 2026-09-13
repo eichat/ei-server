@@ -369,6 +369,7 @@
   "err_text_too_long": "Masyadong mahaba ang teksto",
   "err_token_balance": "Hindi mabasa ang balanse",
   "err_token_disabled": "Hindi pa naibibigay ang EION",
+  "err_too_fast": "Masyadong maraming mensahe, maghintay",
   "err_too_many_posts": "Masyadong maraming post",
   "err_too_many_refs": "Masyadong maraming file nang sabay",
   "err_transfer_daily_limit": "Naabot na ang limitasyon ng paglilipat ngayong araw",

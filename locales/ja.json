@@ -369,6 +369,7 @@
   "err_text_too_long": "テキストが長すぎます",
   "err_token_balance": "残高を取得できませんでした",
   "err_token_disabled": "EIONはまだ発行されていません",
+  "err_too_fast": "メッセージが多すぎます。お待ちください",
   "err_too_many_posts": "投稿が多すぎます",
   "err_too_many_refs": "一度に送るファイルが多すぎます",
   "err_transfer_daily_limit": "本日の送金上限に達しました",

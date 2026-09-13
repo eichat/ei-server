@@ -369,6 +369,7 @@
   "err_text_too_long": "Văn bản quá dài",
   "err_token_balance": "Không đọc được số dư",
   "err_token_disabled": "EION chưa được phát hành",
+  "err_too_fast": "Quá nhiều tin nhắn, vui lòng đợi",
   "err_too_many_posts": "Quá nhiều bài đăng",
   "err_too_many_refs": "Quá nhiều tệp cùng lúc",
   "err_transfer_daily_limit": "Đã đạt giới hạn chuyển hôm nay",

@@ -369,6 +369,7 @@
   "err_text_too_long": "텍스트가 너무 깁니다",
   "err_token_balance": "잔액을 불러오지 못했습니다",
   "err_token_disabled": "EION이 아직 발행되지 않았습니다",
+  "err_too_fast": "메시지가 너무 많습니다. 잠시 기다리세요",
   "err_too_many_posts": "게시물이 너무 많습니다",
   "err_too_many_refs": "한 번에 너무 많은 파일입니다",
   "err_transfer_daily_limit": "오늘의 전송 한도에 도달했습니다",

@@ -369,6 +369,7 @@
   "err_text_too_long": "Tekst jest za długi",
   "err_token_balance": "Nie udało się odczytać salda",
   "err_token_disabled": "EION nie został jeszcze wydany",
+  "err_too_fast": "Zbyt wiele wiadomości, poczekaj",
   "err_too_many_posts": "Zbyt wiele postów",
   "err_too_many_refs": "Zbyt wiele plików naraz",
   "err_transfer_daily_limit": "Dzienny limit przelewów został wyczerpany",

@@ -369,6 +369,7 @@
   "err_text_too_long": "Текст слишком длинный",
   "err_token_balance": "Не удалось прочитать баланс",
   "err_token_disabled": "EION ещё не выпущен",
+  "err_too_fast": "Слишком много сообщений, подождите",
   "err_too_many_posts": "Слишком много постов",
   "err_too_many_refs": "Слишком много файлов сразу",
   "err_transfer_daily_limit": "Лимит переводов на сегодня исчерпан",

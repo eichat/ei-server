@@ -369,6 +369,7 @@
   "err_text_too_long": "पाठ बहुत लंबा है",
   "err_token_balance": "बैलेंस नहीं पढ़ा जा सका",
   "err_token_disabled": "EION अभी जारी नहीं हुआ",
+  "err_too_fast": "बहुत अधिक संदेश, प्रतीक्षा करें",
   "err_too_many_posts": "बहुत अधिक पोस्ट",
   "err_too_many_refs": "एक साथ बहुत अधिक फ़ाइलें",
   "err_transfer_daily_limit": "आज की स्थानांतरण सीमा समाप्त हो गई",

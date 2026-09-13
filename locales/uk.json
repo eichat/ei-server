@@ -369,6 +369,7 @@
   "err_text_too_long": "Текст задовгий",
   "err_token_balance": "Не вдалося прочитати баланс",
   "err_token_disabled": "EION ще не випущено",
+  "err_too_fast": "Забагато повідомлень, зачекайте",
   "err_too_many_posts": "Занадто багато постів",
   "err_too_many_refs": "Забагато файлів за раз",
   "err_transfer_daily_limit": "Ліміт переказів на сьогодні вичерпано",

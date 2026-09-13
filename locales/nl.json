@@ -369,6 +369,7 @@
   "err_text_too_long": "De tekst is te lang",
   "err_token_balance": "Saldo kon niet worden gelezen",
   "err_token_disabled": "EION is nog niet uitgegeven",
+  "err_too_fast": "Te veel berichten, wacht even",
   "err_too_many_posts": "Te veel berichten",
   "err_too_many_refs": "Te veel bestanden tegelijk",
   "err_transfer_daily_limit": "De overboekingslimiet van vandaag is bereikt",

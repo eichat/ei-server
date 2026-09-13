@@ -369,6 +369,7 @@
   "err_text_too_long": "文本太长",
   "err_token_balance": "无法读取余额",
   "err_token_disabled": "EION 尚未发行",
+  "err_too_fast": "消息过多，请稍候",
   "err_too_many_posts": "帖子过多",
   "err_too_many_refs": "一次上传的文件过多",
   "err_transfer_daily_limit": "今日转账次数已达上限",

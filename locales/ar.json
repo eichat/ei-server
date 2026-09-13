@@ -369,6 +369,7 @@
   "err_text_too_long": "النص طويل جدًا",
   "err_token_balance": "تعذّر قراءة الرصيد",
   "err_token_disabled": "لم يُطلق EION بعد",
+  "err_too_fast": "رسائل كثيرة، انتظر قليلاً",
   "err_too_many_posts": "عدد المنشورات كبير جدًا",
   "err_too_many_refs": "ملفات كثيرة جدًا دفعة واحدة",
   "err_transfer_daily_limit": "تم استنفاد حد التحويلات لهذا اليوم",

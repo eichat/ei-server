@@ -369,6 +369,7 @@
   "err_text_too_long": "Metin çok uzun",
   "err_token_balance": "Bakiye okunamadı",
   "err_token_disabled": "EION henüz çıkarılmadı",
+  "err_too_fast": "Çok fazla mesaj, bekleyin",
   "err_too_many_posts": "Çok fazla gönderi",
   "err_too_many_refs": "Aynı anda çok fazla dosya",
   "err_transfer_daily_limit": "Bugünkü transfer limitine ulaşıldı",
