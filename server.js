@@ -189,7 +189,7 @@ app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/re
 // користувача `x`, і той міг би включити чужу наліпку у свій платний набір
 // (знайдено аудитом 13.09.2026). Ніки з самих крапок — з тієї ж причини:
 // `..` у сегменті шляху.
-const NICK_FORBIDDEN = /[,()"'\\/]|[\u0000-\u001f\u007f]/;
+const NICK_FORBIDDEN = /[,()"'\\/<>&]|[\u0000-\u001f\u007f]/;   // <>& — щоб нік не був розміткою в жодному HTML
 function nickLooksSafe(nick) {
   if (typeof nick !== 'string') return false;
   if (NICK_FORBIDDEN.test(nick)) return false;
@@ -7826,7 +7826,13 @@ async function collectOverview() {
 }
 
 function overviewHtml(o) {
-  const n = (v) => v === null || v === undefined ? '—' : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  // 🔴 Ніки з бази йдуть у розмітку, а вони приходять від користувачів. Нік із
+  // <img src=x onerror=...> виконався б у браузері того, хто відкрив огляд, —
+  // а відкриває його адмін, ще й із ?key= прямо в URL, тобто скрипт зміг би
+  // цей ключ прочитати й відправити. Екрануємо все динамічне (аудит 13.09).
+  const esc = (v) => String(v ?? '').replace(/[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const n = (v) => v === null || v === undefined ? '—' : esc(String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '));
   const card = (title, rows) => `<section><h2>${title}</h2><table>${
     rows.map(([k, v]) => `<tr><td>${k}</td><td class="v">${n(v)}</td></tr>`).join('')}</table></section>`;
   const d = o.downloads;
@@ -7843,7 +7849,7 @@ tr:last-child td{border:0}td.v{text-align:right;font-variant-numeric:tabular-num
 .err{background:#2b1416;border-color:#5c2126;color:#ffb4ad}</style></head><body>
 <h1>EION — огляд</h1><div class="sub">${o.generatedAt.replace('T', ' ').slice(0, 16)} UTC</div>
 ${o.errors.length ? `<section class="err"><h2>Числа неповні</h2><table>${
-    o.errors.map(e => `<tr><td>${e}</td></tr>`).join('')}</table></section>` : ''}
+    o.errors.map(e => `<tr><td>${esc(e)}</td></tr>`).join('')}</table></section>` : ''}
 ${card('Люди', [
     ['Усього акаунтів', o.users.total],
     ['Нових за добу', o.users.newDay],
@@ -7893,7 +7899,7 @@ ${card('Монета', [
     ['Транзакцій за тиждень', o.coins.transactionsWeek],
   ])}
 ${o.recentTransactions.length ? `<section><h2>Останні рухи монет</h2><table>${
-    o.recentTransactions.map(t => `<tr><td>${t.at.slice(5, 16).replace('T', ' ')} · ${t.kind}<br><span style="color:#7d8f9d;font-size:12px">${t.from || '—'} → ${t.to || '—'}</span></td><td class="v">${n(t.amount)}</td></tr>`).join('')}</table></section>` : ''}
+    o.recentTransactions.map(t => `<tr><td>${esc(t.at.slice(5, 16).replace('T', ' '))} · ${esc(t.kind)}<br><span style="color:#7d8f9d;font-size:12px">${esc(t.from || '—')} → ${esc(t.to || '—')}</span></td><td class="v">${n(t.amount)}</td></tr>`).join('')}</table></section>` : ''}
 ${card('Сервер', [
     ['Онлайн зараз', o.runtime.onlineNow],
     ['Аптайм, год', o.runtime.uptimeHours],
