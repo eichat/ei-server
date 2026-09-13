@@ -4373,9 +4373,24 @@ async function scanTokenDeposits() {
   if (!sigs.length) return { ok: true, checked: 0, credited: 0 };
 
   let credited = 0;
+  // 🔴 Стеля розборів за один скан. getParsedTransaction — найдорожчий виклик,
+  // і публічний вузол ріже його 429-ю. Без стелі скан замовляв усі невідомі
+  // підписи разом, упирався в ліміт і не записував НІЧОГО — тобто наступного
+  // разу список невідомих був той самий. Цикл сам себе підтримував: саме так
+  // одна виплата від 31.08 дала 460 пачок retry за 12 годин. По 12 за раз
+  // (кожні 5 хв) історія розбирається за кілька проходів і більше не
+  // перечитується. Затримка для реального надходження — щонайбільше кілька
+  // хвилин, бо нові підписи йдуть першими.
+  let parsed = 0;
+  const PARSE_PER_SCAN = 12;
   for (const s of sigs) {
     if (seen.has(s.signature) || s.err) continue;
+    if (parsed >= PARSE_PER_SCAN) break;
     try {
+      parsed++;
+      // Пауза між дорогими викликами: вузол лімітує за секунду, і пачка підряд
+      // гарантовано впирається в 429 навіть при малій кількості.
+      if (parsed > 1) await new Promise(r => setTimeout(r, 400));
       const tx = await c.getParsedTransaction(s.signature, { maxSupportedTransactionVersion: 0 });
       if (!tx || !tx.meta) continue;
       const pre = tx.meta.preTokenBalances || [];
@@ -4448,7 +4463,7 @@ async function scanTokenDeposits() {
       }
     } catch (e) { console.error('[deposit]', s.signature, e.message); }
   }
-  return { ok: true, checked: sigs.length, credited };
+  return { ok: true, checked: sigs.length, parsed, credited };
 }
 
 // ── Поповнення вбудованим гаманцем: сервер платить комісію ───────────────
