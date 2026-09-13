@@ -7962,6 +7962,16 @@ wss.on('connection', (ws) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; if (userNick) touchSession(userNick, ws); });
   ws.on('message', async (raw) => {
+    // 🔴 Рахуємо ДО JSON.parse. Навантажувальний тест 13.09 показав: із
+    // перевіркою після розбору 5 акаунтів клали HTTP того ж процесу
+    // (keepalive 81 с), бо сам парсинг мегабайтів JSON зʼїдає CPU. База при
+    // цьому була захищена, а сервіс — ні.
+    if (wsFrameFlood(ws)) {
+      // Грубий флуд — РОЗРИВАЄМО. Відповідати на кожен зайвий кадр означає
+      // працювати на нападника; одного попередження за вікно досить.
+      try { ws.close(1008, 'rate limit'); } catch (_) {}
+      return;
+    }
     try {
       const msg = JSON.parse(raw);
 
@@ -8183,7 +8193,13 @@ wss.on('connection', (ws) => {
 
       // Частота — перед усім іншим: інакше флуд усе одно доходив би до БД.
       if (wsRateExceeded(ws, msg.type)) {
-        try { ws.send(JSON.stringify({ type: 'error', error: 'Забагато повідомлень, зачекайте', code: 'err_too_fast' })); } catch (_) {}
+        // Одне попередження за вікно: відповідь на КОЖЕН зайвий кадр — це
+        // робота на нападника (і зайвий трафік чесному клієнту, який просто
+        // переслав пачку).
+        if (ws.rateWarnedAt !== ws.rateWin) {
+          ws.rateWarnedAt = ws.rateWin;
+          try { ws.send(JSON.stringify({ type: 'error', error: 'Забагато повідомлень, зачекайте', code: 'err_too_fast' })); } catch (_) {}
+        }
         return;
       }
       // Стеля текстових полів — один гард на всі типи: інакше кожен обробник
@@ -8970,6 +8986,17 @@ const WS_CONTENT_TYPES = new Set(['chat_message', 'group_message', 'sticker', 'f
 const WS_CONTENT_MAX = 20;      // створень вмісту за вікно
 const WS_FRAMES_MAX = 400;      // усіх кадрів за вікно
 const WS_WINDOW_MS = 10000;
+// Дешевий лічильник КАДРІВ, до розбору JSON. Перевищив стелю з запасом —
+// зʼєднання закривається: клієнт перепідключиться, а процес не витрачає CPU
+// на розбір флуду.
+const WS_FRAMES_HARD = WS_FRAMES_MAX * 3;
+function wsFrameFlood(ws) {
+  const now = Date.now();
+  if (!ws.frameWin || now - ws.frameWin > WS_WINDOW_MS) { ws.frameWin = now; ws.frameN = 0; }
+  ws.frameN++;
+  return ws.frameN > WS_FRAMES_HARD;
+}
+
 function wsRateExceeded(ws, type) {
   const now = Date.now();
   if (!ws.rateWin || now - ws.rateWin > WS_WINDOW_MS) {
