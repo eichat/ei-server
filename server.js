@@ -6579,6 +6579,7 @@ app.get('/channel/messages', async (req, res) => {
 app.post('/channel/message', async (req, res) => {
   const { channelId, text, imageUrl, fileData, fileName, waveform, durationSec, forwardedFrom } = req.body; const fromNick = req.nick;
   if (!channelId || !fromNick || (!text && !imageUrl && !fileData)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  if (textTooLong(req.body)) return res.json({ ok: false, error: 'Текст задовгий', code: 'err_text_too_long' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Тільки власник або адмін може писати', code: 'err_only_owner_admin_post' });
   const ts = Date.now(); const msgId = `ch_${channelId}_${ts}`;
@@ -6726,6 +6727,7 @@ app.get('/channel/comments', async (req, res) => {
 
 app.post('/channel/comment', async (req, res) => {
   const { channelId, postId, text, fileData, fileName, waveform, durationSec, replyToNick, replyToText, replyToImage, replyToId } = req.body; const fromNick = req.nick;
+  if (textTooLong(req.body)) return res.json({ ok: false, error: 'Текст задовгий', code: 'err_text_too_long' });
   if (!channelId || !postId || !fromNick || (!text && !fileData)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', fromNick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі', code: 'err_blocked_in_channel' });
@@ -8179,6 +8181,12 @@ wss.on('connection', (ws) => {
         }
       }
 
+      // Стеля текстових полів — один гард на всі типи: інакше кожен обробник
+      // мав би власну перевірку, і новий тип неминуче лишився б без неї.
+      if (textTooLong(msg)) {
+        try { ws.send(JSON.stringify({ type: 'error', error: 'Текст задовгий', code: 'err_text_too_long' })); } catch (_) {}
+        return;
+      }
       if (msg.type === 'register_fcm_token') {
         if (userNick && msg.token) {
           // deviceId санітизуємо: він іде в ключ таблиці user_devices і в
@@ -8939,6 +8947,25 @@ const FILE_MIN_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 // дублювала `file_name` (саме ім'я лежить в окремій колонці), тож нової колонки
 // не треба. Клієнт відрізняє підпис від службового імені саме за цією
 // нерівністю — так само, як це давно зроблено в коментарях каналів.
+// 🔴 Стелі на текстові поля. До аудиту 13.09 їх не було ВЗАГАЛІ: одним WS-кадром
+// (maxPayload 16 МБ) можна було покласти в Postgres мегабайти тексту й розіслати
+// їх усім учасникам групи. Обрізати не можна — текст шифрований, урізаний
+// конверт стане нечитабельним назавжди; тому задовге ВІДХИЛЯЄМО.
+// 20 000 — це 4096 символів будь-якою мовою після E2EE (укр. 4096 → ≈11 000).
+const TEXT_MAX = 20000;
+const REPLY_TEXT_MAX = 8000;
+const REPLY_IMAGE_MAX = 200000;   // base64-мініатюра цитати
+const FILE_NAME_MAX = 255;
+function textTooLong(o) {
+  if (!o) return false;
+  const over = (v, max) => typeof v === 'string' && v.length > max;
+  return over(o.text, TEXT_MAX) || over(o.content, TEXT_MAX)
+      || over(o.caption, TEXT_MAX)
+      || over(o.replyToText, REPLY_TEXT_MAX)
+      || over(o.replyToImage, REPLY_IMAGE_MAX)
+      || over(o.fileName, FILE_NAME_MAX);
+}
+
 function mediaCaption(msg) {
   const c = typeof msg.caption === 'string' ? msg.caption.trim() : '';
   return c ? c.slice(0, 4000) : msg.fileName;
