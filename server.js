@@ -6013,6 +6013,33 @@ app.get('/check-phone', async (req, res) => {
 });
 
 // ── Магазин Premium ──────────────────────────
+// ── Послідовне виконання однієї покупки ─────────────────────────────────
+// 🔴 Преміум і платна підписка читають поточний термін, списують монети й пишуть
+// новий. Два одночасні запити (подвійний тап, повтор після таймауту) читали
+// ОДИН старий термін: монети списувались двічі, а продовження ставало одне.
+// Унікального ключа, як у наборів наліпок, тут немає — підписку можна
+// продовжувати. Тож запити одного користувача на ту саму дію йдуть по черзі.
+// ⚠️ Замок у памʼяті процесу: при кількох інстансах (REDIS_URL, розділ 49)
+// його треба перенести в спільний шар.
+const keyLocks = new Map();
+async function withKeyLock(key, fn) {
+  const prev = keyLocks.get(key) || Promise.resolve();
+  let release;
+  const cur = new Promise(r => { release = r; });
+  const chain = prev.then(() => cur);
+  keyLocks.set(key, chain);
+  await prev;
+  try { return await fn(); }
+  finally {
+    release();
+    if (keyLocks.get(key) === chain) keyLocks.delete(key);
+  }
+}
+// Щойно завершена покупка преміуму: повтор тієї самої за кілька секунд — це
+// подвійний тап, а не бажання купити ще місяць. Віддаємо той самий результат.
+const recentPremium = new Map();
+const PREMIUM_REPEAT_MS = 15000;
+
 app.post('/shop/buy-premium', async (req, res) => {
   const { plan } = req.body;
   const nick = req.nick; // Фаза 1: покупець — автентифікований юзер.
@@ -6020,6 +6047,11 @@ app.post('/shop/buy-premium', async (req, res) => {
   const PRICES = PREMIUM_PRICES;
   const price = PRICES[plan];
   if (!price) return res.json({ ok: false, error: 'Невідомий план', code: 'err_unknown_plan' });
+  return withKeyLock(`premium:${nick}`, async () => {
+  const recent = recentPremium.get(nick);
+  if (recent && recent.plan === plan && Date.now() - recent.at < PREMIUM_REPEAT_MS) {
+    return res.json({ ...recent.body, repeated: true });
+  }
   const { data: user } = await supabase.from('users').select('premium_expires_at').eq('nick', nick).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
   // Атомарне списання: spend_coins повертає новий баланс або -1 (недостатньо).
@@ -6035,7 +6067,10 @@ app.post('/shop/buy-premium', async (req, res) => {
   else expiresAt.setFullYear(expiresAt.getFullYear() + 1);
   await supabase.from('users').update({ premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
   sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
-  res.json({ ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan });
+  const body = { ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan };
+  recentPremium.set(nick, { plan, at: Date.now(), body });
+  res.json(body);
+  });
 });
 
 // ═══════════════════════════════════════════════
@@ -7421,6 +7456,9 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   const { data: ch } = await supabase.from('channels').select('owner_nick, is_paid, price, sub_days').eq('id', channelId).single();
   if (!ch) return res.json({ ok: false, error: 'Канал не знайдено', code: 'err_channel_not_found' });
   if (!ch.is_paid) return res.json({ ok: false, error: 'Канал безкоштовний', code: 'err_channel_free' });
+  // По черзі (див. withKeyLock): інакше два запити обидва бачили «підписки ще
+  // немає» й обидва списували ціну.
+  return withKeyLock(`paidsub:${channelId}:${nick}`, async () => {
   // Вже є активна підписка — не списувати повторно
   const { data: curArr } = await supabase.from('channel_paid_subs').select('expires_at').eq('channel_id', channelId).eq('nick', nick).order('expires_at', { ascending: false }).limit(1);
   if (curArr && curArr[0] && Number(curArr[0].expires_at) > Date.now()) return res.json({ ok: true, alreadySubscribed: true, expiresAt: Number(curArr[0].expires_at) });
@@ -7461,6 +7499,7 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
   sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
   res.json({ ok: true, newBalance, expiresAt });
+  });
 });
 
 // Власник вмикає/вимикає платність і ставить ціну/період
