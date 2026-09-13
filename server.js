@@ -2996,6 +2996,13 @@ app.get('/call-offer', async (req, res) => {
     catch (e) { console.error('[cluster] offer get:', e.message); }
   }
   if (!data) return res.json({ ok: false, error: 'Offer не знайдено або застарів', code: 'err_offer_expired' });
+  // 🔴 Забрати offer може ЛИШЕ той, кому дзвонять. callId має вигляд
+  // `<від>_<кому>_<мітка часу>` — тобто передбачуваний: знаючи два публічні
+  // ніки, лишалося вгадати мілісекунду в межах 60 с життя offer. А в offer
+  // лежить SDP з IP-адресами співрозмовника (аудит 13.09).
+  if (data.toNick && data.toNick !== req.nick) {
+    return res.json({ ok: false, error: 'Offer не знайдено або застарів', code: 'err_offer_expired' });
+  }
   res.json({ ok: true, fromNick: data.fromNick, offer: data.offer, hasVideo: data.hasVideo });
 });
 
@@ -3279,14 +3286,21 @@ app.post('/logout', async (req, res) => {
 // інстанс після ~15 хв бездіяльності, тобто рівно в межах життя коду.
 app.post('/forgot', async (req, res) => {
   const { email } = req.body;
+  // 🔴 ВІДПОВІДЬ ОДНАКОВА, є така адреса чи ні (аудит 13.09). Раніше
+  // «Email не знайдено» перетворювало endpoint на перебір: за ним можна було
+  // з'ясувати, чи має людина акаунт у EION — а для месенджера це чутливо.
+  // Те саме стосується cooldown: «Зачекайте N с» так само підтверджував
+  // існування адреси, тож він тепер теж мовчазний.
+  const ok = () => res.json({ ok: true });
+  if (typeof email !== 'string' || !email.includes('@')) return ok();
   const { data: user } = await supabase.from('users').select('nick').eq('email', email).single();
-  if (!user) return res.json({ ok: false, error: 'Email не знайдено', code: 'err_email_not_found' });
+  if (!user) return ok();
   // Cooldown 60 с на адресу (як у /phone/request-code): ліміт по IP обходиться
   // зміною IP, а за спам у чужу скриньку платить її власник — і наша квота Brevo.
   const { data: existing } = await supabase.from('email_codes').select('last_sent_at').eq('email', email).single();
   if (existing && existing.last_sent_at) {
     const elapsed = Date.now() - new Date(existing.last_sent_at).getTime();
-    if (elapsed < 60000) return res.json({ ok: false, error: `Зачекайте ${Math.ceil((60000 - elapsed) / 1000)} с`, code: 'err_wait_before_retry' });
+    if (elapsed < 60000) return ok();   // мовчки: лист не шлемо, але й не зізнаємось
   }
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const { error } = await supabase.from('email_codes').upsert({
@@ -3294,8 +3308,9 @@ app.post('/forgot', async (req, res) => {
     expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     attempts: 0, last_sent_at: new Date().toISOString(),
   });
+  // Збій на нашому боці — кажемо чесно: він не залежить від того, чия адреса.
   if (error) { console.error('[forgot] email_codes upsert:', error); return res.json({ ok: false, error: 'Помилка збереження коду', code: 'err_code_save' }); }
-  try { await sendEmail(email, 'EION — Відновлення пароля', `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`); res.json({ ok: true }); }
+  try { await sendEmail(email, 'EION — Відновлення пароля', `Ваш код відновлення: ${code}\n\nКод дійсний 15 хвилин.`); ok(); }
   catch (e) { console.log('[forgot] sendEmail:', e.message); res.json({ ok: false, error: 'Помилка відправки email', code: 'err_email_send' }); }
 });
 
