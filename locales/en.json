@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Not enough coins",
   "err_not_enough_earned": "Not enough withdrawable coins",
   "err_not_enough_rights": "Not enough permissions",
+  "err_not_group_member": "You are not a member of this group",
   "err_not_subscribed": "You are not subscribed to the channel",
   "err_not_youtube_url": "That doesn’t look like a YouTube link",
   "err_nothing_to_update": "Nothing to change",

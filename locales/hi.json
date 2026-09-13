@@ -296,6 +296,7 @@
   "err_not_enough_coins": "पर्याप्त सिक्के नहीं",
   "err_not_enough_earned": "निकासी योग्य सिक्के पर्याप्त नहीं",
   "err_not_enough_rights": "पर्याप्त अनुमति नहीं",
+  "err_not_group_member": "आप इस समूह के सदस्य नहीं हैं",
   "err_not_subscribed": "आपने इस चैनल की सदस्यता नहीं ली",
   "err_not_youtube_url": "यह YouTube लिंक नहीं लगता",
   "err_nothing_to_update": "बदलने के लिए कुछ नहीं",

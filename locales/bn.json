@@ -296,6 +296,7 @@
   "err_not_enough_coins": "পর্যাপ্ত কয়েন নেই",
   "err_not_enough_earned": "উত্তোলনযোগ্য কয়েন যথেষ্ট নয়",
   "err_not_enough_rights": "পর্যাপ্ত অনুমতি নেই",
+  "err_not_group_member": "আপনি এই গ্রুপের সদস্য নন",
   "err_not_subscribed": "আপনি এই চ্যানেলে সাবস্ক্রাইব করেননি",
   "err_not_youtube_url": "এটি YouTube লিংক বলে মনে হচ্ছে না",
   "err_nothing_to_update": "পরিবর্তনের কিছু নেই",

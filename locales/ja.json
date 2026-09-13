@@ -296,6 +296,7 @@
   "err_not_enough_coins": "コインが足りません",
   "err_not_enough_earned": "出金可能なコインが足りません",
   "err_not_enough_rights": "権限が足りません",
+  "err_not_group_member": "このグループのメンバーではありません",
   "err_not_subscribed": "このチャンネルを登録していません",
   "err_not_youtube_url": "YouTube のリンクではないようです",
   "err_nothing_to_update": "変更する項目がありません",

@@ -296,6 +296,7 @@
   "err_not_enough_coins": "No tienes monedas suficientes",
   "err_not_enough_earned": "No hay suficientes monedas retirables",
   "err_not_enough_rights": "Permisos insuficientes",
+  "err_not_group_member": "No eres miembro de este grupo",
   "err_not_subscribed": "No estás suscrito al canal",
   "err_not_youtube_url": "Esto no parece un enlace de YouTube",
   "err_nothing_to_update": "No hay nada que cambiar",

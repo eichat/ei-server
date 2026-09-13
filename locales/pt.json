@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Moedas insuficientes",
   "err_not_enough_earned": "Moedas levantáveis insuficientes",
   "err_not_enough_rights": "Permissões insuficientes",
+  "err_not_group_member": "Não é membro deste grupo",
   "err_not_subscribed": "Não está subscrito no canal",
   "err_not_youtube_url": "Isto não parece uma ligação do YouTube",
   "err_nothing_to_update": "Nada para alterar",

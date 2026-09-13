@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Nicht genug Coins",
   "err_not_enough_earned": "Nicht genug auszahlbare Coins",
   "err_not_enough_rights": "Nicht genug Rechte",
+  "err_not_group_member": "Sie sind kein Mitglied dieser Gruppe",
   "err_not_subscribed": "Du hast den Kanal nicht abonniert",
   "err_not_youtube_url": "Das sieht nicht nach einem YouTube-Link aus",
   "err_nothing_to_update": "Nichts zu ändern",

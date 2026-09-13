@@ -296,6 +296,7 @@
   "err_not_enough_coins": "코인이 부족합니다",
   "err_not_enough_earned": "출금 가능한 코인이 부족합니다",
   "err_not_enough_rights": "권한이 부족합니다",
+  "err_not_group_member": "이 그룹의 멤버가 아닙니다",
   "err_not_subscribed": "이 채널을 구독하지 않았습니다",
   "err_not_youtube_url": "YouTube 링크가 아닌 것 같습니다",
   "err_nothing_to_update": "변경할 내용이 없습니다",

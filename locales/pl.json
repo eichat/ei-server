@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Za mało monet",
   "err_not_enough_earned": "Za mało monet do wypłaty",
   "err_not_enough_rights": "Za mało uprawnień",
+  "err_not_group_member": "Nie jesteś członkiem tej grupy",
   "err_not_subscribed": "Nie subskrybujesz tego kanału",
   "err_not_youtube_url": "To nie wygląda na link do YouTube",
   "err_nothing_to_update": "Nie ma czego zmieniać",

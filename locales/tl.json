@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Kulang ang coins",
   "err_not_enough_earned": "Kulang ang maaaring i-withdraw na barya",
   "err_not_enough_rights": "Kulang ang pahintulot",
+  "err_not_group_member": "Hindi ka miyembro ng grupong ito",
   "err_not_subscribed": "Hindi ka naka-subscribe sa channel",
   "err_not_youtube_url": "Mukhang hindi ito YouTube link",
   "err_nothing_to_update": "Walang babaguhin",

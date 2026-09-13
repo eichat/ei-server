@@ -296,6 +296,7 @@
   "err_not_enough_coins": "العملات غير كافية",
   "err_not_enough_earned": "لا توجد عملات كافية قابلة للسحب",
   "err_not_enough_rights": "الصلاحيات غير كافية",
+  "err_not_group_member": "أنت لست عضوًا في هذه المجموعة",
   "err_not_subscribed": "أنت غير مشترك في القناة",
   "err_not_youtube_url": "لا يبدو هذا رابط YouTube",
   "err_nothing_to_update": "لا يوجد ما يتم تغييره",

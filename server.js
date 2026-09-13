@@ -5651,8 +5651,24 @@ app.get('/direct/reactions', async (req, res) => {
   res.json({ ok: true, reactions: byMsg });
 });
 
+// 🔴 Членство в групі. /group/messages не перевіряв його ВЗАГАЛІ: знаючи
+// groupId (а вони послідовні), будь-хто читав усю переписку чужої групи
+// (аудит 13.09, підтверджено на проді). Групова переписка приватна за
+// природою — «відкритий» тип означає лише вільний ВСТУП, не вільне читання.
+async function isGroupMember(nick, groupId) {
+  if (!nick || !groupId) return false;
+  const { data } = await supabase.from('group_members')
+    .select('nick').eq('group_id', groupId).eq('nick', nick).maybeSingle();
+  return !!data;
+}
+
 app.get('/group/messages', async (req, res) => {
-  const { groupId, nick, before } = req.query;
+  const { groupId, before } = req.query;
+  // Нік — ІЗ СЕСІЇ: з query він дозволяв читати ще й чужу позначку очищення.
+  const nick = req.nick;
+  if (!(await isGroupMember(nick, groupId))) {
+    return res.json({ ok: false, error: 'Ви не учасник групи', code: 'err_not_group_member' });
+  }
   const limit = Math.min(parseInt(req.query.limit) || 100, 200);
   let clearedAt = 0;
   if (nick) {
@@ -5688,6 +5704,7 @@ app.get('/group/messages', async (req, res) => {
 // Очистити історію групи лише для себе (персистентний маркер часу)
 app.post('/group/clear-history', async (req, res) => {
   const { groupId } = req.body; const nick = req.nick;
+  if (!(await isGroupMember(nick, groupId))) return res.json({ ok: false, error: 'Ви не учасник групи', code: 'err_not_group_member' });
   if (!groupId || !nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const clearedAt = Date.now();
   const { error } = await supabase.from('group_history_cleared').upsert({ nick, group_id: groupId, cleared_at: clearedAt }, { onConflict: 'nick,group_id' });
@@ -5708,6 +5725,7 @@ app.post('/group/clear-history', async (req, res) => {
 // який був офлайн, побачить відсутність рядка як «не очищено».
 app.post('/group/restore-history', async (req, res) => {
   const { groupId } = req.body; const nick = req.nick;
+  if (!(await isGroupMember(nick, groupId))) return res.json({ ok: false, error: 'Ви не учасник групи', code: 'err_not_group_member' });
   if (!groupId || !nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { error } = await supabase.from('group_history_cleared').delete().eq('nick', nick).eq('group_id', groupId);
   if (error) {

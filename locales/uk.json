@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Недостатньо монет",
   "err_not_enough_earned": "Недостатньо монет до виведення",
   "err_not_enough_rights": "Недостатньо прав",
+  "err_not_group_member": "Ви не учасник групи",
   "err_not_subscribed": "Ви не підписані на канал",
   "err_not_youtube_url": "Це не схоже на посилання YouTube",
   "err_nothing_to_update": "Нічого змінювати",

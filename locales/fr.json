@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Pas assez de pièces",
   "err_not_enough_earned": "Pas assez de pièces retirables",
   "err_not_enough_rights": "Droits insuffisants",
+  "err_not_group_member": "Vous n’êtes pas membre de ce groupe",
   "err_not_subscribed": "Vous n’êtes pas abonné au canal",
   "err_not_youtube_url": "Cela ne ressemble pas à un lien YouTube",
   "err_nothing_to_update": "Rien à modifier",

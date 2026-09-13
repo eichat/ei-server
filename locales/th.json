@@ -296,6 +296,7 @@
   "err_not_enough_coins": "เหรียญไม่พอ",
   "err_not_enough_earned": "เหรียญที่ถอนได้ไม่พอ",
   "err_not_enough_rights": "สิทธิ์ไม่เพียงพอ",
+  "err_not_group_member": "คุณไม่ได้เป็นสมาชิกของกลุ่มนี้",
   "err_not_subscribed": "คุณยังไม่ได้ติดตามช่องนี้",
   "err_not_youtube_url": "ดูเหมือนไม่ใช่ลิงก์ YouTube",
   "err_nothing_to_update": "ไม่มีอะไรให้เปลี่ยน",

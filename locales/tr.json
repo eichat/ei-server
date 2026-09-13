@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Yeterli jeton yok",
   "err_not_enough_earned": "Çekilebilir yeterli para yok",
   "err_not_enough_rights": "Yetki yetersiz",
+  "err_not_group_member": "Bu grubun üyesi değilsiniz",
   "err_not_subscribed": "Bu kanala abone değilsiniz",
   "err_not_youtube_url": "Bu bir YouTube bağlantısına benzemiyor",
   "err_nothing_to_update": "Değiştirilecek bir şey yok",

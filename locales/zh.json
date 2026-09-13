@@ -296,6 +296,7 @@
   "err_not_enough_coins": "金币不足",
   "err_not_enough_earned": "可提取的金币不足",
   "err_not_enough_rights": "权限不足",
+  "err_not_group_member": "您不是该群组成员",
   "err_not_subscribed": "你尚未订阅该频道",
   "err_not_youtube_url": "这看起来不是 YouTube 链接",
   "err_nothing_to_update": "没有可修改的内容",

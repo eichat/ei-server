@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Niet genoeg munten",
   "err_not_enough_earned": "Niet genoeg opneembare munten",
   "err_not_enough_rights": "Onvoldoende rechten",
+  "err_not_group_member": "Je bent geen lid van deze groep",
   "err_not_subscribed": "Je bent niet geabonneerd op het kanaal",
   "err_not_youtube_url": "Dat lijkt geen YouTube-link",
   "err_nothing_to_update": "Niets te wijzigen",

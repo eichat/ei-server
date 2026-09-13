@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Koin tidak cukup",
   "err_not_enough_earned": "Koin yang bisa ditarik tidak cukup",
   "err_not_enough_rights": "Izin tidak cukup",
+  "err_not_group_member": "Anda bukan anggota grup ini",
   "err_not_subscribed": "Anda belum berlangganan saluran ini",
   "err_not_youtube_url": "Itu sepertinya bukan tautan YouTube",
   "err_nothing_to_update": "Tidak ada yang diubah",

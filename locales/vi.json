@@ -296,6 +296,7 @@
   "err_not_enough_coins": "Không đủ xu",
   "err_not_enough_earned": "Không đủ xu có thể rút",
   "err_not_enough_rights": "Không đủ quyền",
+  "err_not_group_member": "Bạn không phải thành viên của nhóm này",
   "err_not_subscribed": "Bạn chưa đăng ký kênh",
   "err_not_youtube_url": "Đây không giống liên kết YouTube",
   "err_nothing_to_update": "Không có gì để thay đổi",
