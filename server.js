@@ -66,6 +66,27 @@ const wss = new WebSocket.Server({ server, maxPayload: 16 * 1024 * 1024 });
 // переходу на підписані upload-URL (Storage 2.2) байти в HTTP більше не
 // потрапляють: найбільші тіла тепер — список телефонів (до 2000 номерів,
 // ≈30 КБ) і переписка для /ai/chat. 4 МБ — із великим запасом.
+// ── Відмови async-обробників (падіння «Exited with status 1») ──────────────
+// Express 4 НЕ ловить відмову async-обробника: вона стає unhandledRejection,
+// а в Node 15+ це валить процес — для ВСІХ користувачів через один поганий
+// запит. Дописувати try/catch довелось би у 110 місцях, тож обгортаємо один
+// раз тут, до оголошення маршрутів. Роутерів (`app.use('/x', router)`) у
+// файлі немає, інакше обгортка стерла б їхні власні властивості.
+for (const m of ['use', 'get', 'post', 'put', 'delete', 'patch']) {
+  const orig = app[m].bind(app);
+  app[m] = (...args) => orig(...args.map((a) => {
+    if (typeof a !== 'function' || a.length >= 4) return a;   // 4 арг = обробник помилок
+    const wrapped = function (req, res, next) {
+      let r;
+      try { r = a.call(this, req, res, next); } catch (e) { next(e); return; }
+      if (r && typeof r.then === 'function') r.catch(next);
+      return r;
+    };
+    Object.defineProperty(wrapped, 'length', { value: a.length });
+    return wrapped;
+  }));
+}
+
 app.use(express.json({ limit: '4mb' }));
 
 // ── Storage 2.3: підпис медіа-рефів у ВСІХ JSON-відповідях (чокпойнт HTTP) ───
@@ -9177,6 +9198,30 @@ setInterval(async () => {
   try { await cleanupGroups(); } catch (e) { console.log('[cleanup] groups error:', e.message); }
   try { await cleanupFileObjects(); } catch (e) { console.log('[cleanup] fileObjects error:', e.message); }
 }, 60 * 60 * 1000);
+
+// Останній рубіж: усе, що впало в маршруті, доїжджає сюди зі стеком у лозі.
+// Віддаємо JSON, а не типовий HTML Express, — клієнт розбирає відповідь як
+// JSON і на HTML дає FormatException замість зрозумілої помилки.
+app.use((err, req, res, next) => {
+  console.error('[500]', req.method, req.path, '—', err && err.stack ? err.stack : err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ ok: false, error: 'Помилка сервера', code: 'err_server' });
+});
+
+// Досі перехоплювачів не було ЗОВСІМ, тож будь-яка невиловлена відмова гасила
+// процес мовчки: у пошту прилітало «Exited with status 1» без жодного стека,
+// і причину встановити не було з чого.
+process.on('unhandledRejection', (reason) => {
+  // НЕ падаємо: це майже завжди забутий await у фоновій задачі, а процес цілий.
+  // Рестарт на безкоштовному Render коштує 30–50 с і скидає всі мапи в памʼяті.
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  // Тут навпаки: стан процесу невизначений, тож логуємо й даємо Render підняти
+  // чистий. Цінність у тому, що тепер у лозі буде стек, а не сама лише смерть.
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+  setTimeout(() => process.exit(1), 300).unref();
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
