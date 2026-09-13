@@ -4385,7 +4385,18 @@ async function scanTokenDeposits() {
         return r ? Number(r.uiTokenAmount.uiAmount || 0) : 0;
       };
       const gained = amountOf(post, kp.publicKey.toBase58()) - amountOf(pre, kp.publicKey.toBase58());
-      if (gained <= 0) continue;   // це не надходження (виплата або чужа операція)
+      // 🔴 Не надходження (виплата, переказ, створення ATA) — але рядок усе одно
+      // ПОТРІБЕН. Без нього транзакція лишається «невідомою» назавжди: кожен скан
+      // тягне її дорогим getParsedTransaction, вузол відповідає 429, і те саме
+      // повторюється кожні 5 хв. Одна виплата від 31.08 так дала 460 пачок retry
+      // за 12 годин і забила лог, у якому потонули справжні помилки.
+      if (gained <= 0) {
+        await supabase.from('token_deposits').insert({
+          signature: s.signature, nick: null, address: kp.publicKey.toBase58(),
+          tokens: 0, coins: 0, slot: s.slot, status: 'outgoing',
+        });
+        continue;
+      }
 
       // Відправник — той, чий баланс цього ж mint зменшився найбільше.
       let sender = null, drop = 0;
@@ -4394,7 +4405,15 @@ async function scanTokenDeposits() {
         const d = amountOf(pre, b.owner) - Number(b.uiTokenAmount.uiAmount || 0);
         if (d > drop) { drop = d; sender = b.owner; }
       }
-      if (!sender) continue;
+      if (!sender) {
+        // Надходження є, а відправника не видно (нетипова транзакція). Теж
+        // записуємо, інакше вона перечитувалась би вічно, як і вихідні вище.
+        await supabase.from('token_deposits').insert({
+          signature: s.signature, nick: null, address: 'unknown',
+          tokens: gained, coins: 0, slot: s.slot, status: 'unmatched',
+        });
+        continue;
+      }
 
       // Внутрішній гаманець або сума понад стелю — записуємо, але не зараховуємо.
       // Запис потрібен, щоб наступний скан не розбирав цю транзакцію знову.
