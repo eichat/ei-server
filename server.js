@@ -9203,9 +9203,17 @@ setInterval(async () => {
 // Віддаємо JSON, а не типовий HTML Express, — клієнт розбирає відповідь як
 // JSON і на HTML дає FormatException замість зрозумілої помилки.
 app.use((err, req, res, next) => {
-  console.error('[500]', req.method, req.path, '—', err && err.stack ? err.stack : err);
+  // Помилки самого запиту (битий JSON — 400, завелике тіло — 413) ставить
+  // body-parser, і вони НЕ наші: віддавати на них 500 означало б і збрехати
+  // клієнту, і засмітити лог власними «падіннями».
+  const st = err && (err.status || err.statusCode);
+  const bad = Number.isInteger(st) && st >= 400 && st < 500;
+  if (bad) console.warn('[' + st + ']', req.method, req.path, '—', err.message);
+  else console.error('[500]', req.method, req.path, '—', err && err.stack ? err.stack : err);
   if (res.headersSent) return next(err);
-  res.status(500).json({ ok: false, error: 'Помилка сервера', code: 'err_server' });
+  res.status(bad ? st : 500).json(bad
+    ? { ok: false, error: 'Некоректний запит', code: 'err_bad_request' }
+    : { ok: false, error: 'Помилка сервера', code: 'err_server' });
 });
 
 // Досі перехоплювачів не було ЗОВСІМ, тож будь-яка невиловлена відмова гасила
