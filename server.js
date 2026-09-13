@@ -4779,6 +4779,16 @@ app.post('/token/transfer-prepare', async (req, res) => {
   if (used !== null && used >= TOKEN_TRANSFER_DAILY) {
     return res.json({ ok: false, error: 'Ліміт переказів на сьогодні вичерпано', code: 'err_transfer_daily_limit' });
   }
+  // 🔴 Окремий лічильник на ПІДГОТОВКУ. Стеля вище рахує лише успішні перекази
+  // (bumpUsage стоїть у submit), тож до двадцятого завершеного переказу
+  // prepare можна було кликати нескінченно — а кожен виклик це 3+ звернення до
+  // вузла Solana, який і без того ріже нас 429. У саму квоту переказів це
+  // писати не можна: підготував і передумав — квота не має згоряти.
+  const usedPrep = await usageToday(req.nick, 'token_transfer_prepare');
+  if (usedPrep !== null && usedPrep >= TOKEN_DEPOSIT_PREPARE_DAILY) {
+    return res.json({ ok: false, error: 'Ліміт на сьогодні вичерпано', code: 'err_transfer_daily_limit' });
+  }
+  await bumpUsage(req.nick, 'token_transfer_prepare');
 
   try {
     const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
