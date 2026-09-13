@@ -5040,6 +5040,38 @@ app.get('/keys', async (req, res) => {
   res.json({ ok: true, pubkey: newest, keys });
 });
 
+// Ключі всіх учасників групи — для наскрізного шифрування групових повідомлень.
+// Клієнт шифрує кожне повідомлення для всіх пристроїв усіх ПОТОЧНИХ учасників,
+// тож спільного ключа групи немає: новий учасник бачить лише надіслане після
+// його появи, а вилученому нові повідомлення просто не шифруються.
+// Віддається ЛИШЕ учаснику: інакше список ключів видавав би склад закритої групи.
+// Відповідь по учасниках, а не плоским списком: клієнт має знати, чи в КОЖНОГО
+// є ключ (стара збірка без ключа не прочитала б нічого).
+app.get('/group/keys', async (req, res) => {
+  const groupId = parseInt(req.query.groupId, 10);
+  if (!Number.isFinite(groupId)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  const { data: me } = await supabase.from('group_members').select('nick').eq('group_id', groupId).eq('nick', req.nick).maybeSingle();
+  if (!me) return res.status(403).json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  const { data: mem } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
+  const nicks = (mem || []).map(m => m.nick);
+  const byNick = Object.fromEntries(nicks.map(n => [n, new Set()]));
+  if (nicks.length) {
+    const { data: users } = await supabase.from('users').select('nick, e2ee_pubkey').in('nick', nicks);
+    for (const u of users || []) if (u.e2ee_pubkey && byNick[u.nick]) byNick[u.nick].add(u.e2ee_pubkey);
+    if (MULTI_DEVICE) {
+      const { data: devs } = await supabase.from('user_devices')
+        .select('nick, e2ee_pubkey, last_seen').in('nick', nicks).is('revoked_at', null);
+      const cutoff = Date.now() - DEVICE_STALE_MS;
+      for (const d of devs || []) {
+        if (!d.e2ee_pubkey || !byNick[d.nick]) continue;
+        if (d.last_seen && Number(d.last_seen) < cutoff) continue;
+        byNick[d.nick].add(d.e2ee_pubkey);
+      }
+    }
+  }
+  res.json({ ok: true, members: nicks.map(n => ({ nick: n, keys: [...byNick[n]] })) });
+});
+
 app.post('/update-avatar', async (req, res) => {
   const { avatarUrl } = req.body; const nick = req.nick; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий', code: 'err_param_nick' });
   if (!isOurMediaUrl(avatarUrl)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
@@ -9480,6 +9512,8 @@ const FILE_MIN_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 // конверт стане нечитабельним назавжди; тому задовге ВІДХИЛЯЄМО.
 // 20 000 — це 4096 символів будь-якою мовою після E2EE (укр. 4096 → ≈11 000).
 const TEXT_MAX = 20000;
+const E2EE_MULTI_MARKER = '[e2e2]';
+const SEALED_EXTRA_MAX = 36000;
 const REPLY_TEXT_MAX = 8000;
 const REPLY_IMAGE_MAX = 200000;   // base64-мініатюра цитати
 const FILE_NAME_MAX = 255;
@@ -9520,7 +9554,11 @@ function wsRateExceeded(ws, type) {
 
 function textTooLong(o) {
   if (!o) return false;
-  const over = (v, max) => typeof v === 'string' && v.length > max;
+  // Зашифрований текст довший за відкритий: у груповому конверті по 92 байти на
+  // кожен пристрій кожного учасника (до 255 слотів ≈ 32 КБ у base64) плюс сам
+  // текст. Відкритий текст обмежений так само, як і був.
+  const over = (v, max) => typeof v === 'string'
+      && v.length > (v.startsWith(E2EE_MULTI_MARKER) ? max + SEALED_EXTRA_MAX : max);
   return over(o.text, TEXT_MAX) || over(o.content, TEXT_MAX)
       || over(o.caption, TEXT_MAX)
       || over(o.replyToText, REPLY_TEXT_MAX)
