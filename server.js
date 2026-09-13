@@ -23,11 +23,20 @@ const COMPANY_NICK = 'EION';
 // EION_ADMIN_SECRET (змінна оточення Render — НЕ в коді, НЕ в БД). Нік
 // підробити легко, секрет — ні. Якщо секрет не налаштовано → нікому не адмін
 // (безпечний дефолт). Це єдине джерело правди для всіх привілейованих дій.
+// Порівняння за сталий час: звичайне === зупиняється на першій розбіжності,
+// тож із мережі можна помалу вгадувати секрет побайтово. Практично це складно
+// (шум мережі більший за різницю), але коштує один виклик — аудит #17.
+function safeEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const ba = Buffer.from(a), bb = Buffer.from(b);
+  // timingSafeEqual вимагає однакової довжини, а сама довжина не секрет.
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
 function isAdmin(req) {
   const secret = process.env.EION_ADMIN_SECRET;
   if (!secret) return false;
-  const provided = req.headers['x-admin-secret'];
-  return typeof provided === 'string' && provided.length > 0 && provided === secret;
+  return safeEq(req.headers['x-admin-secret'], secret);
 }
 // Комісія за переказ монет між користувачами (%). Відраховується ІЗ суми
 // (отримувач отримує менше), решта → COMPANY_NICK. Керований параметр:
@@ -7902,7 +7911,7 @@ ${card('Сервер', [
 // тільки заголовок.
 const OVERVIEW_KEY = process.env.OVERVIEW_KEY || '';
 app.get('/admin/overview', async (req, res) => {
-  const byKey = OVERVIEW_KEY && req.query.key === OVERVIEW_KEY;
+  const byKey = !!OVERVIEW_KEY && safeEq(req.query.key, OVERVIEW_KEY);
   if (!byKey && !isAdmin(req)) return res.status(403).json({ ok: false });
   try {
     const o = await collectOverview();
