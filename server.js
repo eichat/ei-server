@@ -3197,8 +3197,13 @@ async function sendGroupInvite(groupId, groupName, inviterNick, targetNick) {
 
 // ── Реєстрація / Авторизація ──────────────────
 app.post('/register', async (req, res) => {
-  const { nick, password, email, color, phone, phoneNormalized } = req.body;
-  if (!nick || nick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)', code: 'err_nick_too_short' });
+  const { nick: rawNick, password, email, color, phone, phoneNormalized } = req.body;
+  // 🔴 Обрізаємо ПЕРЕД усім: довжина перевірялась на trim(), а зберігався й
+  // порівнювався сирий рядок. Тобто нік " void " проходив, у списку чатів
+  // виглядав як «void», а nick_lower із пробілами вважався ІНШИМ ніком —
+  // тобто це була підміна особи, а не косметика (аудит 13.09).
+  const nick = typeof rawNick === 'string' ? rawNick.trim() : rawNick;
+  if (!nick || nick.length < 2) return res.json({ ok: false, error: 'Нік занадто короткий (мін. 2 символи)', code: 'err_nick_too_short' });
   if (!nickLooksSafe(nick)) return res.json({ ok: false, error: 'Нік містить недопустимі символи', code: 'err_nick_bad_chars' });
   if (!password || password.length < 8) return res.json({ ok: false, error: 'Пароль занадто короткий (мін. 8 символів)', code: 'err_password_too_short' });
   if (email && !email.includes('@')) return res.json({ ok: false, error: 'Невірний email', code: 'err_invalid_email' });
@@ -3352,14 +3357,17 @@ app.post('/reset', async (req, res) => {
 });
 
 app.post('/update-nick', async (req, res) => {
-  const { password, newNick } = req.body; const nick = req.nick;
+  const { password, newNick: rawNewNick } = req.body; const nick = req.nick;
+  // Той самий trim, що в /register: інакше зміною ніка можна було б обійти
+  // перевірку зайнятості й узяти візуального двійника чужого ніка.
+  const newNick = typeof rawNewNick === 'string' ? rawNewNick.trim() : rawNewNick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
   if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
   pwFails.delete(user.nick);
-  if (!newNick || newNick.trim().length < 2) return res.json({ ok: false, error: 'Нік занадто короткий', code: 'err_nick_too_short' });
+  if (!newNick || newNick.length < 2) return res.json({ ok: false, error: 'Нік занадто короткий', code: 'err_nick_too_short' });
   if (!nickLooksSafe(newNick)) return res.json({ ok: false, error: 'Нік містить недопустимі символи', code: 'err_nick_bad_chars' });
   const { data: exists } = await supabase.from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
   if (exists) return res.json({ ok: false, error: 'Нік вже зайнятий', code: 'err_nick_taken' });
