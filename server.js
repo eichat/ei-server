@@ -6699,7 +6699,7 @@ app.post('/group/update', async (req, res) => {
   await supabase.from('groups').update(updates).eq('id', groupId);
   // У базі аватар — реф eion://, а список чатів малює адресу як є. Тож у подію
   // кладемо вже підписану (як /group/list), інакше аватар не показався б.
-  const gEvent = { type: 'group_updated', groupId: Number(groupId), ...updates };
+  const gEvent = { ...updates, type: 'group_updated', groupId: Number(groupId) };
   if (updates.avatar_url) gEvent.avatar_url = await signMediaRef(updates.avatar_url);
   await notifyMembers(groupId, gEvent);
   res.json({ ok: true });
@@ -7497,7 +7497,13 @@ app.post('/channel/update', async (req, res) => {
   await supabase.from('channels').update(updates).eq('id', channelId);
   // Підписникам (і іншим пристроям автора) — наживо. Доти події не було
   // взагалі: новий аватар чи назва зʼявлялись лише після перезапуску.
-  const cEvent = { type: 'channel_updated', channelId: Number(channelId), ...updates };
+  // ⚠️ Тип КАНАЛУ — окремим полем channelType. У `updates` він лежить під
+  // ключем `type`, і розгортання `...updates` перезаписувало тип самої ПОДІЇ:
+  // застосунок (він шле тип разом з аватаром) отримував подію «public» і
+  // мовчки її ігнорував.
+  const { type: channelType, ...rest } = updates;
+  const cEvent = { ...rest, type: 'channel_updated', channelId: Number(channelId) };
+  if (channelType !== undefined) cEvent.channelType = channelType;
   if (updates.avatar_url) cEvent.avatar_url = await signMediaRef(updates.avatar_url);
   await notifyChannelSubscribers(channelId, cEvent);
   res.json({ ok: true });
