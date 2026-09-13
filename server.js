@@ -5641,6 +5641,10 @@ app.post('/group/set-moderator', async (req, res) => {
   const { groupId, targetNick, isModerator } = req.body; const requesterNick = req.nick;
   const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
   if (!member || member.role !== 'creator') return res.json({ ok: false, error: 'Тільки творець може призначати модераторів', code: 'err_only_creator_set_mod' });
+  // Роль творця не чіпаємо: інакше він одним запитом знижував себе до учасника,
+  // і група лишалась без нікого, хто може призначати модераторів чи змінювати
+  // її налаштування — стан незворотний.
+  if (targetNick === requesterNick) return res.json({ ok: false, error: 'Роль творця змінити не можна', code: 'err_cannot_change_creator' });
   const newRole = isModerator ? 'moderator' : 'member';
   await supabase.from('group_members').update({ role: newRole }).eq('group_id', groupId).eq('nick', targetNick);
   await notifyMembers(groupId, { type: 'group_role_changed', groupId, nick: targetNick, role: newRole });
@@ -5660,6 +5664,16 @@ app.post('/group/add-member', async (req, res) => {
 app.post('/group/remove-member', async (req, res) => {
   const { groupId, targetNick } = req.body; const requesterNick = req.nick;
   if (requesterNick !== targetNick && !(await isModOrCreator(groupId, requesterNick))) return res.json({ ok: false, error: 'Тільки модератор або творець може видаляти учасників', code: 'err_only_mod_remove_member' });
+  // 🔴 Творця виганяти НЕ можна: isModOrCreator пропускає й модератора, а ціль
+  // не перевірялась — тобто модератор виставляв творця з його ж групи й
+  // лишався головним. Це підвищення привілеїв, а не просто груба дія.
+  // Сам вихід творця лишаємо: це його право (для повного прибирання є
+  // /group/delete).
+  if (requesterNick !== targetNick) {
+    const { data: tgt } = await supabase.from('group_members')
+      .select('role').eq('group_id', groupId).eq('nick', targetNick).maybeSingle();
+    if (tgt && tgt.role === 'creator') return res.json({ ok: false, error: 'Творця видалити не можна', code: 'err_cannot_remove_creator' });
+  }
   await supabase.from('group_members').delete().eq('group_id', groupId).eq('nick', targetNick);
   sendToUser(targetNick, { type: 'group_removed', groupId });
   await notifyMembers(groupId, { type: 'group_member_removed', groupId, nick: targetNick });
@@ -7181,6 +7195,9 @@ app.post('/channel/set-admin', async (req, res) => {
   const { channelId, targetNick, isAdmin } = req.body; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || member.role !== 'owner') return res.json({ ok: false, error: 'Тільки власник може призначати адмінів', code: 'err_only_owner_set_admin' });
+  // Те саме, що з творцем групи: власник не має змоги знизити сам себе до
+  // підписника й лишити канал без керування.
+  if (targetNick === ownerNick) return res.json({ ok: false, error: 'Роль власника змінити не можна', code: 'err_cannot_change_owner' });
   await supabase.from('channel_members').update({ role: isAdmin ? 'admin' : 'subscriber' }).eq('channel_id', channelId).eq('nick', targetNick);
   res.json({ ok: true });
 });
