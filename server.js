@@ -8976,8 +8976,13 @@ function wsRateExceeded(ws, type) {
     ws.rateWin = now; ws.rateContent = 0; ws.rateFrames = 0;
   }
   ws.rateFrames++;
-  if (WS_CONTENT_TYPES.has(type)) ws.rateContent++;
-  return ws.rateFrames > WS_FRAMES_MAX || ws.rateContent > WS_CONTENT_MAX;
+  if (ws.rateFrames > WS_FRAMES_MAX) return true;
+  // ⚠️ Стеля вмісту блокує ТІЛЬКИ вміст. Спершу вона рубала будь-який
+  // наступний кадр у вікні — тобто після пачки пересланих повідомлень
+  // переставали ходити ack, typing і ICE, і ламався навіть дзвінок.
+  if (!WS_CONTENT_TYPES.has(type)) return false;
+  ws.rateContent++;
+  return ws.rateContent > WS_CONTENT_MAX;
 }
 
 function textTooLong(o) {
