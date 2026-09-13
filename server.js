@@ -535,7 +535,7 @@ app.get('/keepalive', async (req, res) => {
 // Приватна статистика — лише за секретним токеном з env (STATS_KEY).
 app.get('/stats', (req, res) => {
   const key = process.env.STATS_KEY;
-  if (!key || req.query.key !== key) return res.status(403).json({ ok: false });
+  if (!key || !safeEq(req.query.key, key)) return res.status(403).json({ ok: false });
   const mem = process.memoryUsage();
   res.json({
     ok: true,
@@ -6525,6 +6525,18 @@ app.post('/admin/sticker-review', async (req, res) => {
   else if (action === 'unpublish') { patch.is_active = false; }
   else { patch.status = 'rejected'; patch.is_active = false; patch.reject_reason = (reason || '').slice(0, 300) || null; }
   await supabase.from('sticker_packs').update(patch).eq('id', packId);
+
+  // 🔴 Відхилений набір — це вміст, який модерація визнала неприйнятним, а
+  // файли лежать у ПУБЛІЧНОМУ бакеті `stickers` (їх кладе туди подача, ще до
+  // розгляду). Без цього рядка вони лишались там назавжди, доступні за прямим
+  // посиланням, яке автор знає. Коментар до ugcRemovePackFiles обіцяв саме це,
+  // але виклику не було — знайдено аудитом 13.09.
+  // При `unpublish` файли НЕ чіпаємо: набір лишається схваленим, і покупці
+  // мають ним користуватись.
+  if (patch.status === 'rejected') {
+    await ugcRemovePackFiles(packId);
+    await supabase.from('sticker_pack_items').delete().eq('pack_id', packId);
+  }
 
   sendToUser(pack.author_nick, {
     type: 'sticker_pack_reviewed', packId, title: pack.title,
