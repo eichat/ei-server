@@ -1018,6 +1018,13 @@ app.get('/link-preview', async (req, res) => {
   if (!url) return res.json({ ok: false, error: 'url обов\'язковий', code: 'err_param_url' });
   const cached = linkPreviewCache.get(url);
   if (cached) return res.json({ ok: true, ...cached.data });
+  // Стеля рахується ПІСЛЯ кешу: повторне відкриття того самого посилання
+  // зовнішнього запиту не робить, тож і норму витрачати не має.
+  const usedLp = await usageToday(req.nick, 'link_preview');
+  if (usedLp !== null && usedLp >= LINK_PREVIEW_DAILY) {
+    return res.json({ ok: false, error: 'Ліміт на сьогодні вичерпано', code: 'err_transfer_daily_limit' });
+  }
+  await bumpUsage(req.nick, 'link_preview');
   try {
     await assertPublicUrl(url); // SSRF-захист
     const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
@@ -4521,6 +4528,11 @@ app.post('/token/deposit-prepare', async (req, res) => {
   const { data: user } = await supabase.from('users').select('solana_address').eq('nick', req.nick).single();
   const owner = user && user.solana_address;
   if (!owner) return res.json({ ok: false, error: 'Спершу вкажіть адресу Solana', code: 'err_payout_no_address' });
+  const usedPrep = await usageToday(req.nick, 'token_deposit_prepare');
+  if (usedPrep !== null && usedPrep >= TOKEN_DEPOSIT_PREPARE_DAILY) {
+    return res.json({ ok: false, error: 'Ліміт на сьогодні вичерпано', code: 'err_transfer_daily_limit' });
+  }
+  await bumpUsage(req.nick, 'token_deposit_prepare');
 
   try {
     const { Connection, PublicKey, Transaction } = require('@solana/web3.js');
@@ -4606,6 +4618,14 @@ app.post('/token/deposit-submit', async (req, res) => {
 // Без стелі один користувач міг би ганяти переказ туди-сюди й спорожнити
 // гаманець обміну.
 const TOKEN_TRANSFER_DAILY = Number(process.env.TOKEN_TRANSFER_DAILY || 20);
+// Те саме для підготовки поповнення: кожен виклик — 2-3 звернення до вузла
+// Solana, а публічний devnet ріже їх 429-ю (13.09 через це стояла чистка
+// депозитів). Без стелі один клієнт міг вичерпати вузол для всіх.
+const TOKEN_DEPOSIT_PREPARE_DAILY = Number(process.env.TOKEN_DEPOSIT_PREPARE_DAILY || 30);
+// Прев'ю посилань ходить у зовнішній світ НАШИМ IP. Кеш допомагає лише для
+// повторних адрес; без стелі сервер — безкоштовний проксі на 120 запитів/хв
+// (стільки дає загальний rate-limit), і наш IP світиться в чужих логах.
+const LINK_PREVIEW_DAILY = Number(process.env.LINK_PREVIEW_DAILY || 200);
 const pendingTokenTransfer = new Map();   // nick → { message, ... }
 
 /// Кому надсилаємо: нік нашого користувача або зовнішня адреса.
@@ -8624,8 +8644,12 @@ wss.on('connection', (ws) => {
         const path = storagePathFromUrl(msg.fileUrl || msg.path || msg.fileData || '');
         if (path && userNick) {
           try {
-            const { data: rows } = await supabase.from('file_objects').select('downloaded_by').eq('storage_path', path).limit(1);
-            if (rows && rows.length) {
+            const { data: rows } = await supabase.from('file_objects').select('downloaded_by, recipients').eq('storage_path', path).limit(1);
+            // Позначити «забрав» може лише той, кому файл призначений: шлях
+            // приходить від клієнта, тож сторонній інакше дописував би себе в
+            // облік чужого файлу. Саму чистку це не прискорювало (вона звіряє
+            // recipients), але дані засмічувало.
+            if (rows && rows.length && (rows[0].recipients || []).includes(userNick)) {
               const set = new Set(rows[0].downloaded_by || []);
               if (!set.has(userNick)) { set.add(userNick); await supabase.from('file_objects').update({ downloaded_by: [...set] }).eq('storage_path', path); }
             }
@@ -8709,6 +8733,13 @@ wss.on('connection', (ws) => {
       if (msg.type === 'reaction') {
         const { msgId, emoji, chatNick, groupId } = msg;
         if (groupId) {
+          // Членство обовʼязкове: сусідні edit_group_message і
+          // delete_group_message його перевіряють, а реакція ні — тож сторонній
+          // ставив реакцію в ЗАКРИТУ групу, і вона розліталась усім учасникам.
+          // msgId груп передбачуваний (`нік_g<id>_<час>`), тож вгадати легко.
+          const { data: rMember } = await supabase.from('group_members')
+            .select('nick').eq('group_id', groupId).eq('nick', userNick).maybeSingle();
+          if (!rMember) return;
           const { data: ex } = await supabase.from('group_message_reactions').select('id').eq('msg_id', msgId).eq('group_id', groupId).eq('nick', userNick).eq('emoji', emoji).maybeSingle();
           if (ex) { await supabase.from('group_message_reactions').delete().eq('id', ex.id); }
           else {
@@ -8724,6 +8755,8 @@ wss.on('connection', (ws) => {
             if (pErr) console.log(`[reaction] pending INSERT FAILED to=${m.nick}: ${pErr.message}`);
           }
         } else if (chatNick) {
+          // Реакція — теж контакт, тож блокування має її спиняти (як typing).
+          if (typeof chatNick !== 'string' || !(await canSignalTo(userNick, chatNick))) return;
           const pairKey = [userNick, chatNick].sort().join('|');
           const { data: dex } = await supabase.from('direct_message_reactions').select('id').eq('msg_id', msgId).eq('from_nick', userNick).eq('emoji', emoji).maybeSingle();
           if (dex) { await supabase.from('direct_message_reactions').delete().eq('id', dex.id); }
