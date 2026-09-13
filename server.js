@@ -4895,7 +4895,12 @@ app.post('/call-log', async (req, res) => {
 });
 
 app.get('/call-logs', async (req, res) => {
-  const { nick, otherNick } = req.query; if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  // 🔴 Свій нік — ІЗ СЕСІЇ. З query обидва endpoint працювали з ЧУЖОЮ парою:
+  // GET віддавав історію дзвінків між двома довільними людьми, а DELETE —
+  // СТИРАВ її (аудит 13.09). otherNick лишається параметром: це співрозмовник.
+  const nick = req.nick;
+  const { otherNick } = req.query;
+  if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   // Пара ніків через .in(): значення екрануються клієнтом, тоді як рядковий
   // `or=(...)` дозволяв дописати умову — обидва ніки приходять із запиту.
   // from і to з одного набору = рівно розмова цієї пари.
@@ -4906,7 +4911,12 @@ app.get('/call-logs', async (req, res) => {
 });
 
 app.delete('/call-logs', async (req, res) => {
-  const { nick, otherNick } = req.query; if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  // 🔴 Свій нік — ІЗ СЕСІЇ. З query обидва endpoint працювали з ЧУЖОЮ парою:
+  // GET віддавав історію дзвінків між двома довільними людьми, а DELETE —
+  // СТИРАВ її (аудит 13.09). otherNick лишається параметром: це співрозмовник.
+  const nick = req.nick;
+  const { otherNick } = req.query;
+  if (!nick || !otherNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   await supabase.from('call_logs').delete()
     .in('from_nick', [nick, otherNick]).in('to_nick', [nick, otherNick]);
   res.json({ ok: true });
@@ -5193,7 +5203,9 @@ app.get('/deletions', async (req, res) => {
 });
 
 app.get('/missed-calls', async (req, res) => {
-  const { nick, since } = req.query;
+  // Нік — ІЗ СЕСІЇ: з query можна було подивитись пропущені дзвінки будь-кого.
+  const nick = req.nick;
+  const { since } = req.query;
   if (!nick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const sinceTs = parseInt(since, 10) || 0;
   const { data } = await supabase.from('call_logs')
