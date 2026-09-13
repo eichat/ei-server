@@ -269,6 +269,24 @@ const CLEANUP_BATCH = 500;
 // Стелі на створення груп і каналів (аудит 13.09: не було жодної).
 // Без них скрипт створював тисячі груп, слав тисячі запрошень одним запитом
 // і клав у БД назву на кілька мегабайтів (express.json пропускає до 4 МБ).
+// 🔴 Аватари й будь-які картинки, що їх задає користувач, мають лежати В НАС.
+// Доти /update-avatar і /channel/update приймали довільний URL, а клієнт
+// малює його через NetworkImage — тобто власник профілю чи каналу бачив IP
+// КОЖНОГО, хто просто побачив його аватар у списку чатів або відкрив канал.
+// Третій шлях того самого класу, що витік через fileData і прев'ю посилань.
+const OUR_MEDIA_HOSTS = /(^|\.)supabase\.co$/i;
+function isOurMediaUrl(v) {
+  if (v === null || v === undefined || v === '') return true;   // «прибрати аватар»
+  if (typeof v !== 'string') return false;
+  if (v.startsWith('eion://')) return true;                     // наш реф
+  let h;
+  try { h = new URL(v).hostname.toLowerCase(); } catch (_) { return false; }
+  return OUR_MEDIA_HOSTS.test(h) || h === new URL(PUBLIC_BASE_URL).hostname;
+}
+// Типи каналу — рівно ті, що розуміє решта коду: пошук шукає 'public',
+// перевірка приватності дивиться на 'private'. Довільне значення не є ні тим,
+// ні тим, і канал тихо випадає з обох гілок.
+const CHANNEL_TYPES = ['public', 'private'];
 const ENTITY_NAME_MAX = 64;      // назва групи/каналу
 const ENTITY_DESC_MAX = 512;     // опис каналу
 const ENTITY_PER_USER_MAX = 100; // скільки груп / каналів може мати акаунт
@@ -5014,6 +5032,7 @@ app.get('/keys', async (req, res) => {
 
 app.post('/update-avatar', async (req, res) => {
   const { avatarUrl } = req.body; const nick = req.nick; if (!nick) return res.json({ ok: false, error: 'Нік обов\'язковий', code: 'err_param_nick' });
+  if (!isOurMediaUrl(avatarUrl)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   await supabase.from('users').update({ avatar_url: avatarUrl || null }).eq('nick', nick);
   for (const [n, user] of onlineUsers) if (n !== nick) user.ws.send(JSON.stringify({ type: 'avatar_changed', nick, avatarUrl: avatarUrl || null }));
   res.json({ ok: true });
@@ -6654,8 +6673,9 @@ app.post('/group/update', async (req, res) => {
   const { data: member } = await supabase.from('group_members').select('role').eq('group_id', groupId).eq('nick', requesterNick).single();
   if (!member || !['creator', 'moderator'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
   const updates = {};
-  if (name !== undefined && name.trim().length > 0) updates.name = name.trim();
-  if (avatarUrl !== undefined) updates.avatar_url = avatarUrl;
+  if (!isOurMediaUrl(avatarUrl)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  if (name !== undefined && name.trim().length > 0) updates.name = name.trim().slice(0, ENTITY_NAME_MAX);
+  if (avatarUrl !== undefined) updates.avatar_url = avatarUrl || null;
   if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати', code: 'err_nothing_to_update' });
   await supabase.from('groups').update(updates).eq('id', groupId);
   await notifyMembers(groupId, { type: 'group_updated', groupId, ...updates });
@@ -7438,11 +7458,17 @@ app.post('/channel/update', async (req, res) => {
   if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  if (!isOurMediaUrl(avatar_url)) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const updates = {};
-  if (name !== undefined) updates.name = name;
-  if (description !== undefined) updates.description = description;
-  if (type !== undefined) updates.type = type;
-  if (avatar_url !== undefined) updates.avatar_url = avatar_url;
+  // Обрізаємо так само, як /channel/create: доти оновлення приймало назву й
+  // опис БУДЬ-ЯКОЇ довжини (до 4 МБ, скільки пускає express.json), і вони
+  // потім летіли в списки всім підписникам.
+  if (typeof name === 'string' && name.trim()) updates.name = name.trim().slice(0, ENTITY_NAME_MAX);
+  if (description !== undefined) updates.description = String(description || '').slice(0, ENTITY_DESC_MAX) || null;
+  // Тип — лише з переліку: довільне значення тихо ламало логіку (пошук шукає
+  // 'public', перевірка приватності — 'private', а все інше не є ні тим, ні тим).
+  if (type !== undefined && CHANNEL_TYPES.includes(type)) updates.type = type;
+  if (avatar_url !== undefined) updates.avatar_url = avatar_url || null;
   if (comments_allow_media !== undefined) updates.comments_allow_media = comments_allow_media;
   if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати', code: 'err_nothing_to_update' });
   await supabase.from('channels').update(updates).eq('id', channelId);
@@ -7592,7 +7618,16 @@ app.get('/admin/orphan-groups', async (req, res) => {
 app.post('/report', async (req, res) => {
   const { targetNick, reason, context } = req.body; const reporterNick = req.nick;
   if (!reporterNick || !targetNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
-  await supabase.from('reports').insert({ reporter_nick: reporterNick, target_nick: targetNick, reason: reason || null, context: context || null, created_at: Date.now() });
+  // Обрізаємо: доти скарга приймала до 4 МБ тексту (стеля express.json), а
+  // загальний rate-limit дає 120 запитів/хв — тобто безкоштовну базу на 500 МБ
+  // можна було забити за хвилину, і це найдешевша атака в усьому API.
+  await supabase.from('reports').insert({
+    reporter_nick: reporterNick,
+    target_nick: String(targetNick).slice(0, 64),
+    reason: reason ? String(reason).slice(0, 500) : null,
+    context: context ? String(context).slice(0, 2000) : null,
+    created_at: Date.now(),
+  });
   res.json({ ok: true });
 });
 
