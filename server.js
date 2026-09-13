@@ -34,6 +34,9 @@ function isAdmin(req) {
 // 0 = без комісії. На малих сумах Math.floor може дати 0 (це нормально для 1%).
 // При запуску токена підняти за потреби (покриття газу мережі).
 const TRANSFER_FEE_PCT = 1;
+// Стеля одного переказу. Баланс і так обмежує, але без неї в журнал монет
+// потрапляли б абсурдні числа з кривих запитів.
+const COIN_TRANSFER_MAX = 1000000;
 // Ціни преміуму — на рівні модуля: їх читає і покупка, і довідка, яку сервер
 // підкладає AI-асистенту. Дві копії розійшлись би тихо, і асистент упевнено
 // називав би стару ціну.
@@ -4827,9 +4830,17 @@ app.post('/update-status', async (req, res) => {
 });
 
 app.post('/transfer-coins', async (req, res) => {
-  const { toNick, amount } = req.body;
+  const { toNick } = req.body;
   const fromNick = req.nick; // Фаза 1: платник — ЛИШЕ автентифікований юзер, не з тіла.
-  if (!fromNick || !toNick || !amount || amount < 1) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  // 🔴 Нормалізуємо суму так само, як у /token/payout. Раніше перевірка була
+  // `!amount || amount < 1`, тож проходили дробові (1.5), рядки ("1e10") і
+  // навіть Infinity — далі вони йшли просто в SQL. Вкрасти це не давало
+  // (spend_coins_split атомарно звіряє баланс), але давало сміття в журналі
+  // монет і 500 на NaN (аудит 13.09).
+  const amount = Math.floor(Number(req.body.amount));
+  if (!fromNick || !toNick || !Number.isFinite(amount) || amount < 1 || amount > COIN_TRANSFER_MAX) {
+    return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  }
   if (fromNick === toNick) return res.json({ ok: false, error: 'Не можна переказати собі', code: 'err_cannot_transfer_self' });
   const { data: receiver } = await supabase.from('users').select('nick').eq('nick', toNick).single();
   if (!receiver) return res.json({ ok: false, error: 'Отримувача не знайдено', code: 'err_recipient_not_found' });
