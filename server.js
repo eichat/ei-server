@@ -830,10 +830,12 @@ const callBindings = new Map();   // `нік1|нік2` (посортовано) 
 const callKey = (a, b) => [a, b].sort().join('|');
 
 function bindCallDevice(a, b, nick, deviceId) {
-  if (!MULTI_DEVICE || !deviceId) return;
+  // Запис створюється ЗАВЖДИ — він же реєстр «між цими двома є дзвінок», на
+  // якому тримається перевірка в sendToCallPeer. Прив'язка до конкретного
+  // пристрою лишається як була: лише при MULTI_DEVICE і відомому deviceId.
   const k = callKey(a, b);
   const cur = callBindings.get(k) || {};
-  cur[nick] = deviceId;
+  if (MULTI_DEVICE && deviceId) cur[nick] = deviceId;
   cur.at = Date.now();
   callBindings.set(k, cur);
 }
@@ -845,7 +847,14 @@ function unbindCall(a, b) { callBindings.delete(callKey(a, b)); }
 function sendToCallPeer(toNick, otherNick, payload) {
   const target = onlineUsers.get(toNick);
   if (!target || !target.ws || target.ws.readyState !== 1) return false;
-  const bound = MULTI_DEVICE ? (callBindings.get(callKey(toNick, otherNick)) || {})[toNick] : null;
+  // 🔴 Сигналізація — тільки в межах наявного дзвінка. Доти сервер доставляв
+  // call_ice / call_renegotiate / call_video_state будь-кому, а клієнт не
+  // звіряє поле `from` із поточним співрозмовником: сторонній міг підкинути
+  // свій SDP чи ICE-кандидати в ЧУЖУ активну розмову. Пара реєструється в
+  // call_offer і знімається в call_reject / call_end (аудит 13.09).
+  const pair = callBindings.get(callKey(toNick, otherNick));
+  if (!pair) return false;
+  const bound = MULTI_DEVICE ? pair[toNick] : null;
   if (bound) {
     const socks = deviceSessions.get(toNick);
     if (socks) {
@@ -966,6 +975,7 @@ setInterval(() => {
   for (const [k, v] of callBindings) if (now - (v.at || 0) > 2 * 60 * 60 * 1000) callBindings.delete(k);
   for (const [url, data] of linkPreviewCache) if (now > data.expires) linkPreviewCache.delete(url);
   for (const [p, exp] of verifiedPhones) if (now > exp) verifiedPhones.delete(p);
+  for (const [k, c] of signalBlockCache) if (now > c.exp) signalBlockCache.delete(k);
 }, 120000);
 
 // ── Захист від SSRF (аудит #6) ────────────────
@@ -3184,6 +3194,22 @@ async function canReceiveFrom(senderNick, recipientNick) {
   const { data: allowed } = await supabase.from('block_allowlist').select('owner_nick')
     .eq('owner_nick', recipientNick).eq('allowed_nick', senderNick).maybeSingle();
   return !!allowed;
+}
+
+// Чи можна слати НЕтекстовий сигнал (typing, запит на спілкування). Окремо від
+// canReceiveFrom, бо кешується: сигнали йдуть часто, а блокування міняється
+// рідко. Ціна кешу — до хвилини після зміни блоку рішення старе; для «друкує»
+// це прийнятно, а от повідомлення й дзвінки перевіряються без кешу, як були.
+const signalBlockCache = new Map();   // 'sender>recipient' -> { v, exp }
+async function canSignalTo(sender, recipient) {
+  if (!sender || !recipient) return false;
+  const k = `${sender}>${recipient}`;
+  const now = Date.now();
+  const c = signalBlockCache.get(k);
+  if (c && c.exp > now) return c.v;
+  const v = !(await isBlockedBy(recipient, sender)) && (await canReceiveFrom(sender, recipient));
+  signalBlockCache.set(k, { v, exp: now + 60000 });
+  return v;
 }
 
 // Коли власник блоку САМ пише комусь за активного блоку — додаємо адресата
@@ -5522,7 +5548,10 @@ app.post('/chat/mark-read', async (req, res) => {
 });
 
 app.get('/group/search', async (req, res) => {
-  const { query, nick } = req.query;
+  // Нік ІЗ СЕСІЇ: він тут вирішує, які групи приховати як «ви вже в них». З
+  // чужим ніком у query видача показувала б, у яких публічних групах людина
+  // складається — витік соціального графа, як з /contact/blocked-list.
+  const { query } = req.query; const nick = req.nick;
   if (!query || query.trim().length < 2) return res.json({ ok: false, error: 'Введіть мін. 2 символи', code: 'err_query_too_short' });
   const { data: groups } = await supabase.from('groups').select('*').ilike('name', `%${query}%`).in('type', ['open', 'approval']);
   const result = [];
@@ -5609,7 +5638,9 @@ app.post('/group/remove-member', async (req, res) => {
 });
 
 app.get('/group/join-requests', async (req, res) => {
-  const { groupId, nick } = req.query;
+  // Актор ІЗ СЕСІЇ: інакше заявки на вступ до чужої групи читав будь-хто, хто
+  // знає нік її модератора.
+  const { groupId } = req.query; const nick = req.nick;
   if (!(await isModOrCreator(groupId, nick))) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
   const { data } = await supabase.from('group_join_requests').select('*').eq('group_id', groupId).eq('status', 'pending');
   res.json({ ok: true, requests: data || [] });
@@ -6062,15 +6093,17 @@ app.post('/shop/buy-pack', async (req, res) => {
   // Записуємо власність. Якщо провалилось — повертаємо коіни (щоб не списати даремно).
   const { error: ownErr } = await supabase.from('user_sticker_packs').insert({ nick, pack_id: packId });
   if (ownErr) {
-    // Можливо, паралельний запит уже записав власність (гонка) — перевіряємо.
+    // Повертаємо ВНУТРІШНІМИ навмисно (як і решта відкатів): інакше
+    // «витратив внутрішні → домігся збою → отримав виведені» відмивало б бонус.
+    await supabase.rpc('add_coins', { p_nick: nick, p_amount: price });
+    await logTx({ fromNick: null, toNick: nick, amount: price, kind: 'pack_refund', ref: packId });
+    // Паралельний запит уже записав власність (подвійний тап). 🔴 Доти ця гілка
+    // йшла ДАЛІ без повернення: обидва запити списували ціну, автор отримував
+    // частку двічі, а пак покупець мав один. Тепер зайве списання завжди
+    // повертається, а гонка віддає той самий результат, що й повторна купівля.
     const { data: recheck } = await supabase.from('user_sticker_packs').select('pack_id').eq('nick', nick).eq('pack_id', packId).maybeSingle();
-    if (!recheck) {
-      // Повертаємо ВНУТРІШНІМИ навмисно (як і решта відкатів): інакше
-      // «витратив внутрішні → домігся збою → отримав виведені» відмивало б бонус.
-      await supabase.rpc('add_coins', { p_nick: nick, p_amount: price });
-      await logTx({ fromNick: null, toNick: nick, amount: price, kind: 'pack_refund', ref: packId });
-      return res.json({ ok: false, error: 'Помилка купівлі', code: 'err_purchase_failed' });
-    }
+    if (recheck) return res.json({ ok: true, alreadyOwned: true });
+    return res.json({ ok: false, error: 'Помилка купівлі', code: 'err_purchase_failed' });
   }
   // Розподіл після успішного запису власності — щоб при поверненні не
   // нарахувати за скасовану купівлю.
@@ -6619,9 +6652,11 @@ app.get('/channel/list', async (req, res) => {
 });
 
 app.get('/channel/search', async (req, res) => {
-  const { query, nick } = req.query;
+  // Нік ІЗ СЕСІЇ: у видачі є myRole, тож із чужим ніком можна було дізнатись,
+  // на які канали людина підписана і з якою роллю.
+  const { query } = req.query; const nick = req.nick;
   if (!query || query.trim().length < 2) return res.json({ ok: false, error: 'Введіть мін. 2 символи', code: 'err_query_too_short' });
-  // Шукаємо публічні канали — nick може бути відсутній (незареєстрований пошук)
+  // Шукаємо публічні канали (шлях автентифікований, тож nick завжди є)
   const { data: channels } = await supabase.from('channels').select('*').ilike('name', `%${query}%`).eq('type', 'public');
   const result = [];
   for (const c of channels || []) {
@@ -7039,7 +7074,10 @@ app.post('/channel/block-subscriber', async (req, res) => {
 });
 
 app.get('/channel/blocked-list', async (req, res) => {
-  const { channelId, ownerNick } = req.query;
+  // Актор ІЗ СЕСІЇ: доти роль перевірялась за ніком із query, тож досить було
+  // підставити нік справжнього власника, щоб прочитати список заблокованих у
+  // будь-якому каналі. Сусідні POST виправили ще в аудиті — читання пропустили.
+  const { channelId } = req.query; const ownerNick = req.nick;
   if (!channelId || !ownerNick) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
@@ -7073,7 +7111,9 @@ app.post('/channel/set-admin', async (req, res) => {
 });
 
 app.get('/channel/subscribers', async (req, res) => {
-  const { channelId, ownerNick } = req.query;
+  // Те саме, що з blocked-list, але наслідок гірший: повний список підписників
+  // будь-якого каналу — це соціальний граф.
+  const { channelId } = req.query; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
   const { data: members } = await supabase.from('channel_members').select('nick, role, joined_at').eq('channel_id', channelId).order('joined_at', { ascending: true });
@@ -8370,7 +8410,15 @@ wss.on('connection', (ws) => {
         const visible = onlineUsers.has(target) && !invisibleNicks.has(target);
         ws.send(JSON.stringify({ type: 'online_status', nick: msg.nick, online: visible }));
       }
-      if (msg.type === 'connect_request') { if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі`, code: 'err_user_offline', nick: msg.to })); }
+      if (msg.type === 'connect_request') {
+        // Заблокований не має навіть постукати: у жертви це виглядало б як
+        // «хоче спілкуватись» від того, кого вона прибрала.
+        if (typeof msg.to !== 'string' || !(await canSignalTo(userNick, msg.to))) {
+          ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі`, code: 'err_user_offline', nick: msg.to }));
+        } else if (!sendToUser(msg.to, { type: 'connect_request', from: userNick })) {
+          ws.send(JSON.stringify({ type: 'error', error: `${msg.to} не в мережі`, code: 'err_user_offline', nick: msg.to }));
+        }
+      }
       if (msg.type === 'connect_response') { sendToUser(msg.to, { type: 'connect_response', from: userNick, accepted: msg.accepted }); }
 
       if (msg.type === 'chat_message') {
@@ -8757,7 +8805,14 @@ wss.on('connection', (ws) => {
           await noteDeletion(userNick, msg.msgId, msg.to, 'me');
         }
       }
-      if (msg.type === 'typing') { const target = onlineUsers.get(msg.to); if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick })); }
+      if (msg.type === 'typing') {
+        // Блокування має ховати й «друкує»: інакше заблокований однаково
+        // світиться в жертви — тобто блок не робить того, заради чого існує.
+        if (typeof msg.to === 'string' && await canSignalTo(userNick, msg.to)) {
+          const target = onlineUsers.get(msg.to);
+          if (target) target.ws.send(JSON.stringify({ type: 'typing', from: userNick }));
+        }
+      }
       // Застосунковий ping тримає сокет живим для heartbeat (isAlive), а не лише
       // оновлює lastSeen: якщо Render не пропускає ПРОТОКОЛЬНІ ping/pong, сервер
       // інакше вбивав би живий сокет кожні 30с (флапінг presence/дзвінків).
