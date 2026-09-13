@@ -6697,7 +6697,11 @@ app.post('/group/update', async (req, res) => {
   if (avatarUrl !== undefined) updates.avatar_url = avatarUrl || null;
   if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати', code: 'err_nothing_to_update' });
   await supabase.from('groups').update(updates).eq('id', groupId);
-  await notifyMembers(groupId, { type: 'group_updated', groupId, ...updates });
+  // У базі аватар — реф eion://, а список чатів малює адресу як є. Тож у подію
+  // кладемо вже підписану (як /group/list), інакше аватар не показався б.
+  const gEvent = { type: 'group_updated', groupId: Number(groupId), ...updates };
+  if (updates.avatar_url) gEvent.avatar_url = await signMediaRef(updates.avatar_url);
+  await notifyMembers(groupId, gEvent);
   res.json({ ok: true });
 });
 
@@ -7491,6 +7495,11 @@ app.post('/channel/update', async (req, res) => {
   if (comments_allow_media !== undefined) updates.comments_allow_media = comments_allow_media;
   if (Object.keys(updates).length === 0) return res.json({ ok: false, error: 'Нічого оновлювати', code: 'err_nothing_to_update' });
   await supabase.from('channels').update(updates).eq('id', channelId);
+  // Підписникам (і іншим пристроям автора) — наживо. Доти події не було
+  // взагалі: новий аватар чи назва зʼявлялись лише після перезапуску.
+  const cEvent = { type: 'channel_updated', channelId: Number(channelId), ...updates };
+  if (updates.avatar_url) cEvent.avatar_url = await signMediaRef(updates.avatar_url);
+  await notifyChannelSubscribers(channelId, cEvent);
   res.json({ ok: true });
 });
 
