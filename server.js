@@ -5180,7 +5180,16 @@ async function uploadPathAllowed(nick, bucket, path) {
     if (!Number.isFinite(cid)) return false;
     const { data } = await supabase.from('channel_members')
       .select('role').eq('channel_id', cid).eq('nick', nick).maybeSingle();
-    return !!data && ['owner', 'admin'].includes(data.role);
+    if (!data) return false;
+    // Коментарі пишуть ПІДПИСНИКИ, не лише керівники — те саме правило, що в
+    // /channel/comment. Без цієї гілки після аудиту 13.09 медіа й голосові в
+    // коментарях не заливались ні в кого, крім власника й адмінів.
+    if (seg[2] === 'comments') {
+      const { data: blocked } = await supabase.from('channel_blocked')
+        .select('id').eq('channel_id', cid).eq('nick', nick).maybeSingle();
+      return !blocked;
+    }
+    return ['owner', 'admin'].includes(data.role);
   }
   return false;
 }
