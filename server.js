@@ -3915,6 +3915,12 @@ async function purgeAccountData(nick, user) {
     // налаштування акаунта — зокрема «очищено історію каналу».
     'user_prefs', 'user_stickers', 'chat_mutes', 'message_deletions',
   ];
+  // Відписка через видалення акаунта — теж відписка: інакше статистика каналів
+  // рахувала б людину назавжди підписаною.
+  try {
+    const { data: mems } = await supabase.from('channel_members').select('channel_id, role').eq('nick', nick);
+    for (const m of mems || []) if (m.role !== 'owner') await logChannelEvents(m.channel_id, 'leave', 'account_deleted');
+  } catch (_) { /* статистика не має зупиняти видалення */ }
   for (const t of byNick) await del(t, 'nick', nick);
 
   for (const [t, cols] of [
@@ -6937,6 +6943,7 @@ app.post('/channel/create', async (req, res) => {
       await supabase.from('channel_members')
         .insert(allowed.map(n => ({ channel_id: channel.id, nick: n, role: 'subscriber' })));
       added = allowed.length;
+      await logChannelEvents(channel.id, 'join', 'added', added);
     }
   }
   res.json({ ok: true, channel: { ...channel, myRole: 'owner', subscriberCount: 1 + added, lastPostAt: null, lastPostText: null } });
@@ -7012,7 +7019,8 @@ app.post('/channel/subscribe', async (req, res) => {
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі', code: 'err_blocked_in_channel' });
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
   if (existing) return res.json({ ok: false, error: 'Ви вже підписані', code: 'err_already_subscribed' });
-  await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+  const { error: subErr } = await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+  if (!subErr) await logChannelEvents(channelId, 'join', 'self');
   res.json({ ok: true });
 });
 
@@ -7022,6 +7030,7 @@ app.post('/channel/unsubscribe', async (req, res) => {
   if (!member) return res.json({ ok: false, error: 'Ви не підписані', code: 'err_not_subscribed' });
   if (member.role === 'owner') return res.json({ ok: false, error: 'Власник не може відписатись — видаліть канал', code: 'err_owner_cannot_unsub' });
   await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('nick', nick);
+  await logChannelEvents(channelId, 'leave', 'self');
   res.json({ ok: true });
 });
 
@@ -7467,7 +7476,9 @@ app.post('/channel/remove-subscriber', async (req, res) => {
   const { channelId, targetNick } = req.body; const ownerNick = req.nick;
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
-  await supabase.from('channel_members').delete().eq('channel_id', channelId).eq('nick', targetNick);
+  const { data: removed } = await supabase.from('channel_members').delete()
+    .eq('channel_id', channelId).eq('nick', targetNick).neq('role', 'owner').select('nick');
+  if (removed && removed.length) await logChannelEvents(channelId, 'leave', 'removed');
   sendToUser(targetNick, { type: 'channel_removed', channelId });
   res.json({ ok: true });
 });
@@ -7493,6 +7504,143 @@ app.get('/channel/subscribers', async (req, res) => {
   const { data: blocked } = await supabase.from('channel_blocked').select('nick').eq('channel_id', channelId);
   const blockedSet = new Set((blocked || []).map(b => b.nick));
   res.json({ ok: true, subscribers: (members || []).map(m => ({ ...m, isBlocked: blockedSet.has(m.nick) })) });
+});
+
+// Числа для меню налаштувань каналу: підписники, адміністратори, заблоковані.
+app.get('/channel/manage-counts', async (req, res) => {
+  const channelId = Number(req.query.channelId);
+  if (!channelId || !(await channelManagerRole(req.nick, channelId))) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  const head = { count: 'exact', head: true };
+  const [subs, admins, blocked] = await Promise.all([
+    supabase.from('channel_members').select('*', head).eq('channel_id', channelId),
+    supabase.from('channel_members').select('*', head).eq('channel_id', channelId).in('role', ['owner', 'admin']),
+    supabase.from('channel_blocked').select('*', head).eq('channel_id', channelId),
+  ]);
+  res.json({ ok: true, subscribers: subs.count || 0, admins: admins.count || 0, blocked: blocked.count || 0 });
+});
+
+// Усі рядки вибірки сторінками: PostgREST мовчки обрізає на 1000.
+async function selectAllRows(build, cap = 20000) {
+  const out = [];
+  for (let from = 0; from < cap; from += 1000) {
+    const { data, error } = await build().range(from, from + 999);
+    if (error) return { rows: out, error };
+    out.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  return { rows: out, error: null };
+}
+
+// Статистика каналу — власнику й адмінам.
+// tzOffset — зсув клієнта в хвилинах (DateTime.timeZoneOffset), щоб дні графіка
+// були днями користувача, а не UTC.
+app.get('/channel/stats', async (req, res) => {
+  const channelId = Number(req.query.channelId);
+  if (!channelId || !(await channelManagerRole(req.nick, channelId))) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  const DAYS = 30, DAY = 86400000;
+  const tz = Math.max(-840, Math.min(840, Number(req.query.tzOffset) || 0)) * 60000;
+  const now = Date.now();
+  const dayKey = (ms) => Math.floor((ms + tz) / DAY);
+  const today = dayKey(now);
+  const since30 = (today - DAYS + 1) * DAY - tz;
+  const since7 = (today - 6) * DAY - tz;
+  const head = { count: 'exact', head: true };
+  const errors = [];
+
+  const { data: ch } = await supabase.from('channels').select('owner_nick, is_paid, price, sub_days, created_at').eq('id', channelId).maybeSingle();
+  if (!ch) return res.json({ ok: false, error: 'Канал не знайдено', code: 'err_channel_not_found' });
+
+  const [subs, muted] = await Promise.all([
+    supabase.from('channel_members').select('*', head).eq('channel_id', channelId),
+    supabase.from('chat_mutes').select('*', head).eq('chat_type', 'channel').eq('chat_id', String(channelId)),
+  ]);
+
+  // Підписки й відписки по днях.
+  // date — календарна дата користувача (YYYY-MM-DD), вже з урахуванням зсуву.
+  const days = Array.from({ length: DAYS }, (_, i) => ({ date: new Date((today - DAYS + 1 + i) * DAY).toISOString().slice(0, 10), joins: 0, leaves: 0 }));
+  let journal = true, journalSince = null;
+  const ev = await selectAllRows(() => supabase.from('channel_member_events')
+    .select('kind, created_at').eq('channel_id', channelId).gte('created_at', since30).order('created_at', { ascending: true }));
+  if (ev.error) {
+    journal = false;
+    // Журналу ще немає — показуємо хоча б прихід тих, хто досі підписаний.
+    const mem = await selectAllRows(() => supabase.from('channel_members')
+      .select('joined_at, role').eq('channel_id', channelId).gte('joined_at', since30));
+    for (const m of mem.rows) {
+      if (m.role === 'owner') continue;
+      const i = dayKey(Number(m.joined_at)) - (today - DAYS + 1);
+      if (i >= 0 && i < DAYS) days[i].joins++;
+    }
+  } else {
+    for (const e of ev.rows) {
+      const i = dayKey(Number(e.created_at)) - (today - DAYS + 1);
+      if (i < 0 || i >= DAYS) continue;
+      if (e.kind === 'join') days[i].joins++; else days[i].leaves++;
+    }
+    // Перший запис у журналі взагалі (не лише цього каналу) = день, коли журнал
+    // запрацював: до нього відписок немає ніде, і графік має це чесно сказати.
+    const { data: first } = await supabase.from('channel_member_events')
+      .select('created_at').order('created_at', { ascending: true }).limit(1);
+    journalSince = first && first[0] ? Number(first[0].created_at) : now;
+  }
+  const sum = (arr, k) => arr.reduce((a, d) => a + d[k], 0);
+  const last7 = days.slice(-7);
+
+  // Пости: перегляди за 30 днів і останні 20 з реакціями й коментарями.
+  const recent = await selectAllRows(() => supabase.from('channel_messages')
+    .select('view_count').eq('channel_id', channelId).gte('timestamp', since30), 5000);
+  if (recent.error) errors.push('posts30');
+  const avgViews = recent.rows.length ? Math.round(recent.rows.reduce((a, p) => a + (p.view_count || 0), 0) / recent.rows.length) : null;
+
+  const { data: lastPosts, error: lpErr } = await supabase.from('channel_messages')
+    .select('id, content, image_url, file_name, timestamp, view_count')
+    .eq('channel_id', channelId).order('timestamp', { ascending: false }).limit(20);
+  if (lpErr) errors.push('posts');
+  const ids = (lastPosts || []).map(p => p.id);
+  const reactCount = {}, commentCount = {};
+  if (ids.length) {
+    const r = await selectAllRows(() => supabase.from('channel_reactions').select('post_id').in('post_id', ids));
+    for (const x of r.rows) reactCount[x.post_id] = (reactCount[x.post_id] || 0) + 1;
+    const c = await selectAllRows(() => supabase.from('channel_comments').select('post_id').in('post_id', ids));
+    for (const x of c.rows) commentCount[x.post_id] = (commentCount[x.post_id] || 0) + 1;
+    if (r.error || c.error) errors.push('engagement');
+  }
+  const kindOf = (p) => {
+    const t = p.content || '';
+    if (t.startsWith('[stream]')) return 'stream';
+    if (t.startsWith('[sticker]')) return 'sticker';
+    if (p.image_url) return 'image';
+    if (p.file_name) return 'file';
+    return 'text';
+  };
+  const posts = (lastPosts || []).map(p => ({
+    id: p.id, timestamp: Number(p.timestamp), kind: kindOf(p),
+    text: kindOf(p) === 'text' ? (p.content || '').slice(0, 80) : (p.content && !p.content.startsWith('[') ? p.content.slice(0, 80) : (p.file_name || '')),
+    views: p.view_count || 0, reactions: reactCount[p.id] || 0, comments: commentCount[p.id] || 0,
+  }));
+
+  // Монети: активні платні підписки й заробіток власника з цього каналу.
+  let coins = null;
+  const { count: activePaid } = await supabase.from('channel_paid_subs').select('*', head).eq('channel_id', channelId).gt('expires_at', now);
+  const tx = await selectAllRows(() => supabase.from('coin_transactions')
+    .select('amount, kind').eq('ref', String(channelId)).eq('to_nick', ch.owner_nick)
+    .in('kind', ['paid_sub', 'contact_owner']).gte('created_at', new Date(since30).toISOString()));
+  if (tx.error) errors.push('coins');
+  const earned30 = tx.rows.reduce((a, t) => a + (t.amount || 0), 0);
+  if (ch.is_paid || earned30 > 0 || (activePaid || 0) > 0) {
+    coins = { isPaid: !!ch.is_paid, price: ch.price || 0, activePaid: activePaid || 0, earned30,
+      paidSubs30: tx.rows.filter(t => t.kind === 'paid_sub').length, contacts30: tx.rows.filter(t => t.kind === 'contact_owner').length };
+  }
+
+  res.json({
+    ok: true,
+    subscribers: subs.count || 0,
+    muted: muted.count || 0,
+    joins7: sum(last7, 'joins'), leaves7: sum(last7, 'leaves'),
+    joins30: sum(days, 'joins'), leaves30: sum(days, 'leaves'),
+    journal, journalSince, days,
+    posts30: recent.rows.length, avgViews, posts, coins, errors,
+  });
 });
 
 app.post('/channel/invite', async (req, res) => {
@@ -7525,7 +7673,10 @@ app.post('/channel/invite-response', async (req, res) => {
   const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channelId).eq('nick', nick).single();
   if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі', code: 'err_blocked_in_channel' });
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
-  if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+  if (!existing) {
+    const { error: invErr } = await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+    if (!invErr) await logChannelEvents(channelId, 'join', 'invite');
+  }
   const { data: channel } = await supabase.from('channels').select('*').eq('id', channelId).single();
   const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', channelId);
   res.json({ ok: true, channel: { ...channel, myRole: 'subscriber', subscriberCount: count || 0 } });
@@ -7611,7 +7762,10 @@ app.post('/channel/subscribe-paid', async (req, res) => {
   }
   if (subWriteErr) console.error('[paid-sub] WRITE ERROR:', JSON.stringify(subWriteErr));
   const { data: existing } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).single();
-  if (!existing) await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+  if (!existing) {
+    const { error: paidErr } = await supabase.from('channel_members').insert({ channel_id: channelId, nick, role: 'subscriber' });
+    if (!paidErr) await logChannelEvents(channelId, 'join', 'paid');
+  }
   sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
   res.json({ ok: true, newBalance, expiresAt });
   });
@@ -7723,6 +7877,25 @@ app.post('/channel/stream/stop', async (req, res) => {
 
 /// Видалити канал разом з усім, що на нього посилається.
 /// Винесено з endpoint'а, бо тепер має ДВА входи: власник і адміністратор.
+// ── Журнал підписок каналу (статистика) ──────────────────────────────────────
+// channel_members тримає лише поточних учасників, тож відписки без журналу не
+// порахувати. Без ніка — статистиці він не потрібен. Збій запису (напр. до
+// міграції) не має ламати саму підписку.
+let channelEventsWarned = false;
+async function logChannelEvents(channelId, kind, via, count = 1) {
+  if (!channelId || count < 1) return;
+  const now = Date.now();
+  const rows = Array.from({ length: Math.min(count, 5000) }, () => ({ channel_id: channelId, kind, via, created_at: now }));
+  const { error } = await supabase.from('channel_member_events').insert(rows);
+  if (error && !channelEventsWarned) { channelEventsWarned = true; console.error('[channel_member_events]', error.message); }
+}
+
+async function channelManagerRole(nick, channelId) {
+  if (!nick || !channelId) return null;
+  const { data } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', nick).maybeSingle();
+  return data && ['owner', 'admin'].includes(data.role) ? data.role : null;
+}
+
 async function deleteChannelById(channelId) {
   // Збираємо файли постів і коментарів перед видаленням — щоб прибрати зі Storage.
   const { data: chPosts } = await supabase.from('channel_messages').select('id, image_url, file_data').eq('channel_id', channelId);
@@ -7736,6 +7909,7 @@ async function deleteChannelById(channelId) {
   await supabase.from('channel_blocked').delete().eq('channel_id', channelId);
   await supabase.from('channel_paid_subs').delete().eq('channel_id', channelId);
   await supabase.from('pending_channel_invites').delete().eq('channel_id', channelId);
+  await supabase.from('channel_member_events').delete().eq('channel_id', channelId);
   await supabase.from('channels').delete().eq('id', channelId);
   for (const p of (chPosts || [])) await removeChannelFile(p.image_url, p.file_data);
   for (const c of (chComments || [])) await removeChannelFile(c.file_data);
