@@ -121,6 +121,7 @@
   "call_calling": "Tumatawag...",
   "call_camera": "Camera",
   "call_connect_failed": "Nabigong kumonekta",
+  "call_video_failed": "Hindi naisindi ang camera",
   "call_declined": "Tinanggihan",
   "call_duration": "Tagal: {time}",
   "call_ended": "Tapos na ang tawag",

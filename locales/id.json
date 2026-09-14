@@ -121,6 +121,7 @@
   "call_calling": "Memanggil...",
   "call_camera": "Kamera",
   "call_connect_failed": "Gagal terhubung",
+  "call_video_failed": "Gagal menyalakan kamera",
   "call_declined": "Ditolak",
   "call_duration": "Durasi: {time}",
   "call_ended": "Panggilan berakhir",

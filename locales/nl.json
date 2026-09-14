@@ -121,6 +121,7 @@
   "call_calling": "Bellen...",
   "call_camera": "Camera",
   "call_connect_failed": "Verbinden mislukt",
+  "call_video_failed": "Camera inschakelen mislukt",
   "call_declined": "Geweigerd",
   "call_duration": "Duur: {time}",
   "call_ended": "Oproep beëindigd",

@@ -121,6 +121,7 @@
   "call_calling": "Calling...",
   "call_camera": "Camera",
   "call_connect_failed": "Failed to connect",
+  "call_video_failed": "Couldn't turn on the camera",
   "call_declined": "Declined",
   "call_duration": "Duration: {time}",
   "call_ended": "Call ended",

@@ -121,6 +121,7 @@
   "call_calling": "発信中...",
   "call_camera": "カメラ",
   "call_connect_failed": "接続できませんでした",
+  "call_video_failed": "カメラをオンにできませんでした",
   "call_declined": "拒否されました",
   "call_duration": "通話時間: {time}",
   "call_ended": "通話終了",

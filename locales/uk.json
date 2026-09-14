@@ -121,6 +121,7 @@
   "call_calling": "Виклик...",
   "call_camera": "Камера",
   "call_connect_failed": "Не вдалося з'єднатися",
+  "call_video_failed": "Не вдалося увімкнути камеру",
   "call_declined": "Відхилено",
   "call_duration": "Час розмови: {time}",
   "call_ended": "Дзвінок завершено",

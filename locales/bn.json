@@ -121,6 +121,7 @@
   "call_calling": "কল করা হচ্ছে...",
   "call_camera": "ক্যামেরা",
   "call_connect_failed": "সংযোগ ব্যর্থ হয়েছে",
+  "call_video_failed": "ক্যামেরা চালু করা যায়নি",
   "call_declined": "প্রত্যাখ্যাত",
   "call_duration": "সময়কাল: {time}",
   "call_ended": "কল শেষ",

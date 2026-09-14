@@ -121,6 +121,7 @@
   "call_calling": "جارٍ الاتصال...",
   "call_camera": "الكاميرا",
   "call_connect_failed": "تعذّر الاتصال",
+  "call_video_failed": "تعذّر تشغيل الكاميرا",
   "call_declined": "مرفوضة",
   "call_duration": "المدة: {time}",
   "call_ended": "انتهت المكالمة",

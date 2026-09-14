@@ -121,6 +121,7 @@
   "call_calling": "กำลังโทร...",
   "call_camera": "กล้อง",
   "call_connect_failed": "เชื่อมต่อไม่สำเร็จ",
+  "call_video_failed": "เปิดกล้องไม่สำเร็จ",
   "call_declined": "ปฏิเสธแล้ว",
   "call_duration": "ระยะเวลา: {time}",
   "call_ended": "วางสายแล้ว",

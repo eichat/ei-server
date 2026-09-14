@@ -121,6 +121,7 @@
   "call_calling": "Đang gọi...",
   "call_camera": "Camera",
   "call_connect_failed": "Không thể kết nối",
+  "call_video_failed": "Không thể bật camera",
   "call_declined": "Đã từ chối",
   "call_duration": "Thời lượng: {time}",
   "call_ended": "Cuộc gọi đã kết thúc",

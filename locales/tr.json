@@ -121,6 +121,7 @@
   "call_calling": "Aranıyor...",
   "call_camera": "Kamera",
   "call_connect_failed": "Bağlanılamadı",
+  "call_video_failed": "Kamera açılamadı",
   "call_declined": "Reddedildi",
   "call_duration": "Süre: {time}",
   "call_ended": "Arama sonlandı",

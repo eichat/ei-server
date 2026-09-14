@@ -121,6 +121,7 @@
   "call_calling": "कॉल हो रही है...",
   "call_camera": "कैमरा",
   "call_connect_failed": "कनेक्ट नहीं हो सका",
+  "call_video_failed": "कैमरा चालू नहीं हो सका",
   "call_declined": "अस्वीकृत",
   "call_duration": "अवधि: {time}",
   "call_ended": "कॉल समाप्त",

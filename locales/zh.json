@@ -121,6 +121,7 @@
   "call_calling": "拨号中...",
   "call_camera": "摄像头",
   "call_connect_failed": "连接失败",
+  "call_video_failed": "无法打开摄像头",
   "call_declined": "已拒绝",
   "call_duration": "通话时长：{time}",
   "call_ended": "通话结束",
