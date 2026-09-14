@@ -776,7 +776,6 @@
   "stream_open_youtube": "Panoorin sa YouTube",
   "stream_player_failed": "Hindi ma-play ang video sa app",
   "stream_post_label": "Live stream",
-  "stream_recording_badge": "Recording ng stream",
   "stream_start_btn": "Simulan ang stream",
   "stream_start_title": "Simulan ang stream",
   "stream_stop_btn": "Tapusin",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Aktibong paid subscription",
   "stats_paid_30": "Bayad sa subscription, 30 araw",
   "stats_contacts_30": "Paid na contact, 30 araw",
-  "stats_coins": "Coins"
+  "stats_coins": "Coins",
+  "stream_ended_badge": "Tapos ang live",
+  "stream_live_now": "Live ngayon",
+  "stream_join": "Sumali",
+  "stream_started": "Nagsimula ang live stream"
 }

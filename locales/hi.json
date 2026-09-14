@@ -776,7 +776,6 @@
   "stream_open_youtube": "YouTube पर देखें",
   "stream_player_failed": "ऐप में यह वीडियो नहीं चल सका",
   "stream_post_label": "लाइव स्ट्रीम",
-  "stream_recording_badge": "स्ट्रीम रिकॉर्डिंग",
   "stream_start_btn": "स्ट्रीम शुरू करें",
   "stream_start_title": "स्ट्रीम शुरू करें",
   "stream_stop_btn": "समाप्त करें",
@@ -946,5 +945,9 @@
   "stats_paid_active": "सक्रिय सशुल्क सदस्यताएँ",
   "stats_paid_30": "30 दिनों में सदस्यता भुगतान",
   "stats_contacts_30": "30 दिनों में सशुल्क संपर्क",
-  "stats_coins": "सिक्के"
+  "stats_coins": "सिक्के",
+  "stream_ended_badge": "प्रसारण समाप्त",
+  "stream_live_now": "अभी लाइव",
+  "stream_join": "जुड़ें",
+  "stream_started": "लाइव प्रसारण शुरू हुआ"
 }

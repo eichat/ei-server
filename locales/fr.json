@@ -776,7 +776,6 @@
   "stream_open_youtube": "Regarder sur YouTube",
   "stream_player_failed": "Impossible de lire la vidéo dans l'application",
   "stream_post_label": "Direct",
-  "stream_recording_badge": "Enregistrement du direct",
   "stream_start_btn": "Démarrer le direct",
   "stream_start_title": "Démarrer le direct",
   "stream_stop_btn": "Terminer",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Abonnements payants actifs",
   "stats_paid_30": "Paiements d'abonnement, 30 jours",
   "stats_contacts_30": "Contacts payants, 30 jours",
-  "stats_coins": "Pièces"
+  "stats_coins": "Pièces",
+  "stream_ended_badge": "Direct terminé",
+  "stream_live_now": "En direct maintenant",
+  "stream_join": "Rejoindre",
+  "stream_started": "Le direct a commencé"
 }

@@ -776,7 +776,6 @@
   "stream_open_youtube": "YouTube-এ দেখুন",
   "stream_player_failed": "অ্যাপে এই ভিডিওটি চালানো যায়নি",
   "stream_post_label": "লাইভ সম্প্রচার",
-  "stream_recording_badge": "সম্প্রচারের রেকর্ডিং",
   "stream_start_btn": "সম্প্রচার শুরু করুন",
   "stream_start_title": "সম্প্রচার শুরু করুন",
   "stream_stop_btn": "শেষ করুন",
@@ -946,5 +945,9 @@
   "stats_paid_active": "সক্রিয় পেইড সাবস্ক্রিপশন",
   "stats_paid_30": "৩০ দিনে সাবস্ক্রিপশন পেমেন্ট",
   "stats_contacts_30": "৩০ দিনে পেইড যোগাযোগ",
-  "stats_coins": "কয়েন"
+  "stats_coins": "কয়েন",
+  "stream_ended_badge": "সম্প্রচার শেষ",
+  "stream_live_now": "এখন লাইভ",
+  "stream_join": "যোগ দিন",
+  "stream_started": "লাইভ সম্প্রচার শুরু হয়েছে"
 }

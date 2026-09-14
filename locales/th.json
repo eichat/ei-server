@@ -776,7 +776,6 @@
   "stream_open_youtube": "ดูบน YouTube",
   "stream_player_failed": "ไม่สามารถเล่นวิดีโอในแอปได้",
   "stream_post_label": "ถ่ายทอดสด",
-  "stream_recording_badge": "บันทึกการถ่ายทอดสด",
   "stream_start_btn": "เริ่มถ่ายทอดสด",
   "stream_start_title": "เริ่มถ่ายทอดสด",
   "stream_stop_btn": "จบ",
@@ -946,5 +945,9 @@
   "stats_paid_active": "การสมัครแบบชำระเงินที่ใช้งานอยู่",
   "stats_paid_30": "การชำระค่าสมัคร 30 วัน",
   "stats_contacts_30": "การติดต่อแบบชำระเงิน 30 วัน",
-  "stats_coins": "เหรียญ"
+  "stats_coins": "เหรียญ",
+  "stream_ended_badge": "สิ้นสุดการถ่ายทอด",
+  "stream_live_now": "กำลังถ่ายทอดสด",
+  "stream_join": "เข้าร่วม",
+  "stream_started": "เริ่มถ่ายทอดสดแล้ว"
 }

@@ -776,7 +776,6 @@
   "stream_open_youtube": "YouTube'da izle",
   "stream_player_failed": "Video uygulamada oynatılamadı",
   "stream_post_label": "Canlı yayın",
-  "stream_recording_badge": "Yayın kaydı",
   "stream_start_btn": "Yayını başlat",
   "stream_start_title": "Yayını başlat",
   "stream_stop_btn": "Bitir",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Aktif ücretli abonelikler",
   "stats_paid_30": "30 günde abonelik ödemeleri",
   "stats_contacts_30": "30 günde ücretli iletişim",
-  "stats_coins": "Jeton"
+  "stats_coins": "Jeton",
+  "stream_ended_badge": "Yayın sona erdi",
+  "stream_live_now": "Şu an canlı",
+  "stream_join": "Katıl",
+  "stream_started": "Canlı yayın başladı"
 }

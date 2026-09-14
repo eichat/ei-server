@@ -776,7 +776,6 @@
   "stream_open_youtube": "Tonton di YouTube",
   "stream_player_failed": "Tidak dapat memutar video di aplikasi",
   "stream_post_label": "Siaran langsung",
-  "stream_recording_badge": "Rekaman siaran",
   "stream_start_btn": "Mulai siaran",
   "stream_start_title": "Mulai siaran",
   "stream_stop_btn": "Akhiri",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Langganan berbayar aktif",
   "stats_paid_30": "Pembayaran langganan, 30 hari",
   "stats_contacts_30": "Kontak berbayar, 30 hari",
-  "stats_coins": "Koin"
+  "stats_coins": "Koin",
+  "stream_ended_badge": "Siaran berakhir",
+  "stream_live_now": "Sedang live",
+  "stream_join": "Gabung",
+  "stream_started": "Siaran langsung dimulai"
 }

@@ -776,7 +776,6 @@
   "stream_open_youtube": "Assistir no YouTube",
   "stream_player_failed": "Não foi possível reproduzir o vídeo no aplicativo",
   "stream_post_label": "Transmissão ao vivo",
-  "stream_recording_badge": "Gravação da transmissão",
   "stream_start_btn": "Iniciar transmissão",
   "stream_start_title": "Iniciar transmissão",
   "stream_stop_btn": "Encerrar",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Assinaturas pagas ativas",
   "stats_paid_30": "Pagamentos de assinatura, 30 dias",
   "stats_contacts_30": "Contactos pagos, 30 dias",
-  "stats_coins": "Moedas"
+  "stats_coins": "Moedas",
+  "stream_ended_badge": "Transmissão terminada",
+  "stream_live_now": "Ao vivo agora",
+  "stream_join": "Entrar",
+  "stream_started": "A transmissão começou"
 }

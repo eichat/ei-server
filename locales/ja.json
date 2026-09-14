@@ -776,7 +776,6 @@
   "stream_open_youtube": "YouTubeで見る",
   "stream_player_failed": "アプリ内でこの動画を再生できませんでした",
   "stream_post_label": "ライブ配信",
-  "stream_recording_badge": "配信の録画",
   "stream_start_btn": "配信を開始",
   "stream_start_title": "配信を開始",
   "stream_stop_btn": "終了",
@@ -946,5 +945,9 @@
   "stats_paid_active": "有効な有料購読",
   "stats_paid_30": "30日間の購読支払い",
   "stats_contacts_30": "30日間の有料コンタクト",
-  "stats_coins": "コイン"
+  "stats_coins": "コイン",
+  "stream_ended_badge": "配信終了",
+  "stream_live_now": "ライブ配信中",
+  "stream_join": "参加",
+  "stream_started": "ライブ配信が始まりました"
 }

@@ -776,7 +776,6 @@
   "stream_open_youtube": "在 YouTube 观看",
   "stream_player_failed": "无法在应用内播放此视频",
   "stream_post_label": "直播",
-  "stream_recording_badge": "直播回放",
   "stream_start_btn": "开始直播",
   "stream_start_title": "开始直播",
   "stream_stop_btn": "结束",
@@ -946,5 +945,9 @@
   "stats_paid_active": "有效付费订阅",
   "stats_paid_30": "30 天订阅付款",
   "stats_contacts_30": "30 天付费联系",
-  "stats_coins": "金币"
+  "stats_coins": "金币",
+  "stream_ended_badge": "直播已结束",
+  "stream_live_now": "正在直播",
+  "stream_join": "加入",
+  "stream_started": "直播已开始"
 }

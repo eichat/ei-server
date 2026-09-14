@@ -776,7 +776,6 @@
   "stream_open_youtube": "المشاهدة على YouTube",
   "stream_player_failed": "تعذّر تشغيل الفيديو داخل التطبيق",
   "stream_post_label": "بث مباشر",
-  "stream_recording_badge": "تسجيل البث",
   "stream_start_btn": "بدء البث",
   "stream_start_title": "بدء البث",
   "stream_stop_btn": "إنهاء",
@@ -946,5 +945,9 @@
   "stats_paid_active": "الاشتراكات المدفوعة النشطة",
   "stats_paid_30": "مدفوعات الاشتراك خلال 30 يومًا",
   "stats_contacts_30": "طلبات التواصل المدفوعة خلال 30 يومًا",
-  "stats_coins": "العملات"
+  "stats_coins": "العملات",
+  "stream_ended_badge": "انتهى البث",
+  "stream_live_now": "مباشر الآن",
+  "stream_join": "انضم",
+  "stream_started": "بدأ البث المباشر"
 }

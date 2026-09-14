@@ -776,7 +776,6 @@
   "stream_open_youtube": "Watch on YouTube",
   "stream_player_failed": "Couldn't play this video in the app",
   "stream_post_label": "Live stream",
-  "stream_recording_badge": "Stream recording",
   "stream_start_btn": "Start stream",
   "stream_start_title": "Start stream",
   "stream_stop_btn": "End stream",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Active paid subscriptions",
   "stats_paid_30": "Subscription payments, 30 days",
   "stats_contacts_30": "Paid contacts, 30 days",
-  "stats_coins": "Coins"
+  "stats_coins": "Coins",
+  "stream_ended_badge": "Stream ended",
+  "stream_live_now": "Live now",
+  "stream_join": "Join",
+  "stream_started": "Live stream started"
 }

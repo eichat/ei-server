@@ -776,7 +776,6 @@
   "stream_open_youtube": "Дивитись на YouTube",
   "stream_player_failed": "Не вдалося відтворити відео в застосунку",
   "stream_post_label": "Трансляція",
-  "stream_recording_badge": "Запис трансляції",
   "stream_start_btn": "Почати трансляцію",
   "stream_start_title": "Почати трансляцію",
   "stream_stop_btn": "Завершити",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Активні платні підписки",
   "stats_paid_30": "Оплат підписки за 30 днів",
   "stats_contacts_30": "Звернень до власника за 30 днів",
-  "stats_coins": "Монети"
+  "stats_coins": "Монети",
+  "stream_ended_badge": "Трансляція завершена",
+  "stream_live_now": "Зараз у ефірі",
+  "stream_join": "Приєднатися",
+  "stream_started": "Почалась трансляція"
 }

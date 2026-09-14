@@ -776,7 +776,6 @@
   "stream_open_youtube": "YouTube에서 보기",
   "stream_player_failed": "앱에서 이 동영상을 재생할 수 없습니다",
   "stream_post_label": "라이브 방송",
-  "stream_recording_badge": "방송 다시보기",
   "stream_start_btn": "방송 시작",
   "stream_start_title": "방송 시작",
   "stream_stop_btn": "종료",
@@ -946,5 +945,9 @@
   "stats_paid_active": "활성 유료 구독",
   "stats_paid_30": "30일 구독 결제",
   "stats_contacts_30": "30일 유료 연락",
-  "stats_coins": "코인"
+  "stats_coins": "코인",
+  "stream_ended_badge": "방송 종료",
+  "stream_live_now": "지금 라이브",
+  "stream_join": "참여",
+  "stream_started": "라이브 방송이 시작됐습니다"
 }

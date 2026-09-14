@@ -3178,7 +3178,7 @@ async function notifyChannelSubscribers(channelId, payload, excludeNick = null, 
 //  • шлемо пачками, а не всі разом — щоб не відкрити тисячу зʼєднань до FCM;
 //  • є стеля CHANNEL_PUSH_MAX: краще не сповістити «хвіст», ніж покласти інстанс.
 const CHANNEL_PUSH_MAX = parseInt(process.env.CHANNEL_PUSH_MAX, 10) || 2000;
-async function pushChannelPost(channelId, channelName, fromNick, memberNicks, fromDeviceId, postId) {
+async function pushChannelPost(channelId, channelName, fromNick, memberNicks, fromDeviceId, postId, opts = {}) {
   const offline = (memberNicks || []).filter(n => n !== fromNick && !isLive(n));
   if (offline.length === 0) return;
   const muted = new Set();
@@ -3193,6 +3193,7 @@ async function pushChannelPost(channelId, channelName, fromNick, memberNicks, fr
     channel_id: String(channelId), channel_name: (channelName || '').slice(0, 64),
     // Тап по сповіщенню має відкрити САМЕ цей пост, а не просто канал.
     ...(postId != null ? { post_id: String(postId) } : {}),
+    ...(opts.live ? { live: 'true' } : {}),
   };
   for (let i = 0; i < list.length; i += 20) {
     const chunk = list.slice(i, i + 20);
@@ -7086,7 +7087,17 @@ app.get('/channel/messages', async (req, res) => {
   const { data: newest } = await supabase.from('channel_messages').select('*')
     .eq('channel_id', channelId).order('timestamp', { ascending: false }).limit(500);
   const posts = (newest || []).slice().reverse();
-  if (!posts.length) return res.json({ ok: true, messages: [] });
+  // 🔴 Стан трансляції — разом зі стрічкою. Застосунок тримає канал із
+  // /channel/list, завантаженого ДО старту ефіру, і не знав, що він іде: картка
+  // активної трансляції показувала «Запис трансляції», а тап вів у браузер
+  // замість вікна з коментарями (14.09).
+  const { data: liveRow } = await supabase.from('channels')
+    .select('live_active, live_post_id, live_url, live_started_at').eq('id', channelId).maybeSingle();
+  const live = liveRow ? {
+    active: liveRow.live_active === true, postId: liveRow.live_post_id,
+    videoId: liveRow.live_url ? extractYouTubeId(liveRow.live_url) : null, startedAt: liveRow.live_started_at,
+  } : null;
+  if (!posts.length) return res.json({ ok: true, messages: [], live });
   const postIds = posts.map(p => p.id);
   // Завантажуємо всі коментарі і реакції одним запитом
   const [commentsRes, reactionsRes] = await Promise.all([
@@ -7101,7 +7112,7 @@ app.get('/channel/messages', async (req, res) => {
     const topCommenters = [...new Set(postComments.map(c => c.from_nick))].slice(0, 3);
     return { ...p, commentCount: postComments.length, reactions: postReactions, topCommenters };
   });
-  res.json({ ok: true, messages: result });
+  res.json({ ok: true, messages: result, live });
 });
 
 // POST /channel/message — підтримує text, imageUrl, fileData, fileName
@@ -7860,7 +7871,14 @@ app.post('/channel/stream/start', async (req, res) => {
   }).eq('id', channelId);
   // Сповіщаємо онлайн-підписників: і про новий пост, і про live-стан.
   notifyChannelSubscribers(channelId, { type: 'channel_message', channelId, postId: post.id, from: ownerNick, text: `[stream]${videoId}`, timestamp: ts, msgId, message: { ...post, commentCount: 0, reactions: [], topCommenters: [] } }, ownerNick, req.deviceId).catch(() => {});
-  notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, videoId, active: true, postId: post.id }).catch(() => {});
+  const liveMembers = await notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, videoId, active: true, postId: post.id }).catch(() => null);
+  // Пуш офлайн-підписникам: без нього про ефір дізнавались лише ті, хто саме
+  // був у застосунку. `live` міняє текст сповіщення на «Почалась трансляція».
+  if (Array.isArray(liveMembers)) {
+    const { data: chRow } = await supabase.from('channels').select('name').eq('id', channelId).maybeSingle();
+    pushChannelPost(channelId, chRow?.name, ownerNick, liveMembers, req.deviceId, post.id, { live: true })
+      .catch(e => console.error('[stream push]', e.message));
+  }
   res.json({ ok: true, videoId, startedAt, postId: post.id });
 });
 
@@ -7871,7 +7889,8 @@ app.post('/channel/stream/stop', async (req, res) => {
   const { data: member } = await supabase.from('channel_members').select('role').eq('channel_id', channelId).eq('nick', ownerNick).single();
   if (!member || !['owner', 'admin'].includes(member.role)) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
   await supabase.from('channels').update({ live_active: false }).eq('id', channelId);
-  notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, active: false }).catch(() => {});
+  const { data: stopped } = await supabase.from('channels').select('live_post_id').eq('id', channelId).maybeSingle();
+  notifyChannelSubscribers(channelId, { type: 'channel_live', channelId, active: false, postId: stopped?.live_post_id ?? null }).catch(() => {});
   res.json({ ok: true });
 });
 

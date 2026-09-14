@@ -776,7 +776,6 @@
   "stream_open_youtube": "Ver en YouTube",
   "stream_player_failed": "No se pudo reproducir el vídeo en la aplicación",
   "stream_post_label": "Transmisión en directo",
-  "stream_recording_badge": "Grabación de la transmisión",
   "stream_start_btn": "Iniciar transmisión",
   "stream_start_title": "Iniciar transmisión",
   "stream_stop_btn": "Finalizar",
@@ -946,5 +945,9 @@
   "stats_paid_active": "Suscripciones de pago activas",
   "stats_paid_30": "Pagos de suscripción, 30 días",
   "stats_contacts_30": "Contactos de pago, 30 días",
-  "stats_coins": "Monedas"
+  "stats_coins": "Monedas",
+  "stream_ended_badge": "Directo finalizado",
+  "stream_live_now": "En directo ahora",
+  "stream_join": "Unirse",
+  "stream_started": "Empezó el directo"
 }
