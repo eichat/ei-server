@@ -772,7 +772,6 @@
   "stickers_more_in_shop_two": "{n} packs de plus dans la boutique",
   "stream_go_live": "Passer en direct",
   "stream_live_badge": "EN DIRECT",
-  "stream_need_libmpv": "Le lecteur intégré nécessite la bibliothèque libmpv. Installez-la et redémarrez EION.",
   "stream_open_youtube": "Regarder sur YouTube",
   "stream_player_failed": "Impossible de lire la vidéo dans l'application",
   "stream_post_label": "Direct",

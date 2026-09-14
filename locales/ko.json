@@ -772,7 +772,6 @@
   "stickers_more_in_shop_two": "상점에 {n}개 더",
   "stream_go_live": "라이브 시작",
   "stream_live_badge": "라이브",
-  "stream_need_libmpv": "내장 플레이어에는 libmpv 라이브러리가 필요합니다. 설치 후 EION을 다시 시작하세요.",
   "stream_open_youtube": "YouTube에서 보기",
   "stream_player_failed": "앱에서 이 동영상을 재생할 수 없습니다",
   "stream_post_label": "라이브 방송",

@@ -772,7 +772,6 @@
   "stickers_more_in_shop_two": "Ещё {n} наборов в магазине",
   "stream_go_live": "В эфир",
   "stream_live_badge": "В ЭФИРЕ",
-  "stream_need_libmpv": "Встроенный плеер требует библиотеку libmpv. Установите её и перезапустите EION.",
   "stream_open_youtube": "Смотреть на YouTube",
   "stream_player_failed": "Не удалось воспроизвести видео в приложении",
   "stream_post_label": "Трансляция",

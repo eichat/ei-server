@@ -772,7 +772,6 @@
   "stickers_more_in_shop_two": "商店里还有 {n} 个贴纸包",
   "stream_go_live": "开播",
   "stream_live_badge": "直播中",
-  "stream_need_libmpv": "内置播放器需要 libmpv 库。请安装后重启 EION。",
   "stream_open_youtube": "在 YouTube 观看",
   "stream_player_failed": "无法在应用内播放此视频",
   "stream_post_label": "直播",

@@ -772,7 +772,6 @@
   "stickers_more_in_shop_two": "দোকানে আরও {n}টি প্যাক",
   "stream_go_live": "লাইভ যান",
   "stream_live_badge": "লাইভ",
-  "stream_need_libmpv": "অন্তর্নির্মিত প্লেয়ারের জন্য libmpv লাইব্রেরি প্রয়োজন। এটি ইনস্টল করে EION পুনরায় চালু করুন।",
   "stream_open_youtube": "YouTube-এ দেখুন",
   "stream_player_failed": "অ্যাপে এই ভিডিওটি চালানো যায়নি",
   "stream_post_label": "লাইভ সম্প্রচার",
