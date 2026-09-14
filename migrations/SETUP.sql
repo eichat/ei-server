@@ -427,6 +427,27 @@ create table if not exists public.user_prefs (
 
 create index if not exists user_prefs_sync_idx on public.user_prefs (nick, updated_at);
 
+-- Облік пропозиції монет (одна строка) і денні лічильники норм.
+-- 🔴 Досі жили лише в migrations/coin_sinks.sql: розгортання з нуля давало
+-- базу без них — burn_coins падав, норми AI/сховища/релея не рахувались.
+create table if not exists public.coin_supply (
+  id         int  primary key default 1,
+  minted     bigint not null default 0,
+  burned     bigint not null default 0,
+  updated_at timestamptz not null default now(),
+  constraint coin_supply_single_row check (id = 1)
+);
+insert into public.coin_supply (id) values (1) on conflict (id) do nothing;
+
+create table if not exists public.usage_counters (
+  nick   text    not null,
+  kind   text    not null,
+  day    date    not null,
+  used   integer not null default 0,
+  primary key (nick, kind, day)
+);
+create index if not exists usage_counters_day_idx on public.usage_counters (day);
+
 create table if not exists public.pending_channel_invites (
   channel_id bigint NOT NULL,
   id bigint generated always as identity,
@@ -828,6 +849,8 @@ alter table public.message_deletions enable row level security;
 alter table public.user_stickers enable row level security;
 alter table public.chat_mutes enable row level security;
 alter table public.user_prefs enable row level security;
+alter table public.coin_supply enable row level security;
+alter table public.usage_counters enable row level security;
 alter table public.platform_bans enable row level security;
 alter table public.reports enable row level security;
 alter table public.sticker_packs enable row level security;
@@ -1104,6 +1127,10 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 grant delete, insert, references, select, trigger, truncate, update on table public.chat_mutes to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_prefs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_prefs to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.coin_supply to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.coin_supply to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.usage_counters to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.usage_counters to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.platform_bans to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.reports to postgres;
