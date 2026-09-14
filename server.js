@@ -872,6 +872,40 @@ function bindCallDevice(a, b, nick, deviceId) {
 }
 function unbindCall(a, b) { callBindings.delete(callKey(a, b)); }
 
+/// ICE-кандидати того, хто дзвонить, до відповіді.
+///
+/// 🔴 Дзвінок на ЗАКРИТИЙ телефон: поки його будить пуш, сокета ще немає, і
+/// sendToCallPeer мовчки викидав кандидати. Той, хто взяв слухавку, не знав
+/// жодної адреси дзвонаря: пряме з'єднання ще виживало на peer-reflexive, а
+/// через TURN (мобільна мережа) — ні, бо релей не відкриває дозвіл на
+/// невідому адресу. Симптом 14.09: «підняв слухавку, не видно співрозмовника,
+/// потім Не відповів». Тримаємо кандидати до call_answer і віддаємо тому
+/// пристрою, що відповів, — лише ті, яких він ще не отримав.
+const CALL_ICE_BUFFER_MAX = 50;
+function bufferCallIce(fromNick, toNick, candidate) {
+  const pair = callBindings.get(callKey(fromNick, toNick));
+  if (!pair || pair.answered) return;
+  // Кому кандидат пішов наживо — щоб при відповіді не слати його вдруге.
+  const sentTo = new Set();
+  const socks = deviceSessions.get(toNick);
+  if (socks) for (const s of socks.values()) if (s.ws.readyState === 1) sentTo.add(s.ws);
+  const buf = (pair.iceBuf ||= []);
+  if (buf.length < CALL_ICE_BUFFER_MAX) buf.push({ from: fromNick, candidate, sentTo });
+}
+function flushCallIce(answererWs, answererNick, callerNick) {
+  const pair = callBindings.get(callKey(answererNick, callerNick));
+  if (!pair) return 0;
+  pair.answered = true;
+  const buf = pair.iceBuf || [];
+  delete pair.iceBuf;
+  let n = 0;
+  for (const it of buf) {
+    if (it.from !== callerNick || it.sentTo.has(answererWs)) continue;
+    try { answererWs.send(JSON.stringify({ type: 'call_ice', from: callerNick, candidate: it.candidate })); n++; } catch (_) { break; }
+  }
+  return n;
+}
+
 /// Надіслати учаснику дзвінка — САМЕ на його пристрій, якщо він уже відомий.
 /// Доки не відомий (дзвінок ще дзвонить), шлемо на всі: телефон і десктоп
 /// мають задзвонити обидва.
@@ -9287,11 +9321,18 @@ wss.on('connection', (ws) => {
         bindCallDevice(userNick, msg.to, userNick, ws.sessionDevice);
         stopRingingOthers(userNick, ws.sessionDevice, msg.to);
         sendToCallPeer(msg.to, userNick, { type: 'call_answer', from: userNick, answer: msg.answer });
+        const iceFlushed = flushCallIce(ws, userNick, msg.to);
+        if (iceFlushed) console.log(`[calldiag] call_answer ${userNick}<-${msg.to}: дослано ${iceFlushed} ICE з буфера`);
         // Дзвінок таки прийняли (FCM розбудив) → прибираємо передчасний missed-лог
         // цієї пари (from=той-хто-дзвонив=msg.to, to=я=userNick).
         await clearPreemptiveMissed(msg.to, userNick);
       }
-      if (msg.type === 'call_ice') { sendToCallPeer(msg.to, userNick, { type: 'call_ice', from: userNick, candidate: msg.candidate }); }
+      if (msg.type === 'call_ice') {
+        // Буфер — ДО відправки: множина «кому вже пішло» знімається зі стану
+        // сокетів у той самий момент.
+        bufferCallIce(userNick, msg.to, msg.candidate);
+        sendToCallPeer(msg.to, userNick, { type: 'call_ice', from: userNick, candidate: msg.candidate });
+      }
       // Перемикання аудіо↔відео посеред дзвінка (renegotiation)
       if (msg.type === 'call_renegotiate') { sendToCallPeer(msg.to, userNick, { type: 'call_renegotiate', from: userNick, offer: msg.offer }); }
       if (msg.type === 'call_renegotiate_answer') { sendToCallPeer(msg.to, userNick, { type: 'call_renegotiate_answer', from: userNick, answer: msg.answer }); }
