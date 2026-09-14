@@ -5312,17 +5312,20 @@ app.get('/edits', async (req, res) => {
     if (error) return res.json(out);
     out.direct = (data || []).map(m => ({ msgId: m.msg_id, from: m.from_nick, text: m.content, editedAt: m.edited_at }));
 
-    const { data: gm } = await supabase.from('group_members').select('group_id').eq('nick', req.nick);
+    const { data: gm } = await supabase.from('group_members').select('group_id, joined_at').eq('nick', req.nick);
     const gids = (gm || []).map(g => g.group_id);
+    const joinMap = Object.fromEntries((gm || []).map(g => [g.group_id, joinedMs(g)]));
     if (gids.length) {
       const { data: ge } = await supabase.from('group_messages')
-        .select('msg_id, group_id, from_nick, content, edited_at')
+        .select('msg_id, group_id, from_nick, content, edited_at, timestamp')
         .in('group_id', gids)
         .gt('edited_at', since)
         .neq('from_nick', req.nick)      // свої правки клієнт уже застосував локально
         .order('edited_at', { ascending: true })
         .limit(500);
-      out.groups = (ge || []).map(m => ({ msgId: m.msg_id, groupId: m.group_id, from: m.from_nick, text: m.content, editedAt: m.edited_at }));
+      out.groups = (ge || [])
+        .filter(m => !joinMap[m.group_id] || Number(m.timestamp) >= joinMap[m.group_id])   // правки написаного до вступу — не наші
+        .map(m => ({ msgId: m.msg_id, groupId: m.group_id, from: m.from_nick, text: m.content, editedAt: m.edited_at }));
     }
   } catch (e) {
     console.error('/edits', e.message);
@@ -5612,10 +5615,11 @@ app.get('/group/list', async (req, res) => {
   // Нік ІЗ СЕСІЇ: з ніком із query endpoint розкривав групи будь-кого разом зі
   // складом учасників — тобто соціальний граф (аудит 13.09).
   const nick = req.nick;
-  const { data: memberships } = await supabase.from('group_members').select('group_id, role').eq('nick', nick);
+  const { data: memberships } = await supabase.from('group_members').select('group_id, role, joined_at').eq('nick', nick);
   if (!memberships || memberships.length === 0) return res.json({ ok: true, groups: [] });
   const ids = memberships.map(m => m.group_id);
   const roleMap = Object.fromEntries(memberships.map(m => [m.group_id, m.role]));
+  const joinMap = Object.fromEntries(memberships.map(m => [m.group_id, joinedMs(m)]));
   const { data: groups } = await supabase.from('groups').select('*').in('id', ids);
   const readMap = await getChatReadMap(nick, 'group', ids);
   const result = [];
@@ -5634,9 +5638,12 @@ app.get('/group/list', async (req, res) => {
       const { count } = await supabase.from('group_messages')
         .select('*', { count: 'exact', head: true })
         .eq('group_id', g.id).neq('from_nick', nick)
-        .gt('timestamp', ptr);
+        .gt('timestamp', Math.max(ptr, joinMap[g.id] || 0));
       unread = count || 0;
     }
+    // Закріплене до вступу — теж конверт не для нас; не показуємо.
+    const pinnedTooOld = g.pinned_at && joinMap[g.id] && Number(g.pinned_at) < joinMap[g.id];
+    if (pinnedTooOld) Object.assign(g, { pinned_msg_id: null, pinned_text: null, pinned_from: null, pinned_at: null });
     result.push({ ...g, members: (members || []).map(m => m.nick), memberRoles: Object.fromEntries((members || []).map(m => [m.nick, m.role])), myRole: roleMap[g.id], unread });
   }
   if (toSeed.length) { try { await supabase.from('chat_reads').upsert(toSeed, { onConflict: 'nick,chat_type,chat_id' }); } catch (_) {} }
@@ -5956,6 +5963,22 @@ app.get('/direct/reactions', async (req, res) => {
 // groupId (а вони послідовні), будь-хто читав усю переписку чужої групи
 // (аудит 13.09, підтверджено на проді). Групова переписка приватна за
 // природою — «відкритий» тип означає лише вільний ВСТУП, не вільне читання.
+// Коли нік увійшов у групу (мс). Повідомлення, старіші за вступ, йому не
+// віддаємо: групові конверти шифруються лише для тих, хто був учасником на
+// момент надсилання, тож показати їх можна було тільки замком «не вдалося
+// розшифрувати». Так і політика: новий (і повторно доданий) учасник бачить
+// лише написане після вступу. 0 — дату не прочитали, фільтра немає.
+function joinedMs(row) {
+  const t = row && row.joined_at ? Date.parse(row.joined_at) : NaN;
+  return Number.isFinite(t) ? t : 0;
+}
+async function groupJoinedMs(nick, groupId) {
+  if (!nick || !groupId) return 0;
+  const { data } = await supabase.from('group_members')
+    .select('joined_at').eq('group_id', groupId).eq('nick', nick).maybeSingle();
+  return joinedMs(data);
+}
+
 async function isGroupMember(nick, groupId) {
   if (!nick || !groupId) return false;
   const { data } = await supabase.from('group_members')
@@ -5982,6 +6005,8 @@ app.get('/group/messages', async (req, res) => {
   let q = supabase.from('group_messages').select('*').eq('group_id', groupId);
   if (before) q = q.lt('timestamp', Number(before));
   if (clearedAt) q = q.gt('timestamp', clearedAt);
+  const joined = await groupJoinedMs(nick, groupId);
+  if (joined) q = q.gte('timestamp', joined);
   q = q.order('timestamp', { ascending: false }).limit(limit + 1);
   const { data: rawDesc } = await q;
   const rows = rawDesc || [];
@@ -8645,10 +8670,14 @@ wss.on('connection', (ws) => {
           }
         }
 
-        const { data: myGroups } = await supabase.from('group_members').select('group_id').eq('nick', userNick);
+        const { data: myGroups } = await supabase.from('group_members').select('group_id, joined_at').eq('nick', userNick);
         if (myGroups && myGroups.length > 0) {
           for (const gm of myGroups) {
-            const { data: pendingGroup } = await supabase.from('group_messages').select('*').eq('group_id', gm.group_id).not('delivered_to', 'cs', `{"${userNick}"}`).order('timestamp', { ascending: true });
+            // Лише написане після вступу: інакше новий учасник отримував би
+            // догоном усю історію групи, у тому числі нечитабельні конверти.
+            let pq = supabase.from('group_messages').select('*').eq('group_id', gm.group_id).not('delivered_to', 'cs', `{"${userNick}"}`);
+            if (joinedMs(gm)) pq = pq.gte('timestamp', joinedMs(gm));
+            const { data: pendingGroup } = await pq.order('timestamp', { ascending: true });
             const deliveredBySender = {}; // автор → msgIds, що аж тепер дійшли цьому юзеру
             if (pendingGroup && pendingGroup.length > 0) { for (const m of pendingGroup) {
               if (m.type === 'file') ws.send(JSON.stringify({ type: 'file_message', groupId: m.group_id, from: m.from_nick, fileName: m.file_name, ...(m.content && m.content !== m.file_name ? { caption: m.content } : {}), ...(m.file_data && /^(https?|eion):\/\//.test(m.file_data) ? { fileUrl: m.file_data } : { data: m.file_data }), timestamp: m.timestamp, msgId: m.msg_id, catchup: true, ...(m.waveform ? { waveform: m.waveform } : {}), ...(m.duration_sec != null ? { durationSec: m.duration_sec } : {}) }));
