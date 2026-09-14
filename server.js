@@ -892,6 +892,30 @@ function bufferCallIce(fromNick, toNick, candidate) {
   const buf = (pair.iceBuf ||= []);
   if (buf.length < CALL_ICE_BUFFER_MAX) buf.push({ from: fromNick, candidate, sentTo });
 }
+/// Підтвердження, що пристрій справді отримав call_offer сокетом.
+///
+/// 🔴 Щойно згорнутий Android ще кілька секунд виглядає живим: сервер шле offer
+/// у сокет і НАВМИСНО не шле цьому пристрою пуш (інакше подвійний дзвінок). Якщо
+/// сокет насправді вже мертвий або MIUI заморозив ізолят — дзвінок зникає без
+/// сліду (14.09: «на Linux вікно дозвону, на Android не дійшло», телефон зайшов
+/// за 9 с до дзвінка). Той самий клас, що msg_ack для повідомлень: клієнт, що
+/// вміє (`callAck` у login), підтверджує, а без підтвердження — пуш саме йому.
+const CALL_OFFER_ACK_MS = 5000;
+function armCallOfferAck(sess, fromNick, toNick, hasVideo, offer) {
+  const acks = (sess.ws.callOfferAcks ||= new Set());
+  acks.delete(fromNick);
+  setTimeout(async () => {
+    try {
+      if (acks.has(fromNick)) { acks.delete(fromNick); return; }
+      const pair = callBindings.get(callKey(fromNick, toNick));
+      if (!pair || pair.answered) return;   // скасували або взяли на іншому пристрої
+      const others = new Set((await activeDevices(toNick)).map(d => d.device_id).filter(id => id !== sess.deviceId));
+      const n = await sendCallPush(toNick, fromNick, hasVideo, offer, others);
+      console.log(`[calldiag] call_offer ${fromNick}->${toNick}: ${sess.deviceId} не підтвердив за ${CALL_OFFER_ACK_MS}мс → пуш (${n})`);
+      if (n) await supabase.from('call_logs').insert({ from_nick: fromNick, to_nick: toNick, has_video: !!hasVideo, started_at: Date.now(), status: 'missed' });
+    } catch (e) { console.error('[armCallOfferAck]', e.message); }
+  }, CALL_OFFER_ACK_MS);
+}
 function flushCallIce(answererWs, answererNick, callerNick) {
   const pair = callBindings.get(callKey(answererNick, callerNick));
   if (!pair) return 0;
@@ -8575,6 +8599,7 @@ wss.on('connection', (ws) => {
           deviceSessions.delete(userNick);
         }
         // canAck: клієнт підтверджує доставку сам (див. ackAware).
+        ws.callAck = msg.callAck === true;   // підтверджує call_offer (armCallOfferAck)
         addSession(userNick, ws, { canAck: msg.ack === true, deviceId: ws.sessionDevice });
         if (ws.sessionDevice) await touchDevice(userNick, ws.sessionDevice, { platform: typeof msg.platform === 'string' ? msg.platform.slice(0, 24) : null });
         touchLastSeen(userNick);
@@ -9282,6 +9307,7 @@ wss.on('connection', (ws) => {
         // Тепер дзвонять УСІ пристрої: живим сокетам — offer, решті з токеном —
         // пуш. `skip` не дає пристрою задзвонити двічі.
         const liveSocks = [];
+        const ackWatch = [];   // живі сокети телефонів, від яких чекаємо call_offer_ack
         const socks = MULTI_DEVICE ? deviceSessions.get(msg.to) : null;
         if (socks) {
           for (const sess of socks.values()) {
@@ -9290,12 +9316,16 @@ wss.on('connection', (ws) => {
             // Десктоп без токена: евристика йому лише шкодить — фолбеку однаково
             // немає, тож відкритий сокет вважаємо придатним (урок 03.08).
             const deskNoPush = !sess.deviceId || !(await getDeviceToken(msg.to, sess.deviceId));
-            if (alive || deskNoPush) liveSocks.push(sess);
+            if (alive || deskNoPush) {
+              liveSocks.push(sess);
+              if (!deskNoPush && sess.ws.callAck) ackWatch.push(sess);
+            }
           }
         }
         const raw = JSON.stringify({ type: 'call_offer', from: userNick, offer: msg.offer, hasVideo: msg.hasVideo || false });
         if (liveSocks.length) {
           for (const sess of liveSocks) { try { sess.ws.send(raw); } catch (_) { /* помер між перевіркою і записом */ } }
+          for (const sess of ackWatch) armCallOfferAck(sess, userNick, msg.to, msg.hasVideo || false, msg.offer);
         } else if (!MULTI_DEVICE && (wsAlive || (openSocket && !hasToken))) {
           target.ws.send(raw);
         }
@@ -9326,6 +9356,9 @@ wss.on('connection', (ws) => {
         // Дзвінок таки прийняли (FCM розбудив) → прибираємо передчасний missed-лог
         // цієї пари (from=той-хто-дзвонив=msg.to, to=я=userNick).
         await clearPreemptiveMissed(msg.to, userNick);
+      }
+      if (msg.type === 'call_offer_ack' && userNick && typeof msg.from === 'string') {
+        (ws.callOfferAcks ||= new Set()).add(msg.from);
       }
       if (msg.type === 'call_ice') {
         // Буфер — ДО відправки: множина «кому вже пішло» знімається зі стану
