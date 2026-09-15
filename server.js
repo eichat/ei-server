@@ -147,34 +147,43 @@ function decodeStickerContent(content) {
   };
 }
 
-function makeRateLimiter({ windowMs, max }) {
+/// Ліміт частоти на IP. Лічильник у памʼяті процесу — завжди; якщо ввімкнено
+/// кластер (REDIS_URL, розділ 49), рішення бере СПІЛЬНИЙ лічильник у Redis:
+/// інакше кожен інстанс рахував би окремо, і ліміт множився б на їх кількість.
+/// Redis недоступний або не встиг — рішення за локальним лічильником, запит не
+/// висить і не блокується.
+function makeRateLimiter({ windowMs, max, name }) {
   const hits = new Map(); // ip -> { count, resetAt }
   // періодичне прибирання застарілих записів, щоб мапа не росла
   setInterval(() => {
     const now = Date.now();
     for (const [ip, rec] of hits) if (now > rec.resetAt) hits.delete(ip);
   }, windowMs).unref?.();
+  const reject = (res, retryMs) => {
+    res.set('Retry-After', String(Math.max(1, Math.ceil(retryMs / 1000))));
+    return res.status(429).json({ ok: false, error: 'Забагато запитів, спробуйте пізніше', code: 'err_rate_limited' });
+  };
   return (req, res, next) => {
     const ip = req.ip || req.connection?.remoteAddress || 'unknown';
     const now = Date.now();
     let rec = hits.get(ip);
     if (!rec || now > rec.resetAt) { rec = { count: 0, resetAt: now + windowMs }; hits.set(ip, rec); }
     rec.count++;
-    if (rec.count > max) {
-      const retry = Math.ceil((rec.resetAt - now) / 1000);
-      res.set('Retry-After', String(retry));
-      return res.status(429).json({ ok: false, error: 'Забагато запитів, спробуйте пізніше', code: 'err_rate_limited' });
-    }
-    next();
+    const local = () => (rec.count > max ? reject(res, rec.resetAt - now) : next());
+    if (!busReady()) return local();
+    sharedHit(`eion:rl:${name}:${ip}`, windowMs).then((r) => {
+      if (!r) return local();
+      return r.count > max ? reject(res, r.ttl) : next();
+    }, () => local());
   };
 }
 
 // Загальний помірний ліміт на всі HTTP-запити
-app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120 }));
+app.use(makeRateLimiter({ windowMs: 60 * 1000, max: 120, name: 'all' }));
 // Суворіший ліміт на чутливе (вхід/реєстрація/скидання) — проти brute-force.
 // ВИПРАВЛЕНО (аудит #4): раніше тут були неіснуючі /request-reset,/reset-password —
 // реальні шляхи це /forgot,/reset. Плюс телефонні коди (SMS — дорого, брутфорс коду).
-const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20 });
+const authLimiter = makeRateLimiter({ windowMs: 15 * 60 * 1000, max: 20, name: 'auth' });
 app.use(['/login', '/register', '/forgot', '/reset', '/verify-email', '/phone/request-code', '/phone/verify-code', '/check-phone'], authLimiter);
 
 // 🔴 Нік потрапляє у фільтри PostgREST, де кома й дужки — РОЗДІЛЬНИКИ. Нік
@@ -304,12 +313,11 @@ setInterval(() => {
 /// Звірити пароль акаунта перед грошовою дією.
 /// Повертає null, якщо все гаразд; інакше — готове тіло відповіді для res.json.
 ///
-/// ⚠️ Лічильник невдач тримаємо в памʼяті СВІДОМО (на відміну від кодів
-/// відновлення, які довелось переносити в БД). Втрата стану тут грає на користь
-/// власника, а не атакувальника: рестарт знімає лише блокування, а не сам
-/// захист, і активний перебір не дає Render заснути, тож само собою воно не
-/// обнулиться. При ввімкненому кластері це місце переїде в спільний шар разом
-/// із rate-limit.
+/// ⚠️ Лічильник невдач тримаємо в памʼяті СВІДОМО, а не в БД (на відміну від
+/// кодів відновлення). Втрата стану тут грає на користь власника, а не
+/// атакувальника: рестарт знімає лише блокування, а не сам захист, і активний
+/// перебір не дає Render заснути, тож само собою воно не обнулиться. При
+/// ввімкненому кластері лічильник дублюється в Redis (pwLocked/notePwFail).
 /// Ті самі лічильник і пауза, але для шляхів, які звіряють пароль самі
 /// (вхід і зміна даних акаунта). Раніше блокування було лише на грошових
 /// діях — тобто підбирати пароль можна було на `/login` без обмежень на нік,
@@ -318,19 +326,49 @@ setInterval(() => {
 /// ⚠️ Компроміс, свідомий: чужими невдалими спробами можна на 15 хв
 /// заблокувати вхід власнику. Тому для входу поріг вищий (10 проти 5) — там
 /// помиляється жива людина, а не той, хто вже знає половину пароля.
-function pwLocked(nick) {
+///
+/// Кластер: лічильник дублюється в Redis, і блокування діє на ВСІХ інстансах —
+/// інакше перебір розкладався б між процесами й обходив паузу. Локальна копія
+/// лишається запасною, тож збій Redis не знімає захисту.
+async function pwLocked(nick) {
   const rec = pwFails.get(nick);
-  return !!(rec && rec.lockedUntil > Date.now());
+  if (rec && rec.lockedUntil > Date.now()) return true;
+  if (!busReady()) return false;
+  try {
+    const lu = Number(await withRedisTimeout(busPub.hget(`eion:pw:${nick}`, 'lu')));
+    return lu > Date.now();
+  } catch (e) { console.error('[cluster] pwLocked:', e.message); return false; }
 }
 
-function notePwFail(nick, max = PW_FAIL_MAX) {
+const PW_FAIL_LUA = `
+local k = KEYS[1]; local now = tonumber(ARGV[1]); local max = tonumber(ARGV[2]); local lockMs = tonumber(ARGV[3])
+local lu = tonumber(redis.call('HGET', k, 'lu') or '0')
+if lu > 0 and lu <= now then redis.call('DEL', k) end
+local c = redis.call('HINCRBY', k, 'c', 1)
+if c >= max then redis.call('HSET', k, 'lu', now + lockMs) end
+redis.call('PEXPIRE', k, lockMs)
+return c`;
+
+async function notePwFail(nick, max = PW_FAIL_MAX) {
   const now = Date.now();
   const rec = pwFails.get(nick);
+  // Блокування минуло — рахуємо з чистого аркуша, інакше давня серія помилок
+  // складалась би з новою й замикала акаунт з другої спроби.
   let cur = (rec && rec.lockedUntil && rec.lockedUntil <= now) ? null : rec;
   cur = cur || { count: 0, lockedUntil: 0, at: now };
   cur.count++; cur.at = now;
   if (cur.count >= max) cur.lockedUntil = now + PW_LOCK_MS;
   pwFails.set(nick, cur);
+  if (!busReady()) return;
+  try { await withRedisTimeout(busPub.eval(PW_FAIL_LUA, 1, `eion:pw:${nick}`, now, max, PW_LOCK_MS)); }
+  catch (e) { console.error('[cluster] notePwFail:', e.message); }
+}
+
+async function pwReset(nick) {
+  pwFails.delete(nick);
+  if (!busReady()) return;
+  try { await withRedisTimeout(busPub.del(`eion:pw:${nick}`)); }
+  catch (e) { console.error('[cluster] pwReset:', e.message); }
 }
 
 const PW_LOCKED_BODY = { ok: false, error: 'Забагато спроб, спробуйте за 15 хвилин', code: 'err_password_locked' };
@@ -338,26 +376,16 @@ const PW_LOCKED_BODY = { ok: false, error: 'Забагато спроб, спр�
 async function requireAccountPassword(req) {
   const nick = req.nick;
   if (!nick) return { ok: false, error: 'Не авторизовано', code: 'err_unauthorized' };
-  const now = Date.now();
-  const rec = pwFails.get(nick);
-  if (rec && rec.lockedUntil > now) {
-    return { ok: false, error: 'Забагато спроб, спробуйте за 15 хвилин', code: 'err_password_locked' };
-  }
+  if (await pwLocked(nick)) return PW_LOCKED_BODY;
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!password) return { ok: false, error: 'Потрібен пароль', code: 'err_password_required' };
   const { data: user } = await supabase.from('users').select('password_hash').eq('nick', nick).single();
   if (!user || !user.password_hash) return { ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' };
   if (!(await bcrypt.compare(password, user.password_hash))) {
-    // Блокування минуло — рахуємо з чистого аркуша, інакше давня серія помилок
-    // складалась би з новою й замикала акаунт з другої спроби.
-    let cur = (rec && rec.lockedUntil && rec.lockedUntil <= now) ? null : rec;
-    cur = cur || { count: 0, lockedUntil: 0, at: now };
-    cur.count++; cur.at = now;
-    if (cur.count >= PW_FAIL_MAX) cur.lockedUntil = now + PW_LOCK_MS;
-    pwFails.set(nick, cur);
+    await notePwFail(nick);
     return { ok: false, error: 'Невірний пароль', code: 'err_wrong_password' };
   }
-  pwFails.delete(nick); // успіх скидає лічильник
+  await pwReset(nick); // успіх скидає лічильник
   return null;
 }
 
@@ -2673,6 +2701,66 @@ function busPublish(obj) {
   catch (e) { console.error('[cluster] publish:', e.message); return false; }
 }
 
+// ── Спільний стан захистів (ліміти, паузи, замки) ─────────────────────────
+// Запит до Redis не повинен тримати відповідь: не встиг — працюємо за
+// локальним станом, як без кластера. Команди ioredis ставляться в чергу, поки
+// зʼєднання відновлюється, тож без стелі запит міг би висіти хвилинами.
+const REDIS_OP_TIMEOUT_MS = 400;
+function withRedisTimeout(promise, ms = REDIS_OP_TIMEOUT_MS) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => { timer = setTimeout(() => rej(new Error(`redis timeout ${ms}мс`)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
+const RATE_HIT_LUA = `
+local c = redis.call('INCR', KEYS[1])
+if c == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+local t = redis.call('PTTL', KEYS[1])
+if t < 0 then redis.call('PEXPIRE', KEYS[1], ARGV[1]); t = tonumber(ARGV[1]) end
+return {c, t}`;
+
+/// Спільний лічильник вікна: { count, ttl } або null, якщо Redis недоступний.
+async function sharedHit(key, windowMs) {
+  if (!busReady()) return null;
+  try {
+    const [count, ttl] = await withRedisTimeout(busPub.eval(RATE_HIT_LUA, 1, key, windowMs));
+    return { count: Number(count), ttl: Number(ttl) };
+  } catch (e) {
+    console.error('[cluster] rate:', e.message);
+    return null;
+  }
+}
+
+const LOCK_RELEASE_LUA = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end
+return 0`;
+const SHARED_LOCK_TTL_MS = 60000;    // стеля: замок упалого інстанса звільняється сам
+const SHARED_LOCK_WAIT_MS = 30000;   // довше не чекаємо — відповідаємо «спробуйте ще»
+
+/// Замок між інстансами. Повертає функцію звільнення; null — Redis недоступний
+/// (тоді діє лише локальний замок); кидає, якщо не дочекались.
+async function acquireSharedLock(key) {
+  if (!busReady()) return null;
+  const k = `eion:lock:${key}`;
+  const token = `${INSTANCE_ID}:${crypto.randomBytes(6).toString('hex')}`;
+  const deadline = Date.now() + SHARED_LOCK_WAIT_MS;
+  for (;;) {
+    let got;
+    try { got = await withRedisTimeout(busPub.set(k, token, 'PX', SHARED_LOCK_TTL_MS, 'NX')); }
+    catch (e) { console.error('[cluster] lock:', e.message); return null; }
+    if (got === 'OK') {
+      return async () => {
+        try { await withRedisTimeout(busPub.eval(LOCK_RELEASE_LUA, 1, k, token)); }
+        catch (e) { console.error('[cluster] unlock:', e.message); }   // спаде сам за TTL
+      };
+    }
+    if (Date.now() > deadline) throw Object.assign(new Error('lock busy'), { lockBusy: true });
+    await new Promise(r => setTimeout(r, 100));
+  }
+}
+
 /// Запис про користувача, чий сокет тримає ІНШИЙ інстанс.
 /// Реалізує рівно ту поверхню сокета, яку використовує код: send, close,
 /// readyState, isAlive, deviceId (звірено grep-ом, а не на око).
@@ -3496,15 +3584,15 @@ app.post('/login', async (req, res) => {
   const { nick, password } = req.body;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  if (await pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const { data: ban } = await supabase.from('platform_bans').select('reason').eq('nick', user.nick).single();
   if (ban) return res.json({ ok: false, error: `Акаунт заблоковано: ${ban.reason || 'порушення правил'}` });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) {
-    notePwFail(user.nick, 10);
+    await notePwFail(user.nick, 10);
     return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' });
   }
-  pwFails.delete(user.nick);
+  await pwReset(user.nick);
   // Сесійний токен (Фаза 1): клієнт зберігає його й шле в Authorization/WS замість ніка.
   const token = await createSession(user.nick, req.body.deviceId || null);
   res.json({ ok: true, token, nick: user.nick, color: user.color, coins: user.coins || 0, avatar_url: user.avatar_url || null, premium_expires_at: user.premium_expires_at || null, premium_plan: user.premium_plan || null, nick_color: user.nick_color || null, block_incoming: user.block_incoming === true });
@@ -3594,10 +3682,10 @@ app.post('/update-nick', async (req, res) => {
   const newNick = typeof rawNewNick === 'string' ? rawNewNick.trim() : rawNewNick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  if (await pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
-  pwFails.delete(user.nick);
+  if (!valid) { await notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  await pwReset(user.nick);
   if (!newNick || newNick.length < 2) return res.json({ ok: false, error: 'Нік занадто короткий', code: 'err_nick_too_short' });
   if (!nickLooksSafe(newNick)) return res.json({ ok: false, error: 'Нік містить недопустимі символи', code: 'err_nick_bad_chars' });
   const { data: exists } = await supabase.from('users').select('nick').eq('nick_lower', newNick.toLowerCase()).single();
@@ -3644,10 +3732,10 @@ app.post('/update-password', async (req, res) => {
   const { password, newPassword } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  if (await pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
-  pwFails.delete(user.nick);
+  if (!valid) { await notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  await pwReset(user.nick);
   if (!newPassword || newPassword.length < 8) return res.json({ ok: false, error: 'Новий пароль занадто короткий (мін. 8 символів)', code: 'err_password_too_short' });
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await supabase.from('users').update({ password_hash: passwordHash }).eq('nick_lower', nick.toLowerCase());
@@ -3662,10 +3750,10 @@ app.post('/update-phone', async (req, res) => {
   const { password, phone, phoneNormalized } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  if (await pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
-  pwFails.delete(user.nick);
+  if (!valid) { await notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  await pwReset(user.nick);
   if (!phoneNormalized) return res.json({ ok: false, error: 'Невірний номер', code: 'err_invalid_phone' });
   // Унікальність номера (крім самого себе)
   const { data: phoneExists } = await supabase.from('users').select('nick').eq('phone_normalized', phoneNormalized).single();
@@ -3749,10 +3837,10 @@ app.post('/update-email', async (req, res) => {
   const { password, newEmail } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  if (await pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
-  pwFails.delete(user.nick);
+  if (!valid) { await notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  await pwReset(user.nick);
   if (!newEmail || !newEmail.includes('@')) return res.json({ ok: false, error: 'Невірний email', code: 'err_invalid_email' });
   const { data: emailExists } = await supabase.from('users').select('nick').eq('email', newEmail).single();
   if (emailExists) return res.json({ ok: false, error: 'Email вже використовується', code: 'err_email_taken' });
@@ -4135,10 +4223,10 @@ app.post('/delete-account', async (req, res) => {
   const { password } = req.body; const nick = req.nick;
   const { data: user } = await supabase.from('users').select('*').eq('nick_lower', nick?.toLowerCase()).single();
   if (!user) return res.json({ ok: false, error: 'Користувача не знайдено', code: 'err_user_not_found' });
-  if (pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
+  if (await pwLocked(user.nick)) return res.json(PW_LOCKED_BODY);
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) { notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
-  pwFails.delete(user.nick);
+  if (!valid) { await notePwFail(user.nick); return res.json({ ok: false, error: 'Невірний пароль', code: 'err_wrong_password' }); }
+  await pwReset(user.nick);
   // Спершу все привʼязане до ніка, і лише потім сам рядок users: якщо на
   // півдорозі щось упаде, акаунт іще існує і видалення можна повторити.
   const purge = await purgeAccountData(user.nick, user);
@@ -6141,8 +6229,9 @@ app.get('/check-phone', async (req, res) => {
 // ОДИН старий термін: монети списувались двічі, а продовження ставало одне.
 // Унікального ключа, як у наборів наліпок, тут немає — підписку можна
 // продовжувати. Тож запити одного користувача на ту саму дію йдуть по черзі.
-// ⚠️ Замок у памʼяті процесу: при кількох інстансах (REDIS_URL, розділ 49)
-// його треба перенести в спільний шар.
+// Два рівні: чергу в межах процесу тримає локальний ланцюжок, а при
+// ввімкненому кластері (REDIS_URL, розділ 49) — ще й замок у Redis, інакше
+// запити, що потрапили на різні інстанси, знову списали б двічі.
 const keyLocks = new Map();
 async function withKeyLock(key, fn) {
   const prev = keyLocks.get(key) || Promise.resolve();
@@ -6151,16 +6240,36 @@ async function withKeyLock(key, fn) {
   const chain = prev.then(() => cur);
   keyLocks.set(key, chain);
   await prev;
-  try { return await fn(); }
-  finally {
+  let unlockShared = null;
+  try {
+    unlockShared = await acquireSharedLock(key);
+    return await fn();
+  } finally {
+    if (unlockShared) await unlockShared();
     release();
     if (keyLocks.get(key) === chain) keyLocks.delete(key);
   }
 }
 // Щойно завершена покупка преміуму: повтор тієї самої за кілька секунд — це
 // подвійний тап, а не бажання купити ще місяць. Віддаємо той самий результат.
+// У кластері памʼять спільна: повтор може прийти на інший інстанс.
 const recentPremium = new Map();
 const PREMIUM_REPEAT_MS = 15000;
+async function recentPremiumGet(nick) {
+  const local = recentPremium.get(nick);
+  if (local) return local;
+  if (!busReady()) return null;
+  try {
+    const raw = await withRedisTimeout(busPub.get(`eion:premium-recent:${nick}`));
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { console.error('[cluster] premium-recent:', e.message); return null; }
+}
+async function recentPremiumSet(nick, rec) {
+  recentPremium.set(nick, rec);
+  if (!busReady()) return;
+  try { await withRedisTimeout(busPub.set(`eion:premium-recent:${nick}`, JSON.stringify(rec), 'PX', PREMIUM_REPEAT_MS)); }
+  catch (e) { console.error('[cluster] premium-recent:', e.message); }
+}
 
 app.post('/shop/buy-premium', async (req, res) => {
   const { plan } = req.body;
@@ -6170,7 +6279,7 @@ app.post('/shop/buy-premium', async (req, res) => {
   const price = PRICES[plan];
   if (!price) return res.json({ ok: false, error: 'Невідомий план', code: 'err_unknown_plan' });
   return withKeyLock(`premium:${nick}`, async () => {
-  const recent = recentPremium.get(nick);
+  const recent = await recentPremiumGet(nick);
   if (recent && recent.plan === plan && Date.now() - recent.at < PREMIUM_REPEAT_MS) {
     return res.json({ ...recent.body, repeated: true });
   }
@@ -6190,7 +6299,7 @@ app.post('/shop/buy-premium', async (req, res) => {
   await supabase.from('users').update({ premium_expires_at: expiresAt.toISOString(), premium_plan: plan }).eq('nick', nick);
   sendToUser(nick, { type: 'coins_update', amount: -price, total: newBalance });
   const body = { ok: true, newBalance, expiresAt: expiresAt.toISOString(), plan };
-  recentPremium.set(nick, { plan, at: Date.now(), body });
+  await recentPremiumSet(nick, { plan, at: Date.now(), body });
   res.json(body);
   });
 });
@@ -9004,8 +9113,12 @@ wss.on('connection', (ws) => {
           // deviceId санітизуємо: він іде в ключ таблиці user_devices і в
           // порівняння пристроїв при дзвінку. Сирий рядок із клієнта тут
           // лишався єдиним несанітизованим входом (аудит 13.09).
+          // Пристрій сокета — лише `ws.sessionDevice` (ставиться при login).
+          // Колишнє окреме `ws.deviceId` звідси бралось тільки з реєстрації
+          // пуш-токена, тобто лише на Android, і розходилось із пристроєм
+          // сесії: перевірка «дзвінок на той самий пристрій» порівнювала два
+          // різні поля.
           const dev = sanitizeDeviceId(msg.deviceId);
-          if (dev) ws.deviceId = dev;
           await saveFcmToken(userNick, msg.token, dev || undefined);
         }
       }
@@ -9456,13 +9569,14 @@ wss.on('connection', (ws) => {
         // Захист від «дзвінка самому собі»: якщо адресат — інший акаунт на
         // ТОМУ САМОМУ пристрої (спільний FCM-токен), не доставляємо ні WS, ні пуш.
         const target = onlineUsers.get(msg.to);
-        // Порівнюємо deviceId ФАКТИЧНИХ сокетів обох сторін, а не мапу за
-        // ніками: мапа памʼятає історію («нік колись заходив із цього
-        // телефона») і хибно блокувала дзвінки між РІЗНИМИ пристроями. Сокет
-        // же завжди належить одній конкретній машині. Десктоп deviceId не
-        // реєструє → undefined → перевірка не спрацьовує, і це правильно.
-        const fromDev = ws.deviceId;
-        const toDev = target && target.ws && target.ws.deviceId;
+        // Порівнюємо пристрої ФАКТИЧНИХ сокетів, а не мапу за ніками: мапа
+        // памʼятає історію («нік колись заходив із цього телефона») і хибно
+        // блокувала дзвінки між РІЗНИМИ пристроями.
+        // У режимі кількох пристроїв адресат має кілька сокетів, тож «той самий
+        // пристрій» — не заборона дзвінка, а лише пропуск ЦЬОГО пристрою (див.
+        // `fromDev` нижче). Повністю відхиляємо тільки у старому режимі.
+        const fromDev = ws.sessionDevice || null;
+        const toDev = !MULTI_DEVICE && target && target.ws && target.ws.deviceId;
         if (fromDev && toDev && fromDev === toDev) {
           console.log(`call_offer blocked: ${userNick}->${msg.to} same device ${fromDev}`);
           ws.send(JSON.stringify({ type: 'call_error', error: 'Неможливо дзвонити на цей самий пристрій', code: 'err_call_same_device' }));
@@ -9502,9 +9616,13 @@ wss.on('connection', (ws) => {
         const liveSocks = [];
         const ackWatch = [];   // живі сокети телефонів, від яких чекаємо call_offer_ack
         const socks = MULTI_DEVICE ? deviceSessions.get(msg.to) : null;
+        let sameDeviceOnly = false;   // адресат онлайн лише на пристрої дзвонаря
         if (socks) {
           for (const sess of socks.values()) {
             if (sess.ws.readyState !== 1) continue;
+            // Інший акаунт на ТІЙ САМІЙ машині (перемикання профілю на
+            // десктопі, спільний пристрій): дзвонити туди нема сенсу.
+            if (fromDev && sess.deviceId === fromDev) { sameDeviceOnly = true; continue; }
             const alive = sess.ws.isAlive !== false || Date.now() - (sess.lastSeen || 0) < 35000;
             // Десктоп без токена: евристика йому лише шкодить — фолбеку однаково
             // немає, тож відкритий сокет вважаємо придатним (урок 03.08).
@@ -9524,11 +9642,16 @@ wss.on('connection', (ws) => {
         }
         const deliveredLive = liveSocks.length > 0 || (!MULTI_DEVICE && (wsAlive || (openSocket && !hasToken)));
         const skip = new Set(liveSocks.map(x => x.deviceId).filter(Boolean));
+        if (fromDev) skip.add(fromDev);   // пуш на пристрій, з якого дзвонять, — теж ні
         // Пуш — пристроям, які offer сокетом НЕ отримали. Раніше він ішов лише
         // коли онлайн не було НІКОГО.
         const pushed = hasToken ? await sendCallPush(msg.to, userNick, msg.hasVideo || false, msg.offer, skip) : 0;
+        if (!deliveredLive && !pushed && sameDeviceOnly) {
+          ws.send(JSON.stringify({ type: 'call_error', error: 'Неможливо дзвонити на цей самий пристрій', code: 'err_call_same_device' }));
+          return;
+        }
         if (!deliveredLive) {
-          if (target) { onlineUsers.delete(msg.to); console.log(`call_offer: ${msg.to} stale socket → FCM`); }
+          if (target && !sameDeviceOnly) { onlineUsers.delete(msg.to); console.log(`call_offer: ${msg.to} stale socket → FCM`); }
           // Missed-лог створюємо, коли доставити наживо не вдалось: пуш міг не
           // розбудити. Якщо розбудить і дзвінок приймуть — запис приберемо в
           // call_answer (див. нижче).
