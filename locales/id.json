@@ -966,5 +966,8 @@
   "invite_link_hint": "Siapa pun yang memiliki tautan ini dapat bergabung.",
   "invite_link_copied": "Tautan disalin",
   "invite_link_reset": "Atur ulang tautan",
-  "invite_link_reset_warn": "Tautan lama akan berhenti berfungsi. Yang sudah bergabung tetap ada."
+  "invite_link_reset_warn": "Tautan lama akan berhenti berfungsi. Yang sudah bergabung tetap ada.",
+  "my_link_title": "Tautan saya",
+  "my_link_sub": "Agar orang bisa mengirim pesan di EION",
+  "my_link_hint": "Siapa pun yang membuka tautan ini dapat mengirim pesan kepada Anda di EION."
 }

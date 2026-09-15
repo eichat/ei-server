@@ -966,5 +966,8 @@
   "invite_link_hint": "Iedereen met deze link kan deelnemen.",
   "invite_link_copied": "Link gekopieerd",
   "invite_link_reset": "Link opnieuw instellen",
-  "invite_link_reset_warn": "De oude link werkt niet meer. Wie al is toegetreden, blijft."
+  "invite_link_reset_warn": "De oude link werkt niet meer. Wie al is toegetreden, blijft.",
+  "my_link_title": "Mijn link",
+  "my_link_sub": "Zodat men u op EION kan schrijven",
+  "my_link_hint": "Wie deze link opent, kan u op EION een bericht sturen."
 }

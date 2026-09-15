@@ -966,5 +966,8 @@
   "invite_link_hint": "Bất kỳ ai có liên kết này đều có thể tham gia.",
   "invite_link_copied": "Đã sao chép liên kết",
   "invite_link_reset": "Đặt lại liên kết",
-  "invite_link_reset_warn": "Liên kết cũ sẽ ngừng hoạt động. Những người đã tham gia vẫn ở lại."
+  "invite_link_reset_warn": "Liên kết cũ sẽ ngừng hoạt động. Những người đã tham gia vẫn ở lại.",
+  "my_link_title": "Liên kết của tôi",
+  "my_link_sub": "Để mọi người nhắn tin cho bạn trên EION",
+  "my_link_hint": "Bất kỳ ai mở liên kết này đều có thể nhắn tin cho bạn trên EION."
 }

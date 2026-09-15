@@ -966,5 +966,8 @@
   "invite_link_hint": "Chiunque abbia questo link può entrare.",
   "invite_link_copied": "Link copiato",
   "invite_link_reset": "Reimposta link",
-  "invite_link_reset_warn": "Il vecchio link smetterà di funzionare. Chi è già entrato resta."
+  "invite_link_reset_warn": "Il vecchio link smetterà di funzionare. Chi è già entrato resta.",
+  "my_link_title": "Il mio link",
+  "my_link_sub": "Perché ti scrivano su EION",
+  "my_link_hint": "Chi apre questo link potrà scriverti su EION."
 }

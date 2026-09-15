@@ -966,5 +966,8 @@
   "invite_link_hint": "이 링크가 있는 사람은 누구나 참여할 수 있습니다.",
   "invite_link_copied": "링크를 복사했습니다",
   "invite_link_reset": "링크 재설정",
-  "invite_link_reset_warn": "이전 링크는 작동하지 않습니다. 이미 참여한 사람은 그대로 남습니다."
+  "invite_link_reset_warn": "이전 링크는 작동하지 않습니다. 이미 참여한 사람은 그대로 남습니다.",
+  "my_link_title": "내 링크",
+  "my_link_sub": "EION에서 메시지를 받으려면",
+  "my_link_hint": "이 링크를 여는 사람은 EION에서 당신에게 메시지를 보낼 수 있습니다."
 }

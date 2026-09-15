@@ -966,5 +966,8 @@
   "invite_link_hint": "Bu bağlantıya sahip herkes katılabilir.",
   "invite_link_copied": "Bağlantı kopyalandı",
   "invite_link_reset": "Bağlantıyı sıfırla",
-  "invite_link_reset_warn": "Eski bağlantı çalışmayı durduracak. Zaten katılanlar kalır."
+  "invite_link_reset_warn": "Eski bağlantı çalışmayı durduracak. Zaten katılanlar kalır.",
+  "my_link_title": "Bağlantım",
+  "my_link_sub": "EION'da size yazabilmeleri için",
+  "my_link_hint": "Bu bağlantıyı açan herkes EION'da size yazabilir."
 }

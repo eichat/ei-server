@@ -966,5 +966,8 @@
   "invite_link_hint": "任何拥有此链接的人都可以加入。",
   "invite_link_copied": "已复制链接",
   "invite_link_reset": "重置链接",
-  "invite_link_reset_warn": "旧链接将失效。已加入的人会保留。"
+  "invite_link_reset_warn": "旧链接将失效。已加入的人会保留。",
+  "my_link_title": "我的链接",
+  "my_link_sub": "方便别人在 EION 给你发消息",
+  "my_link_hint": "打开此链接的人都可以在 EION 给你发消息。"
 }

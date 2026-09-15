@@ -966,5 +966,8 @@
   "invite_link_hint": "Anyone with this link can join.",
   "invite_link_copied": "Link copied",
   "invite_link_reset": "Reset link",
-  "invite_link_reset_warn": "The old link will stop working. Those who already joined stay."
+  "invite_link_reset_warn": "The old link will stop working. Those who already joined stay.",
+  "my_link_title": "My link",
+  "my_link_sub": "So people can message you on EION",
+  "my_link_hint": "Anyone who opens this link can message you on EION."
 }

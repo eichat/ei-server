@@ -966,5 +966,8 @@
   "invite_link_hint": "Kahit sino na may ganitong link ay makakasali.",
   "invite_link_copied": "Nakopya ang link",
   "invite_link_reset": "I-reset ang link",
-  "invite_link_reset_warn": "Hindi na gagana ang lumang link. Mananatili ang mga sumali na."
+  "invite_link_reset_warn": "Hindi na gagana ang lumang link. Mananatili ang mga sumali na.",
+  "my_link_title": "Aking link",
+  "my_link_sub": "Para makapag-message sa iyo sa EION",
+  "my_link_hint": "Sinumang magbukas ng link na ito ay makakapag-message sa iyo sa EION."
 }
