@@ -949,5 +949,11 @@
   "stream_ended_badge": "방송 종료",
   "stream_live_now": "지금 라이브",
   "stream_join": "참여",
-  "stream_started": "라이브 방송이 시작됐습니다"
+  "stream_started": "라이브 방송이 시작됐습니다",
+  "err_invite_not_found": "초대 링크가 유효하지 않습니다",
+  "err_invite_revoked": "초대 링크가 취소되었습니다",
+  "err_invite_expired": "초대 링크가 만료되었습니다",
+  "err_invite_used_up": "초대 링크 사용 한도에 도달했습니다",
+  "err_invite_create": "초대 링크를 만들 수 없습니다",
+  "err_subscribe_failed": "구독할 수 없습니다"
 }

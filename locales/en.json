@@ -949,5 +949,11 @@
   "stream_ended_badge": "Stream ended",
   "stream_live_now": "Live now",
   "stream_join": "Join",
-  "stream_started": "Live stream started"
+  "stream_started": "Live stream started",
+  "err_invite_not_found": "Invite link is invalid",
+  "err_invite_revoked": "Invite link has been revoked",
+  "err_invite_expired": "Invite link has expired",
+  "err_invite_used_up": "Invite link has reached its limit",
+  "err_invite_create": "Could not create invite link",
+  "err_subscribe_failed": "Could not subscribe"
 }

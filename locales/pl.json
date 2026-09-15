@@ -949,5 +949,11 @@
   "stream_ended_badge": "Transmisja zakończona",
   "stream_live_now": "Teraz na żywo",
   "stream_join": "Dołącz",
-  "stream_started": "Rozpoczęła się transmisja"
+  "stream_started": "Rozpoczęła się transmisja",
+  "err_invite_not_found": "Link zaproszenia jest nieprawidłowy",
+  "err_invite_revoked": "Link zaproszenia został unieważniony",
+  "err_invite_expired": "Link zaproszenia wygasł",
+  "err_invite_used_up": "Link zaproszenia osiągnął limit",
+  "err_invite_create": "Nie udało się utworzyć linku zaproszenia",
+  "err_subscribe_failed": "Nie udało się zasubskrybować"
 }

@@ -949,5 +949,11 @@
   "stream_ended_badge": "Трансляция завершена",
   "stream_live_now": "Сейчас в эфире",
   "stream_join": "Присоединиться",
-  "stream_started": "Началась трансляция"
+  "stream_started": "Началась трансляция",
+  "err_invite_not_found": "Ссылка-приглашение недействительна",
+  "err_invite_revoked": "Ссылка-приглашение отозвана",
+  "err_invite_expired": "Срок действия ссылки истёк",
+  "err_invite_used_up": "Лимит ссылки-приглашения исчерпан",
+  "err_invite_create": "Не удалось создать ссылку",
+  "err_subscribe_failed": "Не удалось подписаться"
 }

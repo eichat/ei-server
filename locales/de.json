@@ -949,5 +949,11 @@
   "stream_ended_badge": "Stream beendet",
   "stream_live_now": "Jetzt live",
   "stream_join": "Ansehen",
-  "stream_started": "Livestream gestartet"
+  "stream_started": "Livestream gestartet",
+  "err_invite_not_found": "Einladungslink ist ungültig",
+  "err_invite_revoked": "Einladungslink wurde widerrufen",
+  "err_invite_expired": "Einladungslink ist abgelaufen",
+  "err_invite_used_up": "Einladungslink ist aufgebraucht",
+  "err_invite_create": "Einladungslink konnte nicht erstellt werden",
+  "err_subscribe_failed": "Abonnieren fehlgeschlagen"
 }

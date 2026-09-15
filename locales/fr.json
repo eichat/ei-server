@@ -949,5 +949,11 @@
   "stream_ended_badge": "Direct terminé",
   "stream_live_now": "En direct maintenant",
   "stream_join": "Rejoindre",
-  "stream_started": "Le direct a commencé"
+  "stream_started": "Le direct a commencé",
+  "err_invite_not_found": "Le lien d'invitation n'est pas valide",
+  "err_invite_revoked": "Le lien d'invitation a été révoqué",
+  "err_invite_expired": "Le lien d'invitation a expiré",
+  "err_invite_used_up": "Le lien d'invitation a atteint sa limite",
+  "err_invite_create": "Impossible de créer le lien d'invitation",
+  "err_subscribe_failed": "Impossible de s'abonner"
 }

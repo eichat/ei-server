@@ -949,5 +949,11 @@
   "stream_ended_badge": "انتهى البث",
   "stream_live_now": "مباشر الآن",
   "stream_join": "انضم",
-  "stream_started": "بدأ البث المباشر"
+  "stream_started": "بدأ البث المباشر",
+  "err_invite_not_found": "رابط الدعوة غير صالح",
+  "err_invite_revoked": "تم إلغاء رابط الدعوة",
+  "err_invite_expired": "انتهت صلاحية رابط الدعوة",
+  "err_invite_used_up": "تم استخدام رابط الدعوة بالكامل",
+  "err_invite_create": "تعذّر إنشاء رابط الدعوة",
+  "err_subscribe_failed": "تعذّر الاشتراك"
 }

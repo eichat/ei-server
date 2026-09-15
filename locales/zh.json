@@ -949,5 +949,11 @@
   "stream_ended_badge": "直播已结束",
   "stream_live_now": "正在直播",
   "stream_join": "加入",
-  "stream_started": "直播已开始"
+  "stream_started": "直播已开始",
+  "err_invite_not_found": "邀请链接无效",
+  "err_invite_revoked": "邀请链接已被撤销",
+  "err_invite_expired": "邀请链接已过期",
+  "err_invite_used_up": "邀请链接已达使用上限",
+  "err_invite_create": "无法创建邀请链接",
+  "err_subscribe_failed": "无法订阅"
 }

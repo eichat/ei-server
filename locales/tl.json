@@ -949,5 +949,11 @@
   "stream_ended_badge": "Tapos ang live",
   "stream_live_now": "Live ngayon",
   "stream_join": "Sumali",
-  "stream_started": "Nagsimula ang live stream"
+  "stream_started": "Nagsimula ang live stream",
+  "err_invite_not_found": "Hindi wasto ang invite link",
+  "err_invite_revoked": "Kinansela na ang invite link",
+  "err_invite_expired": "Nag-expire na ang invite link",
+  "err_invite_used_up": "Naabot na ang limitasyon ng invite link",
+  "err_invite_create": "Hindi makagawa ng invite link",
+  "err_subscribe_failed": "Hindi maka-subscribe"
 }

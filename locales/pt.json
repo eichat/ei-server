@@ -949,5 +949,11 @@
   "stream_ended_badge": "Transmissão terminada",
   "stream_live_now": "Ao vivo agora",
   "stream_join": "Entrar",
-  "stream_started": "A transmissão começou"
+  "stream_started": "A transmissão começou",
+  "err_invite_not_found": "O link de convite é inválido",
+  "err_invite_revoked": "O link de convite foi revogado",
+  "err_invite_expired": "O link de convite expirou",
+  "err_invite_used_up": "O link de convite atingiu o limite",
+  "err_invite_create": "Não foi possível criar o link de convite",
+  "err_subscribe_failed": "Não foi possível inscrever-se"
 }

@@ -949,5 +949,11 @@
   "stream_ended_badge": "সম্প্রচার শেষ",
   "stream_live_now": "এখন লাইভ",
   "stream_join": "যোগ দিন",
-  "stream_started": "লাইভ সম্প্রচার শুরু হয়েছে"
+  "stream_started": "লাইভ সম্প্রচার শুরু হয়েছে",
+  "err_invite_not_found": "আমন্ত্রণ লিঙ্কটি অবৈধ",
+  "err_invite_revoked": "আমন্ত্রণ লিঙ্কটি বাতিল করা হয়েছে",
+  "err_invite_expired": "আমন্ত্রণ লিঙ্কের মেয়াদ শেষ হয়ে গেছে",
+  "err_invite_used_up": "আমন্ত্রণ লিঙ্কের সীমা শেষ",
+  "err_invite_create": "আমন্ত্রণ লিঙ্ক তৈরি করা যায়নি",
+  "err_subscribe_failed": "সাবস্ক্রাইব করা যায়নি"
 }

@@ -949,5 +949,11 @@
   "stream_ended_badge": "Siaran berakhir",
   "stream_live_now": "Sedang live",
   "stream_join": "Gabung",
-  "stream_started": "Siaran langsung dimulai"
+  "stream_started": "Siaran langsung dimulai",
+  "err_invite_not_found": "Tautan undangan tidak valid",
+  "err_invite_revoked": "Tautan undangan telah dicabut",
+  "err_invite_expired": "Tautan undangan telah kedaluwarsa",
+  "err_invite_used_up": "Tautan undangan telah mencapai batasnya",
+  "err_invite_create": "Tidak dapat membuat tautan undangan",
+  "err_subscribe_failed": "Tidak dapat berlangganan"
 }

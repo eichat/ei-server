@@ -949,5 +949,11 @@
   "stream_ended_badge": "Diretta terminata",
   "stream_live_now": "In diretta ora",
   "stream_join": "Partecipa",
-  "stream_started": "La diretta è iniziata"
+  "stream_started": "La diretta è iniziata",
+  "err_invite_not_found": "Il link di invito non è valido",
+  "err_invite_revoked": "Il link di invito è stato revocato",
+  "err_invite_expired": "Il link di invito è scaduto",
+  "err_invite_used_up": "Il link di invito ha raggiunto il limite",
+  "err_invite_create": "Impossibile creare il link di invito",
+  "err_subscribe_failed": "Impossibile iscriversi"
 }

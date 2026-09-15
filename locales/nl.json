@@ -949,5 +949,11 @@
   "stream_ended_badge": "Livestream beëindigd",
   "stream_live_now": "Nu live",
   "stream_join": "Kijken",
-  "stream_started": "Livestream gestart"
+  "stream_started": "Livestream gestart",
+  "err_invite_not_found": "Uitnodigingslink is ongeldig",
+  "err_invite_revoked": "Uitnodigingslink is ingetrokken",
+  "err_invite_expired": "Uitnodigingslink is verlopen",
+  "err_invite_used_up": "Uitnodigingslink heeft de limiet bereikt",
+  "err_invite_create": "Kan uitnodigingslink niet maken",
+  "err_subscribe_failed": "Abonneren mislukt"
 }

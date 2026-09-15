@@ -949,5 +949,11 @@
   "stream_ended_badge": "สิ้นสุดการถ่ายทอด",
   "stream_live_now": "กำลังถ่ายทอดสด",
   "stream_join": "เข้าร่วม",
-  "stream_started": "เริ่มถ่ายทอดสดแล้ว"
+  "stream_started": "เริ่มถ่ายทอดสดแล้ว",
+  "err_invite_not_found": "ลิงก์คำเชิญไม่ถูกต้อง",
+  "err_invite_revoked": "ลิงก์คำเชิญถูกยกเลิกแล้ว",
+  "err_invite_expired": "ลิงก์คำเชิญหมดอายุแล้ว",
+  "err_invite_used_up": "ลิงก์คำเชิญถึงขีดจำกัดแล้ว",
+  "err_invite_create": "ไม่สามารถสร้างลิงก์คำเชิญได้",
+  "err_subscribe_failed": "ไม่สามารถติดตามได้"
 }

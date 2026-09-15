@@ -440,6 +440,26 @@ create table if not exists public.user_prefs (
 
 create index if not exists user_prefs_sync_idx on public.user_prefs (nick, updated_at);
 
+-- Посилання-запрошення в групи й канали (див. migrations/invite_links.sql).
+-- Токен, а не id: id послідовні, тож посилання виду /g/5 дозволяло б перебором
+-- перелічити всі групи застосунку.
+create table if not exists public.invite_links (
+  token text NOT NULL,
+  kind text NOT NULL,
+  target_id bigint NOT NULL,
+  created_by text NOT NULL,
+  created_at bigint NOT NULL,
+  expires_at bigint,
+  max_uses integer,
+  uses integer NOT NULL DEFAULT 0,
+  revoked boolean NOT NULL DEFAULT false,
+  primary key (token),
+  constraint invite_links_kind_chk check (kind in ('group', 'channel'))
+);
+
+create index if not exists invite_links_target_idx
+  on public.invite_links (kind, target_id) where revoked = false;
+
 -- Облік пропозиції монет (одна строка) і денні лічильники норм.
 -- 🔴 Досі жили лише в migrations/coin_sinks.sql: розгортання з нуля давало
 -- базу без них — burn_coins падав, норми AI/сховища/релея не рахувались.
@@ -862,6 +882,7 @@ alter table public.message_deletions enable row level security;
 alter table public.user_stickers enable row level security;
 alter table public.chat_mutes enable row level security;
 alter table public.user_prefs enable row level security;
+alter table public.invite_links enable row level security;
 alter table public.coin_supply enable row level security;
 alter table public.usage_counters enable row level security;
 alter table public.platform_bans enable row level security;
@@ -1140,6 +1161,8 @@ grant delete, insert, references, select, trigger, truncate, update on table pub
 grant delete, insert, references, select, trigger, truncate, update on table public.chat_mutes to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_prefs to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.user_prefs to service_role;
+grant delete, insert, references, select, trigger, truncate, update on table public.invite_links to postgres;
+grant delete, insert, references, select, trigger, truncate, update on table public.invite_links to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_supply to postgres;
 grant delete, insert, references, select, trigger, truncate, update on table public.coin_supply to service_role;
 grant delete, insert, references, select, trigger, truncate, update on table public.usage_counters to postgres;
@@ -1384,5 +1407,37 @@ begin
 end;
 $$;
 
+
+-- Перевірка й лічильник посилання-запрошення — однією транзакцією. Без цього
+-- два одночасні переходи за посиланням «на одну людину» впустили б обох.
+create or replace function public.use_invite(p_token text)
+returns table (ok boolean, reason text, kind text, target_id bigint)
+language plpgsql
+as $$
+declare
+  r public.invite_links%rowtype;
+  now_ms bigint := (extract(epoch from now())::bigint * 1000);
+begin
+  select * into r from public.invite_links where token = p_token for update;
+  if not found then
+    return query select false, 'not_found', null::text, null::bigint; return;
+  end if;
+  if r.revoked then
+    return query select false, 'revoked', r.kind, r.target_id; return;
+  end if;
+  if r.expires_at is not null and r.expires_at < now_ms then
+    return query select false, 'expired', r.kind, r.target_id; return;
+  end if;
+  if r.max_uses is not null and r.uses >= r.max_uses then
+    return query select false, 'used_up', r.kind, r.target_id; return;
+  end if;
+  update public.invite_links set uses = uses + 1 where token = p_token;
+  return query select true, null::text, r.kind, r.target_id;
+end
+$$;
+
+-- PUBLIC має EXECUTE на функціях за замовчуванням (аудит #11, друге коло).
+revoke all on function public.use_invite(text) from public, anon, authenticated;
+grant execute on function public.use_invite(text) to postgres, service_role;
 grant execute on function public.coins_circulating() to postgres, service_role;
 grant execute on function public.note_coin_flow(text, bigint) to postgres, service_role;

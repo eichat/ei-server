@@ -949,5 +949,11 @@
   "stream_ended_badge": "Трансляція завершена",
   "stream_live_now": "Зараз у ефірі",
   "stream_join": "Приєднатися",
-  "stream_started": "Почалась трансляція"
+  "stream_started": "Почалась трансляція",
+  "err_invite_not_found": "Посилання недійсне",
+  "err_invite_revoked": "Посилання скасовано",
+  "err_invite_expired": "Термін дії посилання минув",
+  "err_invite_used_up": "Посилання вичерпано",
+  "err_invite_create": "Не вдалося створити посилання",
+  "err_subscribe_failed": "Не вдалося підписатися"
 }

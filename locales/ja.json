@@ -949,5 +949,11 @@
   "stream_ended_badge": "配信終了",
   "stream_live_now": "ライブ配信中",
   "stream_join": "参加",
-  "stream_started": "ライブ配信が始まりました"
+  "stream_started": "ライブ配信が始まりました",
+  "err_invite_not_found": "招待リンクが無効です",
+  "err_invite_revoked": "招待リンクは取り消されました",
+  "err_invite_expired": "招待リンクの有効期限が切れています",
+  "err_invite_used_up": "招待リンクの利用上限に達しました",
+  "err_invite_create": "招待リンクを作成できませんでした",
+  "err_subscribe_failed": "登録できませんでした"
 }

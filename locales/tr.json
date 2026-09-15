@@ -949,5 +949,11 @@
   "stream_ended_badge": "Yayın sona erdi",
   "stream_live_now": "Şu an canlı",
   "stream_join": "Katıl",
-  "stream_started": "Canlı yayın başladı"
+  "stream_started": "Canlı yayın başladı",
+  "err_invite_not_found": "Davet bağlantısı geçersiz",
+  "err_invite_revoked": "Davet bağlantısı iptal edildi",
+  "err_invite_expired": "Davet bağlantısının süresi doldu",
+  "err_invite_used_up": "Davet bağlantısı sınırına ulaştı",
+  "err_invite_create": "Davet bağlantısı oluşturulamadı",
+  "err_subscribe_failed": "Abone olunamadı"
 }

@@ -949,5 +949,11 @@
   "stream_ended_badge": "Đã kết thúc phát trực tiếp",
   "stream_live_now": "Đang phát trực tiếp",
   "stream_join": "Tham gia",
-  "stream_started": "Đã bắt đầu phát trực tiếp"
+  "stream_started": "Đã bắt đầu phát trực tiếp",
+  "err_invite_not_found": "Liên kết mời không hợp lệ",
+  "err_invite_revoked": "Liên kết mời đã bị thu hồi",
+  "err_invite_expired": "Liên kết mời đã hết hạn",
+  "err_invite_used_up": "Liên kết mời đã đạt giới hạn",
+  "err_invite_create": "Không thể tạo liên kết mời",
+  "err_subscribe_failed": "Không thể đăng ký"
 }

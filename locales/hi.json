@@ -949,5 +949,11 @@
   "stream_ended_badge": "प्रसारण समाप्त",
   "stream_live_now": "अभी लाइव",
   "stream_join": "जुड़ें",
-  "stream_started": "लाइव प्रसारण शुरू हुआ"
+  "stream_started": "लाइव प्रसारण शुरू हुआ",
+  "err_invite_not_found": "आमंत्रण लिंक अमान्य है",
+  "err_invite_revoked": "आमंत्रण लिंक रद्द कर दिया गया है",
+  "err_invite_expired": "आमंत्रण लिंक की अवधि समाप्त हो गई है",
+  "err_invite_used_up": "आमंत्रण लिंक की सीमा समाप्त हो गई है",
+  "err_invite_create": "आमंत्रण लिंक नहीं बनाया जा सका",
+  "err_subscribe_failed": "सदस्यता नहीं ली जा सकी"
 }

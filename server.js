@@ -5919,10 +5919,8 @@ app.post('/group/join', async (req, res) => {
   const { data: existing } = await supabase.from('group_members').select('nick').eq('group_id', groupId).eq('nick', nick).single();
   if (existing) return res.json({ ok: false, error: 'Ви вже в групі', code: 'err_already_in_group' });
   if (group.type === 'open') {
-    await supabase.from('group_members').insert({ group_id: groupId, nick, role: 'member' });
-    const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', groupId);
-    await notifyMembers(groupId, { type: 'group_member_added', groupId, nick }, nick);
-    const t = onlineUsers.get(nick); if (t) t.ws.send(JSON.stringify({ type: 'group_added', group: { id: group.id, name: group.name, creator_nick: group.creator_nick, type: group.type }, members: (members || []).map(m => m.nick) }));
+    // Спільне з /invite/accept: вступ і сповіщення в одному місці.
+    await addMemberToGroup(group, nick);
     return res.json({ ok: true, joined: true });
   }
   if (group.type === 'approval') {
@@ -7804,6 +7802,183 @@ app.post('/channel/invite-response', async (req, res) => {
   res.json({ ok: true, channel: { ...channel, myRole: 'subscriber', subscriberCount: count || 0 } });
 });
 
+
+
+// ─── Посилання-запрошення ─────────────────────────────────────────────────
+//
+// Формат: https://eion.network/i/#<token>. Токен у ФРАГМЕНТІ, бо фрагмент
+// браузер серверу не надсилає — він не осідає ні в логах веб-сервера сайту, ні
+// в Referer, ні в аналітиці (так само зроблено в Signal). Сторінка сайту сама
+// нічого про токен не питає: назву групи показує вже застосунок, тож токен
+// узагалі не виходить за межі пари «пристрій ↔ наш API».
+//
+// Токен, а не id: id груп і каналів послідовні, тож посилання виду /g/5
+// дозволяло б перебором перелічити весь застосунок.
+const INVITE_URL_BASE = process.env.INVITE_URL_BASE || 'https://eion.network/i/#';
+const INVITE_TOKEN_LEN = 10;
+const INVITE_B62 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+function makeInviteToken(len = INVITE_TOKEN_LEN) {
+  let out = '';
+  while (out.length < len) {
+    // Байти від 248 відкидаємо: 248 = 62×4, інакше перші 8 символів алфавіту
+    // випадали б частіше за решту й простір перебору був би меншим за 62^10.
+    for (const b of crypto.randomBytes(len * 2)) {
+      if (b < 248) { out += INVITE_B62[b % 62]; if (out.length === len) break; }
+    }
+  }
+  return out;
+}
+
+async function canManageInvite(kind, targetId, nick) {
+  if (kind === 'group') return await isModOrCreator(targetId, nick);
+  const { data: m } = await supabase.from('channel_members').select('role')
+    .eq('channel_id', targetId).eq('nick', nick).single();
+  return !!(m && ['owner', 'admin'].includes(m.role));
+}
+
+// Читає посилання й перевіряє, чи воно ще чинне. Лічильник НЕ чіпає — цим
+// займається use_invite при самому вступі.
+async function loadInvite(token) {
+  if (!token || typeof token !== 'string' || token.length > 64) return { ok: false, code: 'err_invalid_params', error: 'Невірні параметри' };
+  const { data: link } = await supabase.from('invite_links').select('*').eq('token', token).single();
+  if (!link) return { ok: false, code: 'err_invite_not_found', error: 'Посилання недійсне' };
+  if (link.revoked) return { ok: false, code: 'err_invite_revoked', error: 'Посилання скасовано' };
+  if (link.expires_at && link.expires_at < Date.now()) return { ok: false, code: 'err_invite_expired', error: 'Термін дії посилання минув' };
+  if (link.max_uses != null && link.uses >= link.max_uses) return { ok: false, code: 'err_invite_used_up', error: 'Посилання вичерпано' };
+  return { ok: true, link };
+}
+
+// Вступ у групу + сповіщення. Спільне для /group/join і /invite/accept: дві
+// копії цієї логіки розійшлися б, щойно в одній щось додали.
+async function addMemberToGroup(group, nick) {
+  await supabase.from('group_members').insert({ group_id: group.id, nick, role: 'member' });
+  const { data: members } = await supabase.from('group_members').select('nick').eq('group_id', group.id);
+  await notifyMembers(group.id, { type: 'group_member_added', groupId: group.id, nick }, nick);
+  sendToUser(nick, {
+    type: 'group_added',
+    group: { id: group.id, name: group.name, creator_nick: group.creator_nick, type: group.type },
+    members: (members || []).map(m => m.nick),
+  });
+}
+
+// Створити (або віддати наявне) посилання цілі. Одне стабільне посилання на
+// групу, а не нове на кожен тап «Поділитися»: інакше «скинути посилання»
+// перестає щось означати — старі копії лишалися б робочими.
+app.post('/invite/create', async (req, res) => {
+  const { kind, targetId } = req.body; const nick = req.nick;
+  const id = parseInt(targetId, 10);
+  if (!['group', 'channel'].includes(kind) || !id) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  if (!(await canManageInvite(kind, id, nick))) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  const { data: existing } = await supabase.from('invite_links').select('token')
+    .eq('kind', kind).eq('target_id', id).eq('revoked', false)
+    .is('expires_at', null).is('max_uses', null).limit(1);
+  let token = existing?.[0]?.token;
+  if (!token) {
+    token = makeInviteToken();
+    const { error } = await supabase.from('invite_links')
+      .insert({ token, kind, target_id: id, created_by: nick, created_at: Date.now() });
+    if (error) return res.json({ ok: false, error: 'Не вдалося створити посилання', code: 'err_invite_create' });
+  }
+  // Готову адресу будує СЕРВЕР: домен ще може змінитись, і застосунок не має
+  // його знати — інакше зміна вимагала б нової збірки в усіх (урок переїзду
+  // Supabase, коли клієнт сам конструював адресу сховища).
+  res.json({ ok: true, token, url: INVITE_URL_BASE + token });
+});
+
+// Скинути посилання: старе перестає працювати, одразу віддаємо нове — як
+// «Reset link» у WhatsApp. Дві дії окремо змусили б клієнта робити два запити
+// й лишали б вікно, у якому в групи посилання немає взагалі.
+app.post('/invite/revoke', async (req, res) => {
+  const { kind, targetId } = req.body; const nick = req.nick;
+  const id = parseInt(targetId, 10);
+  if (!['group', 'channel'].includes(kind) || !id) return res.json({ ok: false, error: 'Невірні параметри', code: 'err_invalid_params' });
+  if (!(await canManageInvite(kind, id, nick))) return res.json({ ok: false, error: 'Недостатньо прав', code: 'err_not_enough_rights' });
+  await supabase.from('invite_links').update({ revoked: true })
+    .eq('kind', kind).eq('target_id', id).eq('revoked', false);
+  const token = makeInviteToken();
+  const { error } = await supabase.from('invite_links')
+    .insert({ token, kind, target_id: id, created_by: nick, created_at: Date.now() });
+  if (error) return res.json({ ok: false, error: 'Не вдалося створити посилання', code: 'err_invite_create' });
+  res.json({ ok: true, token, url: INVITE_URL_BASE + token });
+});
+
+// Куди веде посилання — показуємо ДО вступу, щоб людина бачила, у що її
+// кличуть. Ніків учасників тут немає: сам факт володіння токеном не має
+// відкривати список людей.
+app.post('/invite/preview', async (req, res) => {
+  const chk = await loadInvite(req.body?.token);
+  if (!chk.ok) return res.json(chk);
+  const { link } = chk;
+  if (link.kind === 'group') {
+    const { data: g } = await supabase.from('groups').select('*').eq('id', link.target_id).single();
+    if (!g) return res.json({ ok: false, error: 'Групу не знайдено', code: 'err_group_not_found' });
+    const { count } = await supabase.from('group_members').select('*', { count: 'exact', head: true }).eq('group_id', g.id);
+    const { data: me } = await supabase.from('group_members').select('nick').eq('group_id', g.id).eq('nick', req.nick).single();
+    return res.json({ ok: true, kind: 'group', id: g.id, name: g.name, avatar_url: g.avatar_url || null,
+      type: g.type, memberCount: count || 0, joined: !!me, needsApproval: g.type === 'approval' });
+  }
+  const { data: c } = await supabase.from('channels').select('*').eq('id', link.target_id).single();
+  if (!c) return res.json({ ok: false, error: 'Канал не знайдено', code: 'err_channel_not_found' });
+  const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', c.id);
+  const { data: me } = await supabase.from('channel_members').select('nick').eq('channel_id', c.id).eq('nick', req.nick).single();
+  return res.json({ ok: true, kind: 'channel', id: c.id, name: c.name, avatar_url: c.avatar_url || null,
+    description: c.description || null, subscriberCount: count || 0, joined: !!me,
+    isPaid: c.is_paid === true, price: c.price || 0, subDays: c.sub_days || 30 });
+});
+
+// Вступ за посиланням.
+app.post('/invite/accept', async (req, res) => {
+  const nick = req.nick;
+  const chk = await loadInvite(req.body?.token);
+  if (!chk.ok) return res.json(chk);
+  const { link } = chk;
+
+  if (link.kind === 'group') {
+    const { data: group } = await supabase.from('groups').select('*').eq('id', link.target_id).single();
+    if (!group) return res.json({ ok: false, error: 'Групу не знайдено', code: 'err_group_not_found' });
+    const { data: existing } = await supabase.from('group_members').select('nick').eq('group_id', group.id).eq('nick', nick).single();
+    // Уже учасник — не помилка: людина просто відкриє групу.
+    if (existing) return res.json({ ok: true, kind: 'group', id: group.id, already: true });
+    // Лічильник рухаємо ПІСЛЯ перевірок і ДО вступу: інакше «посилання на одну
+    // людину» витрачалося б на тих, хто й так у групі.
+    const { data: used } = await supabase.rpc('use_invite', { p_token: link.token });
+    const u = Array.isArray(used) ? used[0] : used;
+    if (!u || u.ok !== true) return res.json({ ok: false, error: 'Посилання недійсне', code: 'err_invite_not_found' });
+    // Закрита група — посилання і Є запрошенням, тож впускаємо; група «за
+    // схваленням» лишається за схваленням, інакше посилання обходило б її
+    // власне правило.
+    if (group.type === 'approval') {
+      await supabase.from('group_join_requests').upsert({ group_id: group.id, nick, status: 'pending' });
+      const { data: mods } = await supabase.from('group_members').select('nick').eq('group_id', group.id).in('role', ['creator', 'moderator']);
+      for (const mod of mods || []) sendToUser(mod.nick, { type: 'group_join_request', groupId: group.id, groupName: group.name, nick });
+      return res.json({ ok: true, kind: 'group', id: group.id, pending: true });
+    }
+    await addMemberToGroup(group, nick);
+    return res.json({ ok: true, kind: 'group', id: group.id, joined: true });
+  }
+
+  const { data: channel } = await supabase.from('channels').select('*').eq('id', link.target_id).single();
+  if (!channel) return res.json({ ok: false, error: 'Канал не знайдено', code: 'err_channel_not_found' });
+  const { data: blocked } = await supabase.from('channel_blocked').select('id').eq('channel_id', channel.id).eq('nick', nick).single();
+  if (blocked) return res.json({ ok: false, error: 'Ви заблоковані в цьому каналі', code: 'err_blocked_in_channel' });
+  const { data: existing } = await supabase.from('channel_members').select('nick').eq('channel_id', channel.id).eq('nick', nick).single();
+  if (existing) return res.json({ ok: true, kind: 'channel', id: channel.id, already: true });
+  // Платний канал посилання не відкриває — воно лише приводить до оплати.
+  // Інакше запрошення роздавало б доступ, за який інші заплатили.
+  if (channel.is_paid === true) {
+    return res.json({ ok: true, kind: 'channel', id: channel.id, needPayment: true, price: channel.price || 0, subDays: channel.sub_days || 30 });
+  }
+  const { data: used } = await supabase.rpc('use_invite', { p_token: link.token });
+  const u = Array.isArray(used) ? used[0] : used;
+  if (!u || u.ok !== true) return res.json({ ok: false, error: 'Посилання недійсне', code: 'err_invite_not_found' });
+  const { error: subErr } = await supabase.from('channel_members').insert({ channel_id: channel.id, nick, role: 'subscriber' });
+  if (subErr) return res.json({ ok: false, error: 'Не вдалося підписатися', code: 'err_subscribe_failed' });
+  await logChannelEvents(channel.id, 'join', 'invite');
+  const { count } = await supabase.from('channel_members').select('*', { count: 'exact', head: true }).eq('channel_id', channel.id);
+  res.json({ ok: true, kind: 'channel', id: channel.id, joined: true,
+    channel: { ...channel, myRole: 'subscriber', subscriberCount: count || 0 } });
+});
 
 
 app.post('/channel/contact-owner', async (req, res) => {
