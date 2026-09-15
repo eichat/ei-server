@@ -871,6 +871,7 @@
   "upload_sending": "Sending…",
   "video_broken_source": "This video was read incompletely — send it via \"Files\"",
   "video_open_again": "Open again",
+  "video_open_system_player": "Open in system player",
   "video_open_failed": "Couldn't open the video",
   "video_opened_externally": "Video opened in your system player",
   "voice_message": "Voice message",

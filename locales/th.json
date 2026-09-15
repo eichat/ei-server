@@ -871,6 +871,7 @@
   "upload_sending": "กำลังส่ง…",
   "video_broken_source": "อ่านวิดีโอนี้ได้ไม่ครบ — กรุณาส่งผ่าน «ไฟล์»",
   "video_open_again": "เปิดอีกครั้ง",
+  "video_open_system_player": "เปิดในเครื่องเล่นของระบบ",
   "video_open_failed": "ไม่สามารถเปิดวิดีโอได้",
   "video_opened_externally": "เปิดวิดีโอในโปรแกรมเล่นของระบบแล้ว",
   "voice_message": "ข้อความเสียง",

@@ -871,6 +871,7 @@
   "upload_sending": "جارٍ الإرسال…",
   "video_broken_source": "تمت قراءة هذا الفيديو بشكل غير مكتمل — أرسله عبر «الملفات»",
   "video_open_again": "افتح مرة أخرى",
+  "video_open_system_player": "فتح في مشغل النظام",
   "video_open_failed": "تعذّر فتح الفيديو",
   "video_opened_externally": "تم فتح الفيديو في مشغّل النظام",
   "voice_message": "رسالة صوتية",

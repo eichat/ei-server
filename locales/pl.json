@@ -871,6 +871,7 @@
   "upload_sending": "Wysyłanie…",
   "video_broken_source": "To wideo zostało odczytane niekompletnie — wyślij je przez „Pliki”",
   "video_open_again": "Otwórz ponownie",
+  "video_open_system_player": "Otwórz w odtwarzaczu systemowym",
   "video_open_failed": "Nie udało się otworzyć wideo",
   "video_opened_externally": "Wideo otwarte w odtwarzaczu systemowym",
   "voice_message": "Wiadomość głosowa",

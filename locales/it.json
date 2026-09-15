@@ -871,6 +871,7 @@
   "upload_sending": "Invio…",
   "video_broken_source": "Questo video è stato letto in modo incompleto: invialo tramite «File»",
   "video_open_again": "Apri di nuovo",
+  "video_open_system_player": "Apri nel lettore di sistema",
   "video_open_failed": "Impossibile aprire il video",
   "video_opened_externally": "Video aperto nel lettore di sistema",
   "voice_message": "Messaggio vocale",

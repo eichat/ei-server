@@ -871,6 +871,7 @@
   "upload_sending": "Verzenden…",
   "video_broken_source": "Deze video is onvolledig gelezen — verstuur hem via «Bestanden»",
   "video_open_again": "Opnieuw openen",
+  "video_open_system_player": "Openen in systeemspeler",
   "video_open_failed": "Kan de video niet openen",
   "video_opened_externally": "Video geopend in je systeemspeler",
   "voice_message": "Spraakbericht",

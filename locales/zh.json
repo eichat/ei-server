@@ -871,6 +871,7 @@
   "upload_sending": "正在发送…",
   "video_broken_source": "此视频未完整读取，请通过“文件”发送",
   "video_open_again": "再次打开",
+  "video_open_system_player": "在系统播放器中打开",
   "video_open_failed": "无法打开视频",
   "video_opened_externally": "已在系统播放器中打开视频",
   "voice_message": "语音消息",

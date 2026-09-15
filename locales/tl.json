@@ -871,6 +871,7 @@
   "upload_sending": "Ipinapadala…",
   "video_broken_source": "Hindi kumpletong nabasa ang video na ito — ipadala ito sa pamamagitan ng «Mga File»",
   "video_open_again": "Buksan ulit",
+  "video_open_system_player": "Buksan sa system player",
   "video_open_failed": "Hindi mabuksan ang video",
   "video_opened_externally": "Binuksan ang video sa system player",
   "voice_message": "Voice message",

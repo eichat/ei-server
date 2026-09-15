@@ -871,6 +871,7 @@
   "upload_sending": "Wird gesendet…",
   "video_broken_source": "Dieses Video wurde unvollständig gelesen – senden Sie es über „Dateien“",
   "video_open_again": "Erneut öffnen",
+  "video_open_system_player": "Im Systemplayer öffnen",
   "video_open_failed": "Video konnte nicht geöffnet werden",
   "video_opened_externally": "Video im Systemplayer geöffnet",
   "voice_message": "Sprachnachricht",

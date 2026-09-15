@@ -871,6 +871,7 @@
   "upload_sending": "Mengirim…",
   "video_broken_source": "Video ini terbaca tidak lengkap — kirim melalui «File»",
   "video_open_again": "Buka lagi",
+  "video_open_system_player": "Buka di pemutar sistem",
   "video_open_failed": "Tidak dapat membuka video",
   "video_opened_externally": "Video dibuka di pemutar sistem",
   "voice_message": "Pesan suara",

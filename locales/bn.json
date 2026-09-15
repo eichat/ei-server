@@ -871,6 +871,7 @@
   "upload_sending": "পাঠানো হচ্ছে…",
   "video_broken_source": "এই ভিডিওটি সম্পূর্ণ পড়া যায়নি — «ফাইল» দিয়ে পাঠান",
   "video_open_again": "আবার খুলুন",
+  "video_open_system_player": "সিস্টেম প্লেয়ারে খুলুন",
   "video_open_failed": "ভিডিও খোলা যায়নি",
   "video_opened_externally": "সিস্টেম প্লেয়ারে ভিডিও খোলা হয়েছে",
   "voice_message": "ভয়েস বার্তা",

@@ -871,6 +871,7 @@
   "upload_sending": "Gönderiliyor…",
   "video_broken_source": "Bu video eksik okundu — «Dosyalar» üzerinden gönderin",
   "video_open_again": "Tekrar aç",
+  "video_open_system_player": "Sistem oynatıcısında aç",
   "video_open_failed": "Video açılamadı",
   "video_opened_externally": "Video sistem oynatıcısında açıldı",
   "voice_message": "Sesli mesaj",

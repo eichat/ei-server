@@ -871,6 +871,7 @@
   "upload_sending": "भेजा जा रहा है…",
   "video_broken_source": "यह वीडियो पूरी तरह नहीं पढ़ा गया — इसे «फ़ाइलें» से भेजें",
   "video_open_again": "फिर से खोलें",
+  "video_open_system_player": "सिस्टम प्लेयर में खोलें",
   "video_open_failed": "वीडियो नहीं खुल सका",
   "video_opened_externally": "वीडियो सिस्टम प्लेयर में खोला गया",
   "voice_message": "वॉइस संदेश",

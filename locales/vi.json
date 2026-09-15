@@ -871,6 +871,7 @@
   "upload_sending": "Đang gửi…",
   "video_broken_source": "Video này đọc không đầy đủ — hãy gửi qua «Tệp»",
   "video_open_again": "Mở lại",
+  "video_open_system_player": "Mở bằng trình phát hệ thống",
   "video_open_failed": "Không thể mở video",
   "video_opened_externally": "Video đã mở trong trình phát hệ thống",
   "voice_message": "Tin nhắn thoại",

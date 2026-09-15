@@ -871,6 +871,7 @@
   "upload_sending": "Надсилання…",
   "video_broken_source": "Це відео прочиталось не повністю — надішліть його через «Файли»",
   "video_open_again": "Відкрити ще раз",
+  "video_open_system_player": "Відкрити в системному плеєрі",
   "video_open_failed": "Не вдалося відкрити відео",
   "video_opened_externally": "Відео відкрито в системному плеєрі",
   "voice_message": "Голосове повідомлення",
