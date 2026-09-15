@@ -955,5 +955,16 @@
   "err_invite_expired": "O link de convite expirou",
   "err_invite_used_up": "O link de convite atingiu o limite",
   "err_invite_create": "Não foi possível criar o link de convite",
-  "err_subscribe_failed": "Não foi possível inscrever-se"
+  "err_subscribe_failed": "Não foi possível inscrever-se",
+  "btn_share": "Compartilhar",
+  "btn_open": "Abrir",
+  "btn_reset": "Redefinir",
+  "invite_title": "Convite",
+  "invite_paid_note": "Canal pago: 🪙 {price} por {days} dias",
+  "invite_needs_approval": "A entrada requer aprovação",
+  "invite_link_title": "Link de convite",
+  "invite_link_hint": "Qualquer pessoa com este link pode entrar.",
+  "invite_link_copied": "Link copiado",
+  "invite_link_reset": "Redefinir link",
+  "invite_link_reset_warn": "O link antigo deixará de funcionar. Quem já entrou permanece."
 }

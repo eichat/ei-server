@@ -955,5 +955,16 @@
   "err_invite_expired": "邀请链接已过期",
   "err_invite_used_up": "邀请链接已达使用上限",
   "err_invite_create": "无法创建邀请链接",
-  "err_subscribe_failed": "无法订阅"
+  "err_subscribe_failed": "无法订阅",
+  "btn_share": "分享",
+  "btn_open": "打开",
+  "btn_reset": "重置",
+  "invite_title": "邀请",
+  "invite_paid_note": "付费频道：🪙 {price}／{days} 天",
+  "invite_needs_approval": "加入需要管理员批准",
+  "invite_link_title": "邀请链接",
+  "invite_link_hint": "任何拥有此链接的人都可以加入。",
+  "invite_link_copied": "已复制链接",
+  "invite_link_reset": "重置链接",
+  "invite_link_reset_warn": "旧链接将失效。已加入的人会保留。"
 }

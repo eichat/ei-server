@@ -955,5 +955,16 @@
   "err_invite_expired": "Invite link has expired",
   "err_invite_used_up": "Invite link has reached its limit",
   "err_invite_create": "Could not create invite link",
-  "err_subscribe_failed": "Could not subscribe"
+  "err_subscribe_failed": "Could not subscribe",
+  "btn_share": "Share",
+  "btn_open": "Open",
+  "btn_reset": "Reset",
+  "invite_title": "Invitation",
+  "invite_paid_note": "Paid channel: 🪙 {price} for {days} days",
+  "invite_needs_approval": "Joining requires approval",
+  "invite_link_title": "Invite link",
+  "invite_link_hint": "Anyone with this link can join.",
+  "invite_link_copied": "Link copied",
+  "invite_link_reset": "Reset link",
+  "invite_link_reset_warn": "The old link will stop working. Those who already joined stay."
 }

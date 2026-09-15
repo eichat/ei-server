@@ -955,5 +955,16 @@
   "err_invite_expired": "Tautan undangan telah kedaluwarsa",
   "err_invite_used_up": "Tautan undangan telah mencapai batasnya",
   "err_invite_create": "Tidak dapat membuat tautan undangan",
-  "err_subscribe_failed": "Tidak dapat berlangganan"
+  "err_subscribe_failed": "Tidak dapat berlangganan",
+  "btn_share": "Bagikan",
+  "btn_open": "Buka",
+  "btn_reset": "Atur ulang",
+  "invite_title": "Undangan",
+  "invite_paid_note": "Saluran berbayar: 🪙 {price} untuk {days} hari",
+  "invite_needs_approval": "Bergabung memerlukan persetujuan",
+  "invite_link_title": "Tautan undangan",
+  "invite_link_hint": "Siapa pun yang memiliki tautan ini dapat bergabung.",
+  "invite_link_copied": "Tautan disalin",
+  "invite_link_reset": "Atur ulang tautan",
+  "invite_link_reset_warn": "Tautan lama akan berhenti berfungsi. Yang sudah bergabung tetap ada."
 }

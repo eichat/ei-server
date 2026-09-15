@@ -1420,16 +1420,16 @@ declare
 begin
   select * into r from public.invite_links where token = p_token for update;
   if not found then
-    return query select false, 'not_found', null::text, null::bigint; return;
+    return query select false, 'not_found'::text, null::text, null::bigint; return;
   end if;
   if r.revoked then
-    return query select false, 'revoked', r.kind, r.target_id; return;
+    return query select false, 'revoked'::text, r.kind, r.target_id; return;
   end if;
   if r.expires_at is not null and r.expires_at < now_ms then
-    return query select false, 'expired', r.kind, r.target_id; return;
+    return query select false, 'expired'::text, r.kind, r.target_id; return;
   end if;
   if r.max_uses is not null and r.uses >= r.max_uses then
-    return query select false, 'used_up', r.kind, r.target_id; return;
+    return query select false, 'used_up'::text, r.kind, r.target_id; return;
   end if;
   update public.invite_links set uses = uses + 1 where token = p_token;
   return query select true, null::text, r.kind, r.target_id;

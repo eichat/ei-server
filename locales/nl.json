@@ -955,5 +955,16 @@
   "err_invite_expired": "Uitnodigingslink is verlopen",
   "err_invite_used_up": "Uitnodigingslink heeft de limiet bereikt",
   "err_invite_create": "Kan uitnodigingslink niet maken",
-  "err_subscribe_failed": "Abonneren mislukt"
+  "err_subscribe_failed": "Abonneren mislukt",
+  "btn_share": "Delen",
+  "btn_open": "Openen",
+  "btn_reset": "Opnieuw instellen",
+  "invite_title": "Uitnodiging",
+  "invite_paid_note": "Betaald kanaal: 🪙 {price} voor {days} dagen",
+  "invite_needs_approval": "Deelnemen vereist goedkeuring",
+  "invite_link_title": "Uitnodigingslink",
+  "invite_link_hint": "Iedereen met deze link kan deelnemen.",
+  "invite_link_copied": "Link gekopieerd",
+  "invite_link_reset": "Link opnieuw instellen",
+  "invite_link_reset_warn": "De oude link werkt niet meer. Wie al is toegetreden, blijft."
 }

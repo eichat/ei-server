@@ -955,5 +955,16 @@
   "err_invite_expired": "El enlace de invitación ha caducado",
   "err_invite_used_up": "El enlace de invitación alcanzó su límite",
   "err_invite_create": "No se pudo crear el enlace de invitación",
-  "err_subscribe_failed": "No se pudo suscribir"
+  "err_subscribe_failed": "No se pudo suscribir",
+  "btn_share": "Compartir",
+  "btn_open": "Abrir",
+  "btn_reset": "Restablecer",
+  "invite_title": "Invitación",
+  "invite_paid_note": "Canal de pago: 🪙 {price} por {days} días",
+  "invite_needs_approval": "Unirse requiere aprobación",
+  "invite_link_title": "Enlace de invitación",
+  "invite_link_hint": "Cualquiera con este enlace puede unirse.",
+  "invite_link_copied": "Enlace copiado",
+  "invite_link_reset": "Restablecer enlace",
+  "invite_link_reset_warn": "El enlace anterior dejará de funcionar. Quienes ya se unieron permanecen."
 }

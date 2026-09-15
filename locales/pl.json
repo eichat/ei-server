@@ -955,5 +955,16 @@
   "err_invite_expired": "Link zaproszenia wygasł",
   "err_invite_used_up": "Link zaproszenia osiągnął limit",
   "err_invite_create": "Nie udało się utworzyć linku zaproszenia",
-  "err_subscribe_failed": "Nie udało się zasubskrybować"
+  "err_subscribe_failed": "Nie udało się zasubskrybować",
+  "btn_share": "Udostępnij",
+  "btn_open": "Otwórz",
+  "btn_reset": "Zresetuj",
+  "invite_title": "Zaproszenie",
+  "invite_paid_note": "Kanał płatny: 🪙 {price} na {days} dni",
+  "invite_needs_approval": "Dołączenie wymaga zatwierdzenia",
+  "invite_link_title": "Link zaproszenia",
+  "invite_link_hint": "Każdy, kto ma ten link, może dołączyć.",
+  "invite_link_copied": "Link skopiowany",
+  "invite_link_reset": "Zresetuj link",
+  "invite_link_reset_warn": "Stary link przestanie działać. Osoby, które już dołączyły, pozostaną."
 }

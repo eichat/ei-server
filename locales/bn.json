@@ -955,5 +955,16 @@
   "err_invite_expired": "আমন্ত্রণ লিঙ্কের মেয়াদ শেষ হয়ে গেছে",
   "err_invite_used_up": "আমন্ত্রণ লিঙ্কের সীমা শেষ",
   "err_invite_create": "আমন্ত্রণ লিঙ্ক তৈরি করা যায়নি",
-  "err_subscribe_failed": "সাবস্ক্রাইব করা যায়নি"
+  "err_subscribe_failed": "সাবস্ক্রাইব করা যায়নি",
+  "btn_share": "শেয়ার করুন",
+  "btn_open": "খুলুন",
+  "btn_reset": "রিসেট",
+  "invite_title": "আমন্ত্রণ",
+  "invite_paid_note": "পেইড চ্যানেল: 🪙 {price} / {days} দিন",
+  "invite_needs_approval": "যোগ দিতে অনুমোদন প্রয়োজন",
+  "invite_link_title": "আমন্ত্রণ লিঙ্ক",
+  "invite_link_hint": "এই লিঙ্ক যার কাছে থাকবে, সে যোগ দিতে পারবে।",
+  "invite_link_copied": "লিঙ্ক কপি হয়েছে",
+  "invite_link_reset": "লিঙ্ক রিসেট করুন",
+  "invite_link_reset_warn": "পুরোনো লিঙ্ক আর কাজ করবে না। যারা ইতিমধ্যে যোগ দিয়েছেন তারা থাকবেন।"
 }

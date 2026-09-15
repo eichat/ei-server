@@ -955,5 +955,16 @@
   "err_invite_expired": "Nag-expire na ang invite link",
   "err_invite_used_up": "Naabot na ang limitasyon ng invite link",
   "err_invite_create": "Hindi makagawa ng invite link",
-  "err_subscribe_failed": "Hindi maka-subscribe"
+  "err_subscribe_failed": "Hindi maka-subscribe",
+  "btn_share": "Ibahagi",
+  "btn_open": "Buksan",
+  "btn_reset": "I-reset",
+  "invite_title": "Imbitasyon",
+  "invite_paid_note": "Bayad na channel: 🪙 {price} para sa {days} araw",
+  "invite_needs_approval": "Kailangan ng pag-apruba para sumali",
+  "invite_link_title": "Invite link",
+  "invite_link_hint": "Kahit sino na may ganitong link ay makakasali.",
+  "invite_link_copied": "Nakopya ang link",
+  "invite_link_reset": "I-reset ang link",
+  "invite_link_reset_warn": "Hindi na gagana ang lumang link. Mananatili ang mga sumali na."
 }

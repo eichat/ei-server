@@ -955,5 +955,16 @@
   "err_invite_expired": "Einladungslink ist abgelaufen",
   "err_invite_used_up": "Einladungslink ist aufgebraucht",
   "err_invite_create": "Einladungslink konnte nicht erstellt werden",
-  "err_subscribe_failed": "Abonnieren fehlgeschlagen"
+  "err_subscribe_failed": "Abonnieren fehlgeschlagen",
+  "btn_share": "Teilen",
+  "btn_open": "Öffnen",
+  "btn_reset": "Zurücksetzen",
+  "invite_title": "Einladung",
+  "invite_paid_note": "Bezahlkanal: 🪙 {price} für {days} Tage",
+  "invite_needs_approval": "Beitritt muss bestätigt werden",
+  "invite_link_title": "Einladungslink",
+  "invite_link_hint": "Jeder mit diesem Link kann beitreten.",
+  "invite_link_copied": "Link kopiert",
+  "invite_link_reset": "Link zurücksetzen",
+  "invite_link_reset_warn": "Der alte Link funktioniert nicht mehr. Wer bereits beigetreten ist, bleibt."
 }

@@ -955,5 +955,16 @@
   "err_invite_expired": "Le lien d'invitation a expiré",
   "err_invite_used_up": "Le lien d'invitation a atteint sa limite",
   "err_invite_create": "Impossible de créer le lien d'invitation",
-  "err_subscribe_failed": "Impossible de s'abonner"
+  "err_subscribe_failed": "Impossible de s'abonner",
+  "btn_share": "Partager",
+  "btn_open": "Ouvrir",
+  "btn_reset": "Réinitialiser",
+  "invite_title": "Invitation",
+  "invite_paid_note": "Canal payant : 🪙 {price} pour {days} jours",
+  "invite_needs_approval": "L'adhésion nécessite une approbation",
+  "invite_link_title": "Lien d'invitation",
+  "invite_link_hint": "Toute personne disposant de ce lien peut rejoindre.",
+  "invite_link_copied": "Lien copié",
+  "invite_link_reset": "Réinitialiser le lien",
+  "invite_link_reset_warn": "L'ancien lien cessera de fonctionner. Ceux qui ont déjà rejoint restent."
 }

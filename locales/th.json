@@ -955,5 +955,16 @@
   "err_invite_expired": "ลิงก์คำเชิญหมดอายุแล้ว",
   "err_invite_used_up": "ลิงก์คำเชิญถึงขีดจำกัดแล้ว",
   "err_invite_create": "ไม่สามารถสร้างลิงก์คำเชิญได้",
-  "err_subscribe_failed": "ไม่สามารถติดตามได้"
+  "err_subscribe_failed": "ไม่สามารถติดตามได้",
+  "btn_share": "แชร์",
+  "btn_open": "เปิด",
+  "btn_reset": "รีเซ็ต",
+  "invite_title": "คำเชิญ",
+  "invite_paid_note": "ช่องแบบเสียเงิน: 🪙 {price} ต่อ {days} วัน",
+  "invite_needs_approval": "การเข้าร่วมต้องได้รับอนุมัติ",
+  "invite_link_title": "ลิงก์คำเชิญ",
+  "invite_link_hint": "ใครก็ตามที่มีลิงก์นี้สามารถเข้าร่วมได้",
+  "invite_link_copied": "คัดลอกลิงก์แล้ว",
+  "invite_link_reset": "รีเซ็ตลิงก์",
+  "invite_link_reset_warn": "ลิงก์เดิมจะใช้ไม่ได้อีก ผู้ที่เข้าร่วมแล้วจะยังอยู่"
 }

@@ -955,5 +955,16 @@
   "err_invite_expired": "आमंत्रण लिंक की अवधि समाप्त हो गई है",
   "err_invite_used_up": "आमंत्रण लिंक की सीमा समाप्त हो गई है",
   "err_invite_create": "आमंत्रण लिंक नहीं बनाया जा सका",
-  "err_subscribe_failed": "सदस्यता नहीं ली जा सकी"
+  "err_subscribe_failed": "सदस्यता नहीं ली जा सकी",
+  "btn_share": "साझा करें",
+  "btn_open": "खोलें",
+  "btn_reset": "रीसेट करें",
+  "invite_title": "आमंत्रण",
+  "invite_paid_note": "सशुल्क चैनल: 🪙 {price} / {days} दिन",
+  "invite_needs_approval": "शामिल होने के लिए अनुमोदन आवश्यक है",
+  "invite_link_title": "आमंत्रण लिंक",
+  "invite_link_hint": "इस लिंक वाला कोई भी व्यक्ति शामिल हो सकता है।",
+  "invite_link_copied": "लिंक कॉपी किया गया",
+  "invite_link_reset": "लिंक रीसेट करें",
+  "invite_link_reset_warn": "पुराना लिंक काम करना बंद कर देगा। जो पहले शामिल हो चुके हैं वे बने रहेंगे।"
 }

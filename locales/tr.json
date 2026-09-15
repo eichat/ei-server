@@ -955,5 +955,16 @@
   "err_invite_expired": "Davet bağlantısının süresi doldu",
   "err_invite_used_up": "Davet bağlantısı sınırına ulaştı",
   "err_invite_create": "Davet bağlantısı oluşturulamadı",
-  "err_subscribe_failed": "Abone olunamadı"
+  "err_subscribe_failed": "Abone olunamadı",
+  "btn_share": "Paylaş",
+  "btn_open": "Aç",
+  "btn_reset": "Sıfırla",
+  "invite_title": "Davet",
+  "invite_paid_note": "Ücretli kanal: 🪙 {price} / {days} gün",
+  "invite_needs_approval": "Katılım onay gerektirir",
+  "invite_link_title": "Davet bağlantısı",
+  "invite_link_hint": "Bu bağlantıya sahip herkes katılabilir.",
+  "invite_link_copied": "Bağlantı kopyalandı",
+  "invite_link_reset": "Bağlantıyı sıfırla",
+  "invite_link_reset_warn": "Eski bağlantı çalışmayı durduracak. Zaten katılanlar kalır."
 }

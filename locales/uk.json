@@ -955,5 +955,16 @@
   "err_invite_expired": "Термін дії посилання минув",
   "err_invite_used_up": "Посилання вичерпано",
   "err_invite_create": "Не вдалося створити посилання",
-  "err_subscribe_failed": "Не вдалося підписатися"
+  "err_subscribe_failed": "Не вдалося підписатися",
+  "btn_share": "Поділитися",
+  "btn_open": "Відкрити",
+  "btn_reset": "Скинути",
+  "invite_title": "Запрошення",
+  "invite_paid_note": "Платний канал: 🪙 {price} за {days} днів",
+  "invite_needs_approval": "Вступ потребує схвалення",
+  "invite_link_title": "Посилання-запрошення",
+  "invite_link_hint": "Будь-хто з цим посиланням зможе приєднатися.",
+  "invite_link_copied": "Посилання скопійовано",
+  "invite_link_reset": "Скинути посилання",
+  "invite_link_reset_warn": "Старе посилання перестане працювати. Ті, хто вже приєднався, залишаться."
 }

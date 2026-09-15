@@ -955,5 +955,16 @@
   "err_invite_expired": "انتهت صلاحية رابط الدعوة",
   "err_invite_used_up": "تم استخدام رابط الدعوة بالكامل",
   "err_invite_create": "تعذّر إنشاء رابط الدعوة",
-  "err_subscribe_failed": "تعذّر الاشتراك"
+  "err_subscribe_failed": "تعذّر الاشتراك",
+  "btn_share": "مشاركة",
+  "btn_open": "فتح",
+  "btn_reset": "إعادة تعيين",
+  "invite_title": "دعوة",
+  "invite_paid_note": "قناة مدفوعة: 🪙 {price} لمدة {days} يومًا",
+  "invite_needs_approval": "الانضمام يحتاج موافقة المشرف",
+  "invite_link_title": "رابط الدعوة",
+  "invite_link_hint": "يمكن لأي شخص لديه هذا الرابط الانضمام.",
+  "invite_link_copied": "تم نسخ الرابط",
+  "invite_link_reset": "إعادة تعيين الرابط",
+  "invite_link_reset_warn": "سيتوقف الرابط القديم عن العمل. من انضم بالفعل سيبقى."
 }

@@ -955,5 +955,16 @@
   "err_invite_expired": "Срок действия ссылки истёк",
   "err_invite_used_up": "Лимит ссылки-приглашения исчерпан",
   "err_invite_create": "Не удалось создать ссылку",
-  "err_subscribe_failed": "Не удалось подписаться"
+  "err_subscribe_failed": "Не удалось подписаться",
+  "btn_share": "Поделиться",
+  "btn_open": "Открыть",
+  "btn_reset": "Сбросить",
+  "invite_title": "Приглашение",
+  "invite_paid_note": "Платный канал: 🪙 {price} за {days} дней",
+  "invite_needs_approval": "Вступление требует одобрения",
+  "invite_link_title": "Ссылка-приглашение",
+  "invite_link_hint": "Любой, у кого есть эта ссылка, сможет присоединиться.",
+  "invite_link_copied": "Ссылка скопирована",
+  "invite_link_reset": "Сбросить ссылку",
+  "invite_link_reset_warn": "Старая ссылка перестанет работать. Те, кто уже присоединился, останутся."
 }

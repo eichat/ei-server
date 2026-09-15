@@ -955,5 +955,16 @@
   "err_invite_expired": "Liên kết mời đã hết hạn",
   "err_invite_used_up": "Liên kết mời đã đạt giới hạn",
   "err_invite_create": "Không thể tạo liên kết mời",
-  "err_subscribe_failed": "Không thể đăng ký"
+  "err_subscribe_failed": "Không thể đăng ký",
+  "btn_share": "Chia sẻ",
+  "btn_open": "Mở",
+  "btn_reset": "Đặt lại",
+  "invite_title": "Lời mời",
+  "invite_paid_note": "Kênh trả phí: 🪙 {price} trong {days} ngày",
+  "invite_needs_approval": "Việc tham gia cần được phê duyệt",
+  "invite_link_title": "Liên kết mời",
+  "invite_link_hint": "Bất kỳ ai có liên kết này đều có thể tham gia.",
+  "invite_link_copied": "Đã sao chép liên kết",
+  "invite_link_reset": "Đặt lại liên kết",
+  "invite_link_reset_warn": "Liên kết cũ sẽ ngừng hoạt động. Những người đã tham gia vẫn ở lại."
 }

@@ -955,5 +955,16 @@
   "err_invite_expired": "Il link di invito è scaduto",
   "err_invite_used_up": "Il link di invito ha raggiunto il limite",
   "err_invite_create": "Impossibile creare il link di invito",
-  "err_subscribe_failed": "Impossibile iscriversi"
+  "err_subscribe_failed": "Impossibile iscriversi",
+  "btn_share": "Condividi",
+  "btn_open": "Apri",
+  "btn_reset": "Reimposta",
+  "invite_title": "Invito",
+  "invite_paid_note": "Canale a pagamento: 🪙 {price} per {days} giorni",
+  "invite_needs_approval": "L'ingresso richiede approvazione",
+  "invite_link_title": "Link di invito",
+  "invite_link_hint": "Chiunque abbia questo link può entrare.",
+  "invite_link_copied": "Link copiato",
+  "invite_link_reset": "Reimposta link",
+  "invite_link_reset_warn": "Il vecchio link smetterà di funzionare. Chi è già entrato resta."
 }

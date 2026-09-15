@@ -955,5 +955,16 @@
   "err_invite_expired": "招待リンクの有効期限が切れています",
   "err_invite_used_up": "招待リンクの利用上限に達しました",
   "err_invite_create": "招待リンクを作成できませんでした",
-  "err_subscribe_failed": "登録できませんでした"
+  "err_subscribe_failed": "登録できませんでした",
+  "btn_share": "共有",
+  "btn_open": "開く",
+  "btn_reset": "リセット",
+  "invite_title": "招待",
+  "invite_paid_note": "有料チャンネル: 🪙 {price}（{days}日間）",
+  "invite_needs_approval": "参加には承認が必要です",
+  "invite_link_title": "招待リンク",
+  "invite_link_hint": "このリンクを持つ人は誰でも参加できます。",
+  "invite_link_copied": "リンクをコピーしました",
+  "invite_link_reset": "リンクをリセット",
+  "invite_link_reset_warn": "古いリンクは使えなくなります。すでに参加した人はそのままです。"
 }
